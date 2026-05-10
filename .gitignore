@@ -42,4 +42,6 @@ Thumbs.db
 logs/
 
 # Optional local overrides
-.local/
+.local/.contexty
+.memsearch
+.hive
