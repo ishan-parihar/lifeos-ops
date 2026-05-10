@@ -1,0 +1,6 @@
+//! Notion API client and types
+
+pub mod client;
+pub mod types;
+
+pub use client::NotionClient;

@@ -1,0 +1,45 @@
+# Source repos (merged into lifeos-core)
+lifeos-rust-mcp/
+lifeos-sync/
+/target/
+debug/
+release/
+deps/
+incremental/
+*.rlib
+*.d
+*.pdb
+
+# Environment files (NEVER commit these)
+.env
+.env.*
+.envrc
+*.env
+
+# Config with secrets (don't commit actual config)
+lifeos.config.json
+*.config.json
+
+# OS files
+.DS_Store
+Thumbs.db
+*~
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-*
+
+# Vault data
+/vault/
+*.md.bak
+*.md.orig
+
+# Logs
+*.log
+logs/
+
+# Optional local overrides
+.local/

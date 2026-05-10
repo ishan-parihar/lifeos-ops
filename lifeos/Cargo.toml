@@ -1,0 +1,20 @@
+[package]
+name = "lifeos"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "LifeOS unified CLI + MCP server"
+
+[[bin]]
+name = "lifeos"
+path = "src/main.rs"
+
+[dependencies]
+lifeos-core = { path = "../lifeos-core" }
+tokio.workspace = true
+clap.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+dotenvy.workspace = true
+anyhow.workspace = true

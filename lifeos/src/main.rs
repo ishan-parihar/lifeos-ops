@@ -1,0 +1,328 @@
+mod mcp;
+
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use clap::Parser;
+
+use lifeos_core::{
+    Cli, Commands, PageCommand, load_config, LifeOSConfig, NotionClient,
+    vault::{read_index, write_index},
+    sync::{self},
+};
+
+#[tokio::main]
+async fn main() {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
+
+    let cli = Cli::parse();
+
+    dotenvy::dotenv().ok();
+
+    let notion_token = match std::env::var("NOTION_API_TOKEN") {
+        Ok(t) => t,
+        Err(_) => {
+            tracing::error!("NOTION_API_TOKEN not set in environment or .env file");
+            std::process::exit(1);
+        }
+    };
+
+    match cli.command {
+        Commands::Init { config: config_path } => {
+            let cfg = resolve_config(config_path.as_deref());
+            let vault_dir = resolve_vault_dir();
+            let notion = NotionClient::new(cfg, notion_token);
+            if let Err(e) = cmd_init(&notion, &vault_dir).await {
+                tracing::error!("Init failed: {e}");
+                std::process::exit(1);
+            }
+        }
+        Commands::Pull {
+            databases,
+            exclude,
+            incremental,
+            config: config_path,
+        } => {
+            let cfg = resolve_config(config_path.as_deref());
+            let vault_dir = resolve_vault_dir();
+            let notion = NotionClient::new(cfg.clone(), notion_token);
+            if let Err(e) = cmd_pull(&notion, &cfg, &vault_dir, databases.as_deref(), exclude.as_deref(), incremental).await {
+                tracing::error!("Pull failed: {e}");
+                std::process::exit(1);
+            }
+        }
+        Commands::Push {
+            databases,
+            config: config_path,
+            dry_run,
+        } => {
+            let cfg = resolve_config(config_path.as_deref());
+            let vault_dir = resolve_vault_dir();
+            let notion = NotionClient::new(cfg.clone(), notion_token);
+            if let Err(e) = cmd_push(&notion, &cfg, &vault_dir, databases.as_deref(), dry_run).await {
+                tracing::error!("Push failed: {e}");
+                std::process::exit(1);
+            }
+        }
+        Commands::Watch {
+            config: config_path,
+            debounce_ms,
+        } => {
+            let cfg = resolve_config(config_path.as_deref());
+            let vault_dir = resolve_vault_dir();
+            let notion = NotionClient::new(cfg.clone(), notion_token);
+            if let Err(e) = cmd_watch(&notion, &cfg, &vault_dir, debounce_ms).await {
+                tracing::error!("Watch failed: {e}");
+                std::process::exit(1);
+            }
+        }
+        Commands::Page { action } => {
+            let cfg = resolve_config(None);
+            let vault_dir = resolve_vault_dir();
+            let notion = NotionClient::new(cfg.clone(), notion_token);
+            match action {
+                PageCommand::New { db_key, title, config: _ } => {
+                    if let Err(e) = sync::cmd_page_new(&notion, &cfg, &vault_dir, &db_key, &title).await {
+                        tracing::error!("Page new failed: {e}");
+                        std::process::exit(1);
+                    }
+                }
+                PageCommand::Edit { page_id, config: _ } => {
+                    if let Err(e) = sync::cmd_page_edit(&notion, &cfg, &vault_dir, &page_id).await {
+                        tracing::error!("Page edit failed: {e}");
+                        std::process::exit(1);
+                    }
+                }
+                PageCommand::Diff { page_id, config: _ } => {
+                    if let Err(e) = sync::cmd_page_diff(&notion, &cfg, &vault_dir, &page_id).await {
+                        tracing::error!("Page diff failed: {e}");
+                        std::process::exit(1);
+                    }
+                }
+                PageCommand::Merge { page_id, config: _ } => {
+                    if let Err(e) = sync::cmd_page_merge(&notion, &cfg, &vault_dir, &page_id).await {
+                        tracing::error!("Page merge failed: {e}");
+                        std::process::exit(1);
+                    }
+                }
+            }
+        }
+        Commands::MCP => {
+            mcp::run_server().await;
+        }
+    }
+}
+
+fn resolve_config(config_path: Option<&str>) -> LifeOSConfig {
+    if let Some(path) = config_path {
+        std::env::set_var("LIFEOs_CONFIG", path);
+    }
+    match load_config() {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::error!("{}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn resolve_vault_dir() -> PathBuf {
+    let dir = std::env::var("LIFEOs_VAULT")
+        .unwrap_or_else(|_| "./vault".to_string());
+    PathBuf::from(dir)
+}
+
+async fn cmd_init(_notion: &NotionClient, vault_dir: &Path) -> Result<(), String> {
+    tracing::info!("Initializing vault at {}", vault_dir.display());
+    std::fs::create_dir_all(vault_dir)
+        .map_err(|e| format!("Create vault dir: {e}"))?;
+
+    let empty_index = HashMap::new();
+    write_index(vault_dir, &empty_index)?;
+
+    tracing::info!(
+        "Vault initialized at {}. Run `lifeos pull` to sync all databases.",
+        vault_dir.display()
+    );
+    Ok(())
+}
+
+async fn cmd_pull(
+    notion: &NotionClient,
+    config: &LifeOSConfig,
+    vault_dir: &Path,
+    db_filter: Option<&str>,
+    exclude: Option<&str>,
+    incremental: bool,
+) -> Result<(), String> {
+    let exclude_set: std::collections::HashSet<String> = exclude
+        .map(|s| s.split(',').map(|k| k.trim().to_string()).collect())
+        .unwrap_or_default();
+
+    let db_keys: Vec<&String> = if let Some(filter) = db_filter {
+        filter
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect::<Vec<_>>()
+            .iter()
+            .filter_map(|k| {
+                if config.databases.contains_key(k) {
+                    Some(config.databases.keys().find(|dk| *dk == k).unwrap())
+                } else {
+                    tracing::warn!("Unknown database key: {k}");
+                    None
+                }
+            })
+            .collect()
+    } else {
+        config.databases.keys().collect()
+    };
+
+    let db_keys: Vec<&String> = db_keys
+        .into_iter()
+        .filter(|k| !exclude_set.contains(k.as_str()))
+        .collect();
+
+    let mut index = read_index(vault_dir)?;
+    let mut last_pull = if incremental {
+        let t = lifeos_core::vault::read_last_pull_times(vault_dir)?;
+        Some(t)
+    } else {
+        None
+    };
+    let mut global_report = sync::pull::PullReport {
+        db_key: "ALL".to_string(),
+        pages_processed: 0,
+        files_created: 0,
+        files_updated: 0,
+        errors: vec![],
+    };
+
+    for db_key in &db_keys {
+        let since = last_pull
+            .as_ref()
+            .and_then(|lp| lp.per_db.get(*db_key).map(|s| s.as_str()));
+        match sync::pull::pull_database_since(
+            notion, config, db_key, vault_dir, &mut index, since,
+        )
+        .await
+        {
+            Ok(report) => {
+                global_report.pages_processed += report.pages_processed;
+                global_report.files_created += report.files_created;
+                global_report.files_updated += report.files_updated;
+                tracing::info!(
+                    "Pulled {}: {} processed, {} created, {} updated",
+                    db_key,
+                    report.pages_processed,
+                    report.files_created,
+                    report.files_updated,
+                );
+            }
+            Err(e) => {
+                tracing::error!("Pull failed for {db_key}: {e}");
+                global_report.errors.push(format!("{db_key}: {e}"));
+            }
+        }
+        if let Some(ref mut lp) = last_pull {
+            lp.per_db
+                .insert(db_key.to_string(), lifeos_core::vault::utc_now_iso());
+        }
+    }
+
+    if let Some(lp) = last_pull {
+        lifeos_core::vault::write_last_pull_times(vault_dir, &lp)?;
+    }
+
+    write_index(vault_dir, &index)?;
+
+    tracing::info!(
+        "Pull complete: {} pages, {} created, {} updated, {} errors",
+        global_report.pages_processed,
+        global_report.files_created,
+        global_report.files_updated,
+        global_report.errors.len(),
+    );
+
+    Ok(())
+}
+
+async fn cmd_push(
+    notion: &NotionClient,
+    config: &LifeOSConfig,
+    vault_dir: &Path,
+    db_filter: Option<&str>,
+    dry_run: bool,
+) -> Result<(), String> {
+    let db_keys: Vec<&String> = if let Some(filter) = db_filter {
+        filter
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect::<Vec<_>>()
+            .iter()
+            .filter_map(|k| {
+                if config.databases.contains_key(k) {
+                    Some(config.databases.keys().find(|dk| *dk == k).unwrap())
+                } else {
+                    tracing::warn!("Unknown database key: {k}");
+                    None
+                }
+            })
+            .collect()
+    } else {
+        config.databases.keys().collect()
+    };
+
+    let index = read_index(vault_dir)?;
+    let mut global_report = sync::push::PushReport {
+        db_key: "ALL".to_string(),
+        pages_created: 0,
+        pages_updated: 0,
+        errors: vec![],
+    };
+
+    for db_key in &db_keys {
+        match sync::push_database(notion, config, db_key, vault_dir, &index, dry_run).await {
+            Ok(report) => {
+                global_report.pages_created += report.pages_created;
+                global_report.pages_updated += report.pages_updated;
+                tracing::info!(
+                    "Pushed {}: {} created, {} updated",
+                    db_key,
+                    report.pages_created,
+                    report.pages_updated,
+                );
+            }
+            Err(e) => {
+                tracing::error!("Push failed for {db_key}: {e}");
+                global_report.errors.push(format!("{db_key}: {e}"));
+            }
+        }
+    }
+
+    tracing::info!(
+        "Push complete: {} created, {} updated, {} errors",
+        global_report.pages_created,
+        global_report.pages_updated,
+        global_report.errors.len(),
+    );
+
+    Ok(())
+}
+
+async fn cmd_watch(
+    notion: &NotionClient,
+    config: &LifeOSConfig,
+    vault_dir: &Path,
+    debounce_ms: u64,
+) -> Result<(), String> {
+    tracing::info!(
+        "Watching vault at {} for changes (debounce: {debounce_ms}ms)...",
+        vault_dir.display()
+    );
+    sync::watch_vault(notion, config, vault_dir, debounce_ms).await
+}
