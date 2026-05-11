@@ -79,3 +79,7 @@ Compatible with Claude Desktop, Cursor, and any MCP-compatible AI client.
 ## License
 
 MIT
+
+---
+
+Developed by [Ishan Parihar](https://github.com/ishan-parihar) — If you find this useful, [consider supporting](https://rzp.io/rzp/ishan-parihar) ☕
