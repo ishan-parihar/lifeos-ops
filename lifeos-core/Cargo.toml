@@ -29,5 +29,4 @@ pulldown-cmark = { version = "0.11", features = ["simd"] }
 regex = "1"
 strsim = "0.11"
 uuid = { version = "1", features = ["v4"] }
-toon = "0.1"
 walkdir = "2"

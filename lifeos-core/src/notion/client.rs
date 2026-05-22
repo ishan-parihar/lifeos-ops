@@ -152,7 +152,7 @@ impl NotionClient {
             .map_err(|e| format!("Connection: {}", e))?;
         let bytes = resp.bytes().await.map_err(|e| format!("Read: {}", e))?;
         let val: Value = serde_json::from_slice(&bytes).map_err(|e| format!("Parse: {}", e))?;
-        if let Some(err) = val.get("code") {
+        if val.get("code").is_some() {
             return Err(format!("Notion {} /v1/databases/{}: {}", 
                 val.get("status").and_then(|s| s.as_u64()).unwrap_or(0),
                 database_id,

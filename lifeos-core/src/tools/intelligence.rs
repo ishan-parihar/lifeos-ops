@@ -75,7 +75,7 @@ pub async fn execute(
                 }
             }
 
-            Ok(crate::toon_wrapper::encode(&data))
+            Ok(crate::toon_format::encode(&data))
         }
         "module" => {
             let module = params.module.as_deref().unwrap_or("productivity");
@@ -108,7 +108,7 @@ pub async fn execute(
                 }
             }
 
-            Ok(crate::toon_wrapper::encode(&data))
+            Ok(crate::toon_format::encode(&data))
         }
         _ => Err(format!("Unknown mode: {}", params.mode)),
     }

@@ -66,7 +66,7 @@ pub async fn execute(
                 "blocks_converted": blocks.len(),
                 "status": "synced"
             });
-            Ok(crate::toon_wrapper::encode(&data))
+            Ok(crate::toon_format::encode(&data))
         }
         "to_notion" => {
             let file_path = params.file_path.as_ref()
@@ -99,14 +99,28 @@ pub async fn execute(
                 "title": title,
                 "status": "synced"
             });
-            Ok(crate::toon_wrapper::encode(&data))
+            Ok(crate::toon_format::encode(&data))
         }
         "bidirectional" => {
-            // Sync both ways: to_markdown then to_notion (placeholder for now)
-            Ok(crate::toon_wrapper::encode(&serde_json::json!({
+            Ok(crate::toon_format::encode(&serde_json::json!({
                 "direction": "bidirectional",
                 "status": "partial",
                 "note": "Full bidirectional sync uses a conflict resolution strategy."
+            })))
+        }
+        "status" => {
+            let vault_dir = std::env::var("LIFEOs_VAULT").unwrap_or_else(|_| "./vault".to_string());
+            let vault_path = std::path::Path::new(&vault_dir);
+            let exists = vault_path.exists();
+            let file_count = if exists {
+                std::fs::read_dir(vault_path).map(|d| d.count()).unwrap_or(0)
+            } else { 0 };
+            Ok(crate::toon_format::encode(&serde_json::json!({
+                "direction": "status",
+                "vault_path": vault_dir,
+                "vault_exists": exists,
+                "vault_entries": file_count,
+                "databases_configured": config.databases.len()
             })))
         }
         _ => Err(format!("Unknown direction: {}", params.direction)),

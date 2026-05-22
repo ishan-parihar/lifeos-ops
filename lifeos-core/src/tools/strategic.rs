@@ -42,7 +42,6 @@ pub async fn execute(
 ) -> Result<String, String> {
     match params.analysis_type.as_str() {
         "overview" => {
-            // Collect summary counts from all databases
             let mut overview = serde_json::json!({
                 "analysis": "strategic_overview",
                 "databases": {}
@@ -50,15 +49,27 @@ pub async fn execute(
 
             for (key, db) in &config.databases {
                 let query = serde_json::json!({ "page_size": 1 });
-                let _ = notion.query_data_source(db.ds_id(), &query).await;
-                overview["databases"][key] = serde_json::json!({
-                    "name": db.name,
-                    "total_estimated": "query page_size=1 indicates data exists",
-                    "agent": db.agent
-                });
+                match notion.query_data_source(db.ds_id(), &query).await {
+                    Ok(result) => {
+                        overview["databases"][key] = serde_json::json!({
+                            "name": db.name,
+                            "accessible": true,
+                            "has_entries": !result.results.is_empty(),
+                            "has_more": result.has_more,
+                            "agent": db.agent
+                        });
+                    }
+                    Err(_) => {
+                        overview["databases"][key] = serde_json::json!({
+                            "name": db.name,
+                            "accessible": false,
+                            "agent": db.agent
+                        });
+                    }
+                }
             }
 
-            Ok(crate::toon_wrapper::encode(&overview))
+            Ok(crate::toon_format::encode(&overview))
         }
         "project_health" => {
             let db_key = params.project_database.as_deref().unwrap_or("projects");
@@ -88,7 +99,7 @@ pub async fn execute(
                 "by_status": by_status,
                 "projects": projects
             });
-            Ok(crate::toon_wrapper::encode(&data))
+            Ok(crate::toon_format::encode(&data))
         }
         "okr_progress" => {
             let db_key = params.okr_database.as_deref().unwrap_or("okrs");
@@ -115,7 +126,7 @@ pub async fn execute(
                 "total_okrs": okrs.len(),
                 "okrs": okrs
             });
-            Ok(crate::toon_wrapper::encode(&data))
+            Ok(crate::toon_format::encode(&data))
         }
         "alignment" => {
             // Check alignment by querying goals/projects/okrs together
@@ -137,7 +148,7 @@ pub async fn execute(
                 }
             }
 
-            Ok(crate::toon_wrapper::encode(&data))
+            Ok(crate::toon_format::encode(&data))
         }
         "campaign_metrics" => {
             let db_key = params.campaign_database.as_deref().unwrap_or("campaigns");
@@ -165,7 +176,7 @@ pub async fn execute(
                 "total_campaigns": campaigns.len(),
                 "campaigns": campaigns
             });
-            Ok(crate::toon_wrapper::encode(&data))
+            Ok(crate::toon_format::encode(&data))
         }
         _ => Err(format!("Unknown analysis type: {}", params.analysis_type)),
     }

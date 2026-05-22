@@ -12,7 +12,7 @@ pub mod vault;
 pub mod sync;
 pub mod tools;
 pub mod util;
-pub mod toon_wrapper;
+pub mod toon_format;
 pub mod server;
 
 pub use cli::{Cli, Commands, PageCommand};

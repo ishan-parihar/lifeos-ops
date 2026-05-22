@@ -131,7 +131,7 @@ pub async fn execute(
     }));
     let toon_data = serde_json::Value::Object(data);
 
-    Ok(crate::toon_wrapper::encode(&toon_data))
+    Ok(crate::toon_format::encode(&toon_data))
 }
 
 fn build_filter(property: &str, filter_type: &str, value: &str) -> serde_json::Value {

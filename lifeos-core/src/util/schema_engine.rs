@@ -4,22 +4,19 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::config::LifeOSConfig;
 use crate::notion::client::NotionClient;
 use crate::notion::types::NotionDataSource;
 
 /// Schema engine with caching
 pub struct SchemaEngine {
     notion: Arc<NotionClient>,
-    config: LifeOSConfig,
     schema_cache: Arc<Mutex<HashMap<String, NotionDataSource>>>,
 }
 
 impl SchemaEngine {
-    pub fn new(notion: Arc<NotionClient>, config: LifeOSConfig) -> Self {
+    pub fn new(notion: Arc<NotionClient>) -> Self {
         Self {
             notion,
-            config,
             schema_cache: Arc::new(Mutex::new(HashMap::new())),
         }
     }

@@ -931,7 +931,6 @@ dependencies = [
  "strsim",
  "thiserror 1.0.69",
  "tokio",
- "toon",
  "tracing",
  "uuid",
  "walkdir",
@@ -1853,16 +1852,6 @@ dependencies = [
  "futures-sink",
  "pin-project-lite",
  "tokio",
-]
-
-[[package]]
-name = "toon"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fa605a2aa68fefdedc9560bd765ce3ad89d45ac1d3ebad43724621098c9299a"
-dependencies = [
- "regex",
- "serde_json",
 ]
 
 [[package]]
