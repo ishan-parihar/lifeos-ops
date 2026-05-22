@@ -76,13 +76,17 @@ pub async fn execute(
 
         let since = (chrono::Utc::now() - chrono::Duration::days(days_back))
             .format("%Y-%m-%d").to_string();
-        let date_prop = db.properties.get("date").map(|s| s.as_str()).unwrap_or("Date");
+        let date_prop = db.properties.get("date")
+            .or_else(|| db.properties.get("action_date"))
+            .or_else(|| db.properties.get("created_date"))
+            .map(|s| s.as_str())
+            .unwrap_or("Last edited time");
         let query = if params.review_type == "journal" {
             serde_json::json!({ "page_size": 50 })
         } else {
             serde_json::json!({
                 "page_size": 50,
-                "filter": { "date": { "on_or_after": since }, "property": date_prop }
+                "filter": { "property": date_prop, "date": { "on_or_after": since } }
             })
         };
 
@@ -99,5 +103,5 @@ pub async fn execute(
         }
     }
 
-    Ok(crate::toon_wrapper::encode(&review_data))
+    Ok(crate::toon_format::encode(&review_data))
 }

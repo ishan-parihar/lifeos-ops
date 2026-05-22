@@ -30,7 +30,7 @@ pub fn schema() -> serde_json::Value {
     serde_json::json!({
         "type": "object",
         "properties": {
-            "analysis_type": { "type": "string", "enum": ["temporal", "trajectories", "correlations", "weekday_profile", "patterns"], "description": "Analysis type" },
+            "analysis_type": { "type": "string", "enum": ["temporal", "trajectories", "weekday_profile"], "description": "Analysis type" },
             "database": { "type": "string", "description": "Primary database to analyze" },
             "database_b": { "type": "string", "description": "Secondary database for correlations" },
             "days_back": { "type": "integer", "description": "Days to look back (default: 30)" },
@@ -54,10 +54,10 @@ pub async fn execute(
         "temporal" => {
             let db = crate::get_db(config, &params.database)
                 .ok_or_else(|| format!("Unknown database: {}", params.database))?;
-            let date_prop = db.properties.get("date").map(|s| s.as_str()).unwrap_or("Date");
+            let date_prop = date_prop_for(db);
             let query = serde_json::json!({
                 "page_size": 100,
-                "filter": { "date": { "on_or_after": since }, "property": date_prop }
+                "filter": { "property": date_prop, "date": { "on_or_after": since } }
             });
             let result = notion.query_data_source(db.ds_id(), &query).await?;
 
@@ -79,7 +79,7 @@ pub async fn execute(
                     serde_json::json!({ "date": d, "count": c })
                 }).collect::<Vec<_>>()
             });
-            Ok(crate::toon_wrapper::encode(&data))
+            Ok(crate::toon_format::encode(&data))
         }
         "trajectories" => {
             let db = crate::get_db(config, &params.database)
@@ -87,11 +87,11 @@ pub async fn execute(
             let metric = params.metric_property.as_deref()
                 .or_else(|| db.properties.keys().find(|k| k.as_str() == "energy" || k.as_str() == "mood" || k.as_str() == "score").map(|s| s.as_str()))
                 .ok_or("metric_property required for trajectories")?;
-            let date_prop = db.properties.get("date").map(|s| s.as_str()).unwrap_or("Date");
+            let date_prop = date_prop_for(db);
 
             let query = serde_json::json!({
                 "page_size": 100,
-                "filter": { "date": { "on_or_after": since }, "property": date_prop }
+                "filter": { "property": date_prop, "date": { "on_or_after": since } }
             });
             let result = notion.query_data_source(db.ds_id(), &query).await?;
 
@@ -111,15 +111,15 @@ pub async fn execute(
                 "data_points": trajectory.len(),
                 "trajectory": trajectory
             });
-            Ok(crate::toon_wrapper::encode(&data))
+            Ok(crate::toon_format::encode(&data))
         }
         "weekday_profile" => {
             let db = crate::get_db(config, &params.database)
                 .ok_or_else(|| format!("Unknown database: {}", params.database))?;
-            let date_prop = db.properties.get("date").map(|s| s.as_str()).unwrap_or("Date");
+            let date_prop = date_prop_for(db);
             let query = serde_json::json!({
                 "page_size": 100,
-                "filter": { "date": { "on_or_after": since }, "property": date_prop }
+                "filter": { "property": date_prop, "date": { "on_or_after": since } }
             });
             let result = notion.query_data_source(db.ds_id(), &query).await?;
 
@@ -139,8 +139,16 @@ pub async fn execute(
                 "database": params.database,
                 "profile": profile
             });
-            Ok(crate::toon_wrapper::encode(&data))
+            Ok(crate::toon_format::encode(&data))
         }
         _ => Err(format!("Unknown analysis type: {}", params.analysis_type)),
     }
+}
+
+fn date_prop_for(db: &crate::config::DbConfig) -> &str {
+    db.properties.get("date")
+        .or_else(|| db.properties.get("action_date"))
+        .or_else(|| db.properties.get("created_date"))
+        .map(|s| s.as_str())
+        .unwrap_or("Last edited time")
 }
