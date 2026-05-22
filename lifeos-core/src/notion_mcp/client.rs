@@ -84,9 +84,6 @@ impl NotionClient {
         }
     }
 
-    pub async fn query_database(&self, database_id: &str, body: &serde_json::Value) -> Result<QueryResponse, String> {
-        self.execute(reqwest::Method::POST, &format!("/v1/databases/{}/query", database_id), Some(body)).await
-    }
     pub async fn query_data_source(&self, data_source_id: &str, body: &serde_json::Value) -> Result<QueryResponse, String> {
         self.execute(reqwest::Method::POST, &format!("/v1/data_sources/{}/query", data_source_id), Some(body)).await
     }

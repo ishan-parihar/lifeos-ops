@@ -94,7 +94,7 @@ pub async fn pull_database_since(
     }
 
     let pages = notion
-        .query_data_source_all_since(&db.data_source_id, since)
+        .query_data_source_all_since(db.ds_id(), since)
         .await?;
     tracing::info!(
         "  Found {} pages in data source{}",

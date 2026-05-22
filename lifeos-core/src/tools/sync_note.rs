@@ -85,7 +85,7 @@ pub async fn execute(
                 .to_string();
 
             let body = serde_json::json!({
-                "parent": { "database_id": db.data_source_id },
+                "parent": { "data_source_id": db.ds_id() },
                 "properties": {
                     "Name": { "title": [{ "text": { "content": title } }] }
                 }

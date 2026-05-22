@@ -374,7 +374,7 @@ pub async fn push_database(
 
             match push_created_page(
                 notion,
-                &db.data_source_id,
+                db.ds_id(),
                 &title,
                 frontmatter,
                 body,

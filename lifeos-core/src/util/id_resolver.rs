@@ -44,7 +44,7 @@ pub async fn resolve_target_id(
 
     // Query all pages in the database
     let result = match notion.query_data_source(
-        &db.data_source_id,
+        db.ds_id(),
         &serde_json::json!({ "page_size": 100 }),
     ).await {
         Ok(r) => r,

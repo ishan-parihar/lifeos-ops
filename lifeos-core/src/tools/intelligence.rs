@@ -64,7 +64,7 @@ pub async fn execute(
                             query["filter"] = date_filter.clone();
                         }
                     }
-                    if let Ok(result) = notion.query_database(&db.data_source_id, &query).await {
+                    if let Ok(result) = notion.query_data_source(db.ds_id(), &query).await {
                         let items: Vec<serde_json::Value> = result.results.iter()
                             .map(|p| {
                                 let title = crate::transform::extract_title(p);
@@ -97,7 +97,7 @@ pub async fn execute(
                             query["filter"] = date_filter.clone();
                         }
                     }
-                    if let Ok(result) = notion.query_database(&db.data_source_id, &query).await {
+                    if let Ok(result) = notion.query_data_source(db.ds_id(), &query).await {
                         let items: Vec<serde_json::Value> = result.results.iter()
                             .map(|p| {
                                 let title = crate::transform::extract_title(p);

@@ -59,7 +59,7 @@ pub async fn execute(
                 "page_size": 100,
                 "filter": { "date": { "on_or_after": since }, "property": date_prop }
             });
-            let result = notion.query_database(&db.data_source_id, &query).await?;
+            let result = notion.query_data_source(db.ds_id(), &query).await?;
 
             // Group by date
             let mut by_date: std::collections::BTreeMap<String, i64> = std::collections::BTreeMap::new();
@@ -93,7 +93,7 @@ pub async fn execute(
                 "page_size": 100,
                 "filter": { "date": { "on_or_after": since }, "property": date_prop }
             });
-            let result = notion.query_database(&db.data_source_id, &query).await?;
+            let result = notion.query_data_source(db.ds_id(), &query).await?;
 
             let mut trajectory: Vec<serde_json::Value> = Vec::new();
             for page in &result.results {
@@ -121,7 +121,7 @@ pub async fn execute(
                 "page_size": 100,
                 "filter": { "date": { "on_or_after": since }, "property": date_prop }
             });
-            let result = notion.query_database(&db.data_source_id, &query).await?;
+            let result = notion.query_data_source(db.ds_id(), &query).await?;
 
             let mut profile: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
             for page in &result.results {
