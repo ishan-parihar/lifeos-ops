@@ -37,7 +37,7 @@ pub async fn cmd_page_new(
     );
 
     let body = serde_json::json!({
-        "parent": { "data_source_id": db.data_source_id },
+        "parent": { "data_source_id": db.ds_id() },
         "properties": properties,
     });
 

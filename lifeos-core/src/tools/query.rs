@@ -99,7 +99,7 @@ pub async fn execute(
     }
 
     // Execute query
-    let result = notion.query_database(&db.data_source_id, &body).await?;
+    let result = notion.query_data_source(db.ds_id(), &body).await?;
 
     let items: Vec<serde_json::Value> = result.results.iter().map(|page| {
         let title = crate::transform::extract_title(page);

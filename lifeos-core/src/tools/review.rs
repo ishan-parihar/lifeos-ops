@@ -86,7 +86,7 @@ pub async fn execute(
             })
         };
 
-        if let Ok(result) = notion.query_database(&db.data_source_id, &query).await {
+        if let Ok(result) = notion.query_data_source(db.ds_id(), &query).await {
             let items: Vec<serde_json::Value> = result.results.iter().map(|p| {
                 let title = crate::transform::extract_title(p);
                 serde_json::json!({ "title": title, "id": p.id, "last_edited": &p.last_edited_time[..10] })

@@ -6,6 +6,7 @@ use clap::Parser;
 
 use lifeos_core::{
     Cli, Commands, PageCommand, load_config, LifeOSConfig, NotionClient,
+    resolve_all_data_sources,
     vault::{read_index, write_index},
     sync::{self},
 };
@@ -47,9 +48,8 @@ async fn main() {
             incremental,
             config: config_path,
         } => {
-            let cfg = resolve_config(config_path.as_deref());
+            let (cfg, notion) = resolve_config_with_ds(config_path.as_deref(), &notion_token).await;
             let vault_dir = resolve_vault_dir();
-            let notion = NotionClient::new(cfg.clone(), notion_token);
             if let Err(e) = cmd_pull(&notion, &cfg, &vault_dir, databases.as_deref(), exclude.as_deref(), incremental).await {
                 tracing::error!("Pull failed: {e}");
                 std::process::exit(1);
@@ -60,9 +60,8 @@ async fn main() {
             config: config_path,
             dry_run,
         } => {
-            let cfg = resolve_config(config_path.as_deref());
+            let (cfg, notion) = resolve_config_with_ds(config_path.as_deref(), &notion_token).await;
             let vault_dir = resolve_vault_dir();
-            let notion = NotionClient::new(cfg.clone(), notion_token);
             if let Err(e) = cmd_push(&notion, &cfg, &vault_dir, databases.as_deref(), dry_run).await {
                 tracing::error!("Push failed: {e}");
                 std::process::exit(1);
@@ -72,18 +71,16 @@ async fn main() {
             config: config_path,
             debounce_ms,
         } => {
-            let cfg = resolve_config(config_path.as_deref());
+            let (cfg, notion) = resolve_config_with_ds(config_path.as_deref(), &notion_token).await;
             let vault_dir = resolve_vault_dir();
-            let notion = NotionClient::new(cfg.clone(), notion_token);
             if let Err(e) = cmd_watch(&notion, &cfg, &vault_dir, debounce_ms).await {
                 tracing::error!("Watch failed: {e}");
                 std::process::exit(1);
             }
         }
         Commands::Page { action } => {
-            let cfg = resolve_config(None);
+            let (cfg, notion) = resolve_config_with_ds(None, &notion_token).await;
             let vault_dir = resolve_vault_dir();
-            let notion = NotionClient::new(cfg.clone(), notion_token);
             match action {
                 PageCommand::New { db_key, title, config: _ } => {
                     if let Err(e) = sync::cmd_page_new(&notion, &cfg, &vault_dir, &db_key, &title).await {
@@ -128,6 +125,14 @@ fn resolve_config(config_path: Option<&str>) -> LifeOSConfig {
             std::process::exit(1);
         }
     }
+}
+
+async fn resolve_config_with_ds(config_path: Option<&str>, token: &str) -> (LifeOSConfig, NotionClient) {
+    let mut cfg = resolve_config(config_path);
+    let notion = NotionClient::new(cfg.clone(), token.to_string());
+    resolve_all_data_sources(&mut cfg, &notion).await;
+    let notion = NotionClient::new(cfg.clone(), token.to_string());
+    (cfg, notion)
 }
 
 fn resolve_vault_dir() -> PathBuf {

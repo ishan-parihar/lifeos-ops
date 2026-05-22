@@ -5,9 +5,22 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DbConfig {
     pub name: String,
-    pub data_source_id: String,
+    /// The Notion database container ID (what you see in URLs)
+    #[serde(alias = "data_source_id")]
+    pub database_id: String,
     pub agent: String,
     pub properties: HashMap<String, String>,
+    /// Resolved at runtime via GET /v1/databases/{database_id} → data_sources[0].id
+    #[serde(skip)]
+    pub resolved_data_source_id: Option<String>,
+}
+
+impl DbConfig {
+    /// Returns the data_source_id if resolved, otherwise falls back to database_id
+    /// (fallback enables graceful degradation with older API versions)
+    pub fn ds_id(&self) -> &str {
+        self.resolved_data_source_id.as_deref().unwrap_or(&self.database_id)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

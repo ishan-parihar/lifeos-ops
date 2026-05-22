@@ -51,7 +51,7 @@ pub async fn execute(
             let props = params.properties.as_ref()
                 .ok_or("properties required for create")?;
             let body = serde_json::json!({
-                "parent": { "database_id": db.data_source_id },
+                "parent": { "data_source_id": db.ds_id() },
                 "properties": props
             });
             let page = notion.create_page(&body).await?;
@@ -87,7 +87,7 @@ pub async fn execute(
                     "title": { "equals": target_name }
                 }
             });
-            let result = notion.query_database(&db.data_source_id, &query_body).await?;
+            let result = notion.query_data_source(db.ds_id(), &query_body).await?;
 
             let props = params.properties.as_ref()
                 .ok_or("properties required for upsert")?;
@@ -97,7 +97,7 @@ pub async fn execute(
                 Ok(format!("Upsert (updated): {}", target_name))
             } else {
                 let body = serde_json::json!({
-                    "parent": { "database_id": db.data_source_id },
+                    "parent": { "data_source_id": db.ds_id() },
                     "properties": props
                 });
                 notion.create_page(&body).await?;

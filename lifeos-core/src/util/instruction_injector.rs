@@ -50,7 +50,7 @@ impl InstructionInjector {
         };
 
         // Try to fetch schema
-        let schema = self.schema_engine.get_schema(&db.data_source_id).await;
+        let schema = self.schema_engine.get_schema(db.ds_id()).await;
 
         let instructions = match schema {
             Ok(ds) => {

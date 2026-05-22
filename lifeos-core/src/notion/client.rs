@@ -87,6 +87,8 @@ impl NotionClient {
         }
     }
 
+    // --- Data Source APIs (2025-09-03) ---
+
     pub async fn query_data_source(&self, data_source_id: &str, body: &Value) -> Result<QueryResponse, String> {
         self.execute(Method::POST, &format!("/v1/data_sources/{data_source_id}/query"), Some(body)).await
     }
@@ -124,9 +126,48 @@ impl NotionClient {
         Ok(all)
     }
 
-    pub async fn query_database(&self, database_id: &str, body: &Value) -> Result<QueryResponse, String> {
-        self.execute(Method::POST, &format!("/v1/databases/{}/query", database_id), Some(body)).await
+    pub async fn get_data_source(&self, id: &str) -> Result<NotionDataSource, String> {
+        self.execute(Method::GET, &format!("/v1/data_sources/{id}"), None).await
     }
+
+    // --- Database APIs (container level) ---
+
+    pub async fn get_database(&self, id: &str) -> Result<NotionDatabase, String> {
+        self.execute(Method::GET, &format!("/v1/databases/{id}"), None).await
+    }
+
+    /// Resolve database_id → data_source_id by fetching the database container.
+    /// Always uses Notion-Version: 2025-09-03 regardless of config, since that's
+    /// the version that returns the data_sources array.
+    pub async fn resolve_data_source_id(&self, database_id: &str) -> Result<String, String> {
+        self.rate_limit().await;
+        let url = format!("{}/v1/databases/{}", BASE_URL, database_id);
+        let resp = self.http
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", self.token))
+            .header("Notion-Version", "2025-09-03")
+            .header("Content-Type", "application/json")
+            .send()
+            .await
+            .map_err(|e| format!("Connection: {}", e))?;
+        let bytes = resp.bytes().await.map_err(|e| format!("Read: {}", e))?;
+        let val: Value = serde_json::from_slice(&bytes).map_err(|e| format!("Parse: {}", e))?;
+        if let Some(err) = val.get("code") {
+            return Err(format!("Notion {} /v1/databases/{}: {}", 
+                val.get("status").and_then(|s| s.as_u64()).unwrap_or(0),
+                database_id,
+                val.get("message").and_then(|m| m.as_str()).unwrap_or("unknown error")));
+        }
+        val.get("data_sources")
+            .and_then(|v| v.as_array())
+            .and_then(|arr| arr.first())
+            .and_then(|ds| ds.get("id"))
+            .and_then(|id| id.as_str())
+            .map(|s| s.to_string())
+            .ok_or_else(|| format!("No data_sources found for database {database_id}"))
+    }
+
+    // --- Page APIs ---
 
     pub async fn get_page(&self, page_id: &str) -> Result<NotionPage, String> {
         self.execute(Method::GET, &format!("/v1/pages/{page_id}"), None).await
@@ -154,6 +195,8 @@ impl NotionClient {
         let body = serde_json::json!({ "archived": true });
         self.execute(Method::PATCH, &format!("/v1/pages/{page_id}"), Some(&body)).await
     }
+
+    // --- Block APIs ---
 
     pub async fn get_page_blocks(&self, page_id: &str) -> Result<Vec<NotionBlock>, String> {
         let mut blocks = Vec::new();
@@ -192,12 +235,20 @@ impl NotionClient {
         self.execute::<Value>(Method::DELETE, &format!("/v1/blocks/{block_id}"), None).await?;
         Ok(())
     }
+}
 
-    pub async fn get_data_source(&self, id: &str) -> Result<NotionDataSource, String> {
-        self.execute(Method::GET, &format!("/v1/data_sources/{id}"), None).await
-    }
-
-    pub async fn get_database(&self, id: &str) -> Result<NotionDatabase, String> {
-        self.execute(Method::GET, &format!("/v1/databases/{id}"), None).await
+/// Resolve all database_ids in config to their data_source_ids.
+/// Mutates config in place. Logs warnings for databases that can't be resolved.
+pub async fn resolve_all_data_sources(config: &mut LifeOSConfig, notion: &NotionClient) {
+    for (key, db) in config.databases.iter_mut() {
+        match notion.resolve_data_source_id(&db.database_id).await {
+            Ok(ds_id) => {
+                tracing::info!("Resolved {key}: {} → {ds_id}", db.database_id);
+                db.resolved_data_source_id = Some(ds_id);
+            }
+            Err(e) => {
+                tracing::warn!("Could not resolve data_source_id for {key} ({}): {e}", db.database_id);
+            }
+        }
     }
 }

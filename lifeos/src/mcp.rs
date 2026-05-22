@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
-use lifeos_core::{LifeosServer, load_config, NotionClient};
+use lifeos_core::{LifeosServer, load_config, NotionClient, resolve_all_data_sources};
 
 pub async fn run_server() {
-    let config = match load_config() {
+    let mut config = match load_config() {
         Ok(c) => c,
         Err(e) => {
             eprintln!("{}", e);
@@ -16,6 +16,11 @@ pub async fn run_server() {
         std::process::exit(1);
     });
 
+    // Create a temporary client to resolve data source IDs
+    let resolver = NotionClient::new(config.clone(), token.clone());
+    resolve_all_data_sources(&mut config, &resolver).await;
+
+    // Create the actual client with resolved config
     let notion = Arc::new(NotionClient::new(config.clone(), token));
     let server = LifeosServer::new(config, notion);
 

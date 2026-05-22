@@ -17,5 +17,5 @@ pub mod server;
 
 pub use cli::{Cli, Commands, PageCommand};
 pub use config::{LifeOSConfig, load_config, get_db, get_dbs_by_agent, DbConfig, RateLimitConfig, BriefingConfig, BriefingTarget, ConfigError};
-pub use notion::client::NotionClient;
+pub use notion::client::{NotionClient, resolve_all_data_sources};
 pub use server::LifeosServer;

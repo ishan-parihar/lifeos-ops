@@ -50,7 +50,7 @@ pub async fn execute(
 
             for (key, db) in &config.databases {
                 let query = serde_json::json!({ "page_size": 1 });
-                let _ = notion.query_database(&db.data_source_id, &query).await;
+                let _ = notion.query_data_source(db.ds_id(), &query).await;
                 overview["databases"][key] = serde_json::json!({
                     "name": db.name,
                     "total_estimated": "query page_size=1 indicates data exists",
@@ -66,7 +66,7 @@ pub async fn execute(
                 .ok_or_else(|| format!("Unknown database: {}", db_key))?;
 
             let query = serde_json::json!({ "page_size": 50 });
-            let result = notion.query_database(&db.data_source_id, &query).await?;
+            let result = notion.query_data_source(db.ds_id(), &query).await?;
 
             let mut by_status: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
             let mut projects: Vec<serde_json::Value> = Vec::new();
@@ -96,7 +96,7 @@ pub async fn execute(
                 .ok_or_else(|| format!("Unknown database: {}", db_key))?;
 
             let query = serde_json::json!({ "page_size": 50 });
-            let result = notion.query_database(&db.data_source_id, &query).await?;
+            let result = notion.query_data_source(db.ds_id(), &query).await?;
 
             let mut okrs: Vec<serde_json::Value> = Vec::new();
             for page in &result.results {
@@ -124,7 +124,7 @@ pub async fn execute(
             for (key, db) in &config.databases {
                 if db.agent != "strategy" { continue; }
                 let query = serde_json::json!({ "page_size": 20 });
-                if let Ok(result) = notion.query_database(&db.data_source_id, &query).await {
+                if let Ok(result) = notion.query_data_source(db.ds_id(), &query).await {
                     let items: Vec<serde_json::Value> = result.results.iter().map(|p| {
                         serde_json::json!({
                             "title": crate::transform::extract_title(p),
@@ -145,7 +145,7 @@ pub async fn execute(
                 .ok_or_else(|| format!("Unknown database: {}", db_key))?;
 
             let query = serde_json::json!({ "page_size": 50 });
-            let result = notion.query_database(&db.data_source_id, &query).await?;
+            let result = notion.query_data_source(db.ds_id(), &query).await?;
 
             let mut campaigns: Vec<serde_json::Value> = Vec::new();
             for page in &result.results {
