@@ -200,7 +200,16 @@ pub fn yaml_to_properties(yaml: &serde_yaml::Value, property_mapping: &HashMap<S
     for (yaml_key, yaml_value) in yaml_map {
         let db_key = match yaml_key.as_str() { Some(k) => k, None => continue };
         let notion_name = match property_mapping.get(db_key) { Some(n) => n, None => continue };
-        let json_value = yaml_value_to_notion_json(yaml_value);
+        // Title must use "title" type, not "rich_text"
+        let json_value = if db_key == "title" {
+            let text = match yaml_value {
+                serde_yaml::Value::String(s) => s.as_str(),
+                _ => continue,
+            };
+            serde_json::json!({ "title": [{ "type": "text", "text": { "content": text } }] })
+        } else {
+            yaml_value_to_notion_json(yaml_value)
+        };
         if json_value.is_null() { continue; }
         result.insert(notion_name.clone(), json_value);
     }

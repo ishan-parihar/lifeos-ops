@@ -93,8 +93,15 @@ fn parse_frontmatter<'a>(content: &'a str) -> (Option<&'a str>, &'a str) {
     if trimmed.starts_with("---") {
         if let Some(end) = trimmed[3..].find("\n---") {
             let frontmatter = &trimmed[3..3 + end];
-            let body = trimmed[3 + end + 5..].trim();
-            return (Some(frontmatter), body);
+            // Skip "\n---" (4 bytes) then optionally one "\n"
+            let after_close = 3 + end + 4;
+            let body = if after_close < trimmed.len() {
+                let rest = &trimmed[after_close..];
+                if rest.starts_with('\n') { &rest[1..] } else { rest }
+            } else {
+                ""
+            };
+            return (Some(frontmatter), body.trim());
         }
     }
     (None, trimmed)
@@ -198,6 +205,8 @@ async fn push_created_page(
     property_map: &HashMap<String, String>,
     dry_run: bool,
 ) -> Result<String, String> {
+    let title_notion_name = property_map.get("title").map(|s| s.as_str()).unwrap_or("Name");
+
     let mut properties: HashMap<String, Value> = if let Some(yaml_str) = frontmatter {
         serde_yaml::from_str(yaml_str)
             .ok()
@@ -207,12 +216,12 @@ async fn push_created_page(
         HashMap::new()
     };
 
+    // Always overwrite the title with the correct Notion property name and title format.
+    // yaml_to_properties handles the title key correctly now, but we re-insert here
+    // to guarantee the `title` param (the file stem / CLI arg) takes precedence.
     let title_prop: Value =
-        serde_json::json!({ "title": [{ "text": { "content": title } }] });
-
-    if !properties.contains_key("title") {
-        properties.insert("title".to_string(), title_prop);
-    }
+        serde_json::json!({ "title": [{ "type": "text", "text": { "content": title } }] });
+    properties.insert(title_notion_name.to_string(), title_prop);
 
     if dry_run {
         tracing::info!("  Would create page: {}", title);

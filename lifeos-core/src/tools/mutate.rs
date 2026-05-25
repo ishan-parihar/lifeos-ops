@@ -1,5 +1,6 @@
 //! Mutate tool — create, update, delete, upsert entries
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use serde::Deserialize;
 
@@ -13,7 +14,7 @@ pub struct MutateParams {
     pub operation: String,
     /// Target database key
     pub database: String,
-    /// Properties to set (key-value pairs for create/update/upsert)
+    /// Properties to set (config-key → value; value may be a simple scalar or Notion API object)
     pub properties: Option<serde_json::Value>,
     /// Page ID (required for update/delete)
     pub page_id: Option<String>,
@@ -21,21 +22,75 @@ pub struct MutateParams {
     pub target_name: Option<String>,
 }
 
-/// Execute the mutate tool
-
 /// Generate JSON Schema for this tool
 pub fn schema() -> serde_json::Value {
     serde_json::json!({
         "type": "object",
         "properties": {
             "operation": { "type": "string", "enum": ["create", "update", "delete", "upsert"], "description": "Operation to perform" },
-            "database": { "type": "string", "description": "Target database key" },
-            "properties": { "type": "object", "description": "Key-value properties for create/update/upsert" },
+            "database": { "type": "string", "description": "Target database key (e.g. tasks, projects)" },
+            "properties": {
+                "type": "object",
+                "description": "Key-value properties using config keys (e.g. action_date, status). Values may be simple scalars (string, number, bool) or Notion API property objects. Strings that look like dates (YYYY-MM-DD) become date properties; other strings become rich_text. For select/status fields pass a Notion object: {\"status\":{\"name\":\"Done\"}} or {\"select\":{\"name\":\"Option\"}}."
+            },
             "page_id": { "type": "string", "description": "Page ID for update/delete" },
-            "target_name": { "type": "string", "description": "Fuzzy page name to resolve for upsert" }
+            "target_name": { "type": "string", "description": "Fuzzy page name to resolve for upsert/update/delete" }
         },
         "required": ["operation", "database"]
     })
+}
+
+const NOTION_PROP_TYPES: &[&str] = &[
+    "title", "rich_text", "select", "status", "multi_select",
+    "date", "number", "checkbox", "people", "relation",
+    "url", "email", "phone_number", "files",
+];
+
+fn is_notion_format(val: &serde_json::Value) -> bool {
+    val.as_object()
+        .map(|obj| NOTION_PROP_TYPES.iter().any(|t| obj.contains_key(*t)))
+        .unwrap_or(false)
+}
+
+fn looks_like_date(s: &str) -> bool {
+    s.len() >= 10
+        && s.as_bytes()[4] == b'-'
+        && s.as_bytes()[7] == b'-'
+        && s[..4].parse::<u32>().is_ok()
+}
+
+fn coerce_value(value: &serde_json::Value, config_key: &str) -> serde_json::Value {
+    if is_notion_format(value) {
+        return value.clone();
+    }
+    match value {
+        serde_json::Value::String(s) => {
+            if config_key == "title" {
+                serde_json::json!({"title": [{"type": "text", "text": {"content": s}}]})
+            } else if looks_like_date(s) {
+                serde_json::json!({"date": {"start": s}})
+            } else {
+                serde_json::json!({"rich_text": [{"type": "text", "text": {"content": s}}]})
+            }
+        }
+        serde_json::Value::Number(n) => serde_json::json!({"number": n}),
+        serde_json::Value::Bool(b) => serde_json::json!({"checkbox": b}),
+        _ => value.clone(),
+    }
+}
+
+/// Translate config-key property names → Notion property names and coerce simple values.
+fn map_properties(
+    props: &serde_json::Value,
+    property_mapping: &HashMap<String, String>,
+) -> serde_json::Value {
+    let Some(map) = props.as_object() else { return props.clone() };
+    let mut result = serde_json::Map::new();
+    for (key, value) in map {
+        let notion_key = property_mapping.get(key).map(|s| s.as_str()).unwrap_or(key.as_str());
+        result.insert(notion_key.to_string(), coerce_value(value, key));
+    }
+    serde_json::Value::Object(result)
 }
 
 pub async fn execute(
@@ -50,9 +105,10 @@ pub async fn execute(
         "create" => {
             let props = params.properties.as_ref()
                 .ok_or("properties required for create")?;
+            let mapped = map_properties(props, &db.properties);
             let body = serde_json::json!({
                 "parent": { "data_source_id": db.ds_id() },
-                "properties": props
+                "properties": mapped
             });
             let page = notion.create_page(&body).await?;
             let title = crate::transform::extract_title(&page);
@@ -62,7 +118,8 @@ pub async fn execute(
             let page_id = resolve_page_id(params, notion, config).await?;
             let props = params.properties.as_ref()
                 .ok_or("properties required for update")?;
-            let page = notion.update_page(&page_id, props).await?;
+            let mapped = map_properties(props, &db.properties);
+            let page = notion.update_page(&page_id, &mapped).await?;
             let title = crate::transform::extract_title(&page);
             Ok(format!("Updated: {} ({})", title, page.id))
         }
@@ -73,17 +130,17 @@ pub async fn execute(
             Ok(format!("Archived: {} ({})", title, page.id))
         }
         "upsert" => {
-            // Try to find existing page by title, create if not found
             let target_name = params.target_name.as_deref()
                 .or_else(|| params.properties.as_ref()
                     .and_then(|p| p.get("Name"))
                     .and_then(|v| v.as_str()))
                 .ok_or("target_name or 'Name' property required for upsert")?;
 
+            let title_notion_name = db.properties.get("title").map(|s| s.as_str()).unwrap_or("Name");
             let query_body = serde_json::json!({
                 "page_size": 10,
                 "filter": {
-                    "property": "Name",
+                    "property": title_notion_name,
                     "title": { "equals": target_name }
                 }
             });
@@ -91,14 +148,15 @@ pub async fn execute(
 
             let props = params.properties.as_ref()
                 .ok_or("properties required for upsert")?;
+            let mapped = map_properties(props, &db.properties);
 
             if let Some(page) = result.results.first() {
-                notion.update_page(&page.id, props).await?;
+                notion.update_page(&page.id, &mapped).await?;
                 Ok(format!("Upsert (updated): {}", target_name))
             } else {
                 let body = serde_json::json!({
                     "parent": { "data_source_id": db.ds_id() },
-                    "properties": props
+                    "properties": mapped
                 });
                 notion.create_page(&body).await?;
                 Ok(format!("Upsert (created): {}", target_name))
@@ -124,3 +182,4 @@ async fn resolve_page_id(
     ).await;
     result.id.ok_or_else(|| format!("Could not resolve '{}'", name))
 }
+

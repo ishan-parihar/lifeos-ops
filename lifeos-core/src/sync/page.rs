@@ -21,8 +21,9 @@ pub async fn cmd_page_new(
     let mut properties = serde_json::Map::new();
 
     let title_key = db.properties.iter()
-        .find(|(_, v)| **v == "title")
-        .or_else(|| db.properties.iter().find(|(k, _)| k == &"Name" || k == &"name" || k == &"Title"))
+        .find(|(k, _)| *k == "title")
+        .or_else(|| db.properties.iter().find(|(k, _)| k.eq_ignore_ascii_case("name") || k.eq_ignore_ascii_case("Title")))
+        .or_else(|| db.properties.iter().find(|(_, v)| v.eq_ignore_ascii_case("title") || v.eq_ignore_ascii_case("name")))
         .map(|(k, _)| k.clone())
         .ok_or_else(|| "Could not determine title property".to_string())?;
 
