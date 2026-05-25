@@ -64,7 +64,7 @@ fn default_rate_limit() -> RateLimitConfig {
 
 pub fn load_config() -> Result<LifeOSConfig, ConfigError> {
     let paths = vec![
-        std::env::var("LIFEOs_CONFIG").ok().map(PathBuf::from),
+        std::env::var("LIFEOS_CONFIG").ok().map(PathBuf::from),
         Some(PathBuf::from("lifeos.config.json")),
         Some(PathBuf::from("../lifeos.config.json")),
     ];
