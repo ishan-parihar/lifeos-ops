@@ -51,34 +51,39 @@ pub async fn execute(
     let limit = params.limit.unwrap_or(50).min(100) as u64;
     let mut body = serde_json::json!({ "page_size": limit });
 
-    // Handle preset filters
+    // Handle preset filters — only apply if the required property exists in the DB config
     if let Some(ref preset) = params.preset {
         let now = chrono::Utc::now();
-        let status_prop = db.properties.get("status").map(|s| s.as_str()).unwrap_or("Status");
         match preset.as_str() {
             "active" => {
-                body["filter"] = serde_json::json!({
-                    "property": status_prop, "status": { "equals": "Active" }
-                });
+                if let Some(prop) = db.properties.get("status") {
+                    body["filter"] = serde_json::json!({
+                        "property": prop, "status": { "equals": "Active" }
+                    });
+                }
             }
             "this_week" => {
-                let start = (now - chrono::Duration::days(7)).format("%Y-%m-%d").to_string();
-                let date_prop = db.properties.get("date").map(|s| s.as_str()).unwrap_or("Date");
-                body["filter"] = serde_json::json!({
-                    "property": date_prop, "date": { "on_or_after": start }
-                });
+                if let Some(prop) = db.properties.get("date") {
+                    let start = (now - chrono::Duration::days(7)).format("%Y-%m-%d").to_string();
+                    body["filter"] = serde_json::json!({
+                        "property": prop, "date": { "on_or_after": start }
+                    });
+                }
             }
             "this_month" => {
-                let start = (now - chrono::Duration::days(30)).format("%Y-%m-%d").to_string();
-                let date_prop = db.properties.get("date").map(|s| s.as_str()).unwrap_or("Date");
-                body["filter"] = serde_json::json!({
-                    "property": date_prop, "date": { "on_or_after": start }
-                });
+                if let Some(prop) = db.properties.get("date") {
+                    let start = (now - chrono::Duration::days(30)).format("%Y-%m-%d").to_string();
+                    body["filter"] = serde_json::json!({
+                        "property": prop, "date": { "on_or_after": start }
+                    });
+                }
             }
             "needs_review" => {
-                body["filter"] = serde_json::json!({
-                    "property": status_prop, "status": { "equals": "Needs Review" }
-                });
+                if let Some(prop) = db.properties.get("status") {
+                    body["filter"] = serde_json::json!({
+                        "property": prop, "status": { "equals": "Needs Review" }
+                    });
+                }
             }
             _ => {}
         }

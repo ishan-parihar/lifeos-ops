@@ -84,10 +84,11 @@ pub async fn execute(
                 .unwrap_or("Synced Note")
                 .to_string();
 
+            let title_notion_name = db.properties.get("title").map(|s| s.as_str()).unwrap_or("Name");
             let body = serde_json::json!({
                 "parent": { "data_source_id": db.ds_id() },
                 "properties": {
-                    "Name": { "title": [{ "text": { "content": title } }] }
+                    title_notion_name: { "title": [{ "text": { "content": title } }] }
                 }
             });
             let page = notion.create_page(&body).await?;

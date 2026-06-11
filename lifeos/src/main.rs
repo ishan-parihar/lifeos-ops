@@ -130,7 +130,13 @@ fn resolve_config(config_path: Option<&str>) -> LifeOSConfig {
 async fn resolve_config_with_ds(config_path: Option<&str>, token: &str) -> (LifeOSConfig, NotionClient) {
     let mut cfg = resolve_config(config_path);
     let notion = NotionClient::new(cfg.clone(), token.to_string());
-    resolve_all_data_sources(&mut cfg, &notion).await;
+    let failures = resolve_all_data_sources(&mut cfg, &notion).await;
+    if !failures.is_empty() {
+        tracing::warn!("{}/{} databases unresolved", failures.len(), cfg.databases.len());
+        for (db_key, _) in &failures {
+            tracing::warn!("  unresolved database: {db_key}");
+        }
+    }
     let notion = NotionClient::new(cfg.clone(), token.to_string());
     (cfg, notion)
 }
