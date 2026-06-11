@@ -139,20 +139,74 @@ fn property_to_yaml_with_cache(prop: &PropertyValue, title_cache: &HashMap<Strin
     }
 }
 
-fn yaml_value_to_notion_json(value: &serde_yaml::Value) -> serde_json::Value {
+fn yaml_value_to_notion_json(value: &serde_yaml::Value, prop_type: Option<&str>) -> serde_json::Value {
     match value {
-        serde_yaml::Value::String(s) => serde_json::json!({ "rich_text": [{ "type": "text", "text": { "content": s } }] }),
+        serde_yaml::Value::String(s) => {
+            match prop_type {
+                Some("title") => serde_json::json!({ "title": [{ "type": "text", "text": { "content": s } }] }),
+                Some("select") => serde_json::json!({ "select": { "name": s } }),
+                Some("status") => serde_json::json!({ "status": { "name": s } }),
+                Some("url") => serde_json::json!({ "url": s }),
+                Some("email") => serde_json::json!({ "email": s }),
+                Some("phone_number") => serde_json::json!({ "phone_number": s }),
+                Some("rich_text") | None => serde_json::json!({ "rich_text": [{ "type": "text", "text": { "content": s } }] }),
+                _ => serde_json::json!({ "rich_text": [{ "type": "text", "text": { "content": s } }] }),
+            }
+        }
         serde_yaml::Value::Number(n) => serde_json::json!({ "number": n.as_f64().unwrap_or(0.0) }),
         serde_yaml::Value::Bool(b) => serde_json::json!({ "checkbox": b }),
         serde_yaml::Value::Null => serde_json::Value::Null,
-        serde_yaml::Value::Sequence(seq) => yaml_seq_to_notion_json(seq),
+        serde_yaml::Value::Sequence(seq) => yaml_seq_to_notion_json(seq, prop_type),
         serde_yaml::Value::Mapping(m) => yaml_map_to_notion_json(m),
-        serde_yaml::Value::Tagged(t) => yaml_value_to_notion_json(&t.value),
+        serde_yaml::Value::Tagged(t) => yaml_value_to_notion_json(&t.value, prop_type),
     }
 }
 
-fn yaml_seq_to_notion_json(seq: &[serde_yaml::Value]) -> serde_json::Value {
-    if seq.is_empty() { return serde_json::json!({ "multi_select": [] }); }
+fn yaml_seq_to_notion_json(seq: &[serde_yaml::Value], prop_type: Option<&str>) -> serde_json::Value {
+    if seq.is_empty() {
+        return match prop_type {
+            Some("multi_select") => serde_json::json!({ "multi_select": [] }),
+            Some("people") => serde_json::json!({ "people": [] }),
+            Some("relation") => serde_json::json!({ "relation": [] }),
+            Some("files") => serde_json::json!({ "files": [] }),
+            _ => serde_json::json!({ "multi_select": [] }),
+        };
+    }
+
+    match prop_type {
+        Some("multi_select") => {
+            let names: Vec<serde_json::Value> = seq.iter().map(|v| serde_json::json!({ "name": v.as_str().unwrap_or("") })).collect();
+            return serde_json::json!({ "multi_select": names });
+        }
+        Some("people") => {
+            let users: Vec<serde_json::Value> = seq.iter().filter_map(|v| {
+                let map = v.as_mapping()?;
+                let id = map.get(&serde_yaml::Value::String("id".to_string())).and_then(|v| v.as_str()).unwrap_or("");
+                let name = map.get(&serde_yaml::Value::String("name".to_string())).and_then(|v| v.as_str()).unwrap_or("");
+                Some(serde_json::json!({ "object": "user", "id": id, "name": name }))
+            }).collect();
+            return serde_json::json!({ "people": users });
+        }
+        Some("relation") => {
+            let ids: Vec<serde_json::Value> = seq.iter().filter_map(|v| {
+                let id = v.as_str().or_else(|| v.get("id").and_then(|i| i.as_str()))?;
+                Some(serde_json::json!({ "id": id }))
+            }).collect();
+            return serde_json::json!({ "relation": ids });
+        }
+        Some("files") => {
+            let files: Vec<serde_json::Value> = seq.iter().filter_map(|v| {
+                let map = v.as_mapping()?;
+                let name = map.get(&serde_yaml::Value::String("name".to_string())).and_then(|v| v.as_str()).unwrap_or("file");
+                let url = map.get(&serde_yaml::Value::String("url".to_string())).and_then(|v| v.as_str()).unwrap_or("");
+                Some(serde_json::json!({"name": name, "type": "external", "external": {"url": url}}))
+            }).collect();
+            return serde_json::json!({ "files": files });
+        }
+        _ => {}
+    }
+
+    // Fallback: detect from content shape
     match &seq[0] {
         serde_yaml::Value::String(_) => {
             let names: Vec<serde_json::Value> = seq.iter().map(|v| serde_json::json!({ "name": v.as_str().unwrap_or("") })).collect();
@@ -194,13 +248,18 @@ fn yaml_map_to_notion_json(m: &serde_yaml::Mapping) -> serde_json::Value {
     }
 }
 
-pub fn yaml_to_properties(yaml: &serde_yaml::Value, property_mapping: &HashMap<String, String>) -> HashMap<String, serde_json::Value> {
+pub fn yaml_to_properties(
+    yaml: &serde_yaml::Value,
+    property_mapping: &HashMap<String, String>,
+    prop_types: Option<&HashMap<String, String>>,
+) -> HashMap<String, serde_json::Value> {
     let mut result = HashMap::new();
     let yaml_map = match yaml.as_mapping() { Some(m) => m, None => return result };
     for (yaml_key, yaml_value) in yaml_map {
         let db_key = match yaml_key.as_str() { Some(k) => k, None => continue };
         let notion_name = match property_mapping.get(db_key) { Some(n) => n, None => continue };
-        // Title must use "title" type, not "rich_text"
+        let prop_type = prop_types.and_then(|pt| pt.get(db_key)).map(|s| s.as_str());
+        // Title must use "title" type, defaults from context
         let json_value = if db_key == "title" {
             let text = match yaml_value {
                 serde_yaml::Value::String(s) => s.as_str(),
@@ -208,7 +267,7 @@ pub fn yaml_to_properties(yaml: &serde_yaml::Value, property_mapping: &HashMap<S
             };
             serde_json::json!({ "title": [{ "type": "text", "text": { "content": text } }] })
         } else {
-            yaml_value_to_notion_json(yaml_value)
+            yaml_value_to_notion_json(yaml_value, prop_type)
         };
         if json_value.is_null() { continue; }
         result.insert(notion_name.clone(), json_value);

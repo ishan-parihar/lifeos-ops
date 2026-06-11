@@ -6,6 +6,7 @@ use serde::Deserialize;
 
 use crate::config::LifeOSConfig;
 use crate::notion::client::NotionClient;
+use crate::util::schema_engine::SchemaCache;
 
 /// Mutate tool parameters
 #[derive(Debug, Deserialize)]
@@ -28,10 +29,10 @@ pub fn schema() -> serde_json::Value {
         "type": "object",
         "properties": {
             "operation": { "type": "string", "enum": ["create", "update", "delete", "upsert"], "description": "Operation to perform" },
-            "database": { "type": "string", "description": "Target database key (e.g. tasks, projects)" },
+            "database": { "type": "string", "description": "Target database key" },
             "properties": {
                 "type": "object",
-                "description": "Key-value properties using config keys (e.g. action_date, status). Values may be simple scalars (string, number, bool) or Notion API property objects. Strings that look like dates (YYYY-MM-DD) become date properties; other strings become rich_text. For select/status fields pass a Notion object: {\"status\":{\"name\":\"Done\"}} or {\"select\":{\"name\":\"Option\"}}."
+                "description": "Key-value properties using config keys. Simple values auto-detect type: 'Done' for select/status fields becomes {\"select\":{\"name\":\"Done\"}}; 'https://...' becomes {\"url\":\"...\"}. For arrays use [\"A\",\"B\"] for multi_select, or pass Notion API format objects."
             },
             "page_id": { "type": "string", "description": "Page ID for update/delete" },
             "target_name": { "type": "string", "description": "Fuzzy page name to resolve for upsert/update/delete" }
@@ -59,18 +60,85 @@ fn looks_like_date(s: &str) -> bool {
         && s[..4].parse::<u32>().is_ok()
 }
 
-fn coerce_value(value: &serde_json::Value, config_key: &str) -> serde_json::Value {
+fn coerce_value(
+    value: &serde_json::Value,
+    config_key: &str,
+    prop_type: Option<&str>,
+) -> serde_json::Value {
     if is_notion_format(value) {
         return value.clone();
     }
     match value {
         serde_json::Value::String(s) => {
-            if config_key == "title" {
-                serde_json::json!({"title": [{"type": "text", "text": {"content": s}}]})
-            } else if looks_like_date(s) {
-                serde_json::json!({"date": {"start": s}})
-            } else {
-                serde_json::json!({"rich_text": [{"type": "text", "text": {"content": s}}]})
+            match prop_type {
+                Some("title") => serde_json::json!({"title": [{"type": "text", "text": {"content": s}}]}),
+                Some("select") => serde_json::json!({"select": {"name": s}}),
+                Some("status") => serde_json::json!({"status": {"name": s}}),
+                Some("url") => serde_json::json!({"url": s}),
+                Some("email") => serde_json::json!({"email": s}),
+                Some("phone_number") => serde_json::json!({"phone_number": s}),
+                _ => {
+                    if config_key == "title" {
+                        serde_json::json!({"title": [{"type": "text", "text": {"content": s}}]})
+                    } else if looks_like_date(s) {
+                        serde_json::json!({"date": {"start": s}})
+                    } else {
+                        serde_json::json!({"rich_text": [{"type": "text", "text": {"content": s}}]})
+                    }
+                }
+            }
+        }
+        serde_json::Value::Array(arr) => {
+            match prop_type {
+                Some("multi_select") => {
+                    let names: Vec<serde_json::Value> = arr.iter()
+                        .filter_map(|v| v.as_str())
+                        .map(|s| serde_json::json!({"name": s}))
+                        .collect();
+                    serde_json::json!({"multi_select": names})
+                }
+                Some("people") => {
+                    let users: Vec<serde_json::Value> = arr.iter()
+                        .filter_map(|v| {
+                            let id = v.get("id").and_then(|i| i.as_str()).or_else(|| v.as_str())?;
+                            let name = v.get("name").and_then(|n| n.as_str()).unwrap_or("");
+                            Some(serde_json::json!({"object": "user", "id": id, "name": name}))
+                        })
+                        .collect();
+                    serde_json::json!({"people": users})
+                }
+                Some("relation") => {
+                    let ids: Vec<serde_json::Value> = arr.iter()
+                        .filter_map(|v| {
+                            let id = v.get("id").and_then(|i| i.as_str()).or_else(|| v.as_str())?;
+                            Some(serde_json::json!({"id": id}))
+                        })
+                        .collect();
+                    serde_json::json!({"relation": ids})
+                }
+                Some("files") => {
+                    let files: Vec<serde_json::Value> = arr.iter()
+                        .filter_map(|v| {
+                            let name = v.get("name").and_then(|n| n.as_str()).unwrap_or("file");
+                            let url = v.get("url").and_then(|u| u.as_str()).unwrap_or("");
+                            Some(serde_json::json!({"name": name, "type": "external", "external": {"url": url}}))
+                        })
+                        .collect();
+                    serde_json::json!({"files": files})
+                }
+                _ => {
+                    // If user passes ["id1","id2"] without prop_type, try to detect from context
+                    let has_objects = arr.iter().any(|v| v.is_object());
+                    if !has_objects && arr.iter().all(|v| v.is_string()) {
+                        let ids: Vec<serde_json::Value> = arr.iter()
+                            .filter_map(|v| v.as_str())
+                            .map(|s| serde_json::json!({"id": s}))
+                            .collect();
+                        serde_json::json!({"relation": ids})
+                    } else {
+                        value.clone()
+                    }
+                }
             }
         }
         serde_json::Value::Number(n) => serde_json::json!({"number": n}),
@@ -79,16 +147,20 @@ fn coerce_value(value: &serde_json::Value, config_key: &str) -> serde_json::Valu
     }
 }
 
-/// Translate config-key property names → Notion property names and coerce simple values.
+/// Translate config-key property names → Notion property names and coerce values
+/// using schema type info for accurate formatting.
 fn map_properties(
     props: &serde_json::Value,
     property_mapping: &HashMap<String, String>,
+    db_key: &str,
+    schema_cache: &SchemaCache,
 ) -> serde_json::Value {
     let Some(map) = props.as_object() else { return props.clone() };
     let mut result = serde_json::Map::new();
     for (key, value) in map {
         let notion_key = property_mapping.get(key).map(|s| s.as_str()).unwrap_or(key.as_str());
-        result.insert(notion_key.to_string(), coerce_value(value, key));
+        let prop_type = schema_cache.get_prop_type(db_key, key);
+        result.insert(notion_key.to_string(), coerce_value(value, key, prop_type));
     }
     serde_json::Value::Object(result)
 }
@@ -97,6 +169,7 @@ pub async fn execute(
     params: &MutateParams,
     config: &Arc<LifeOSConfig>,
     notion: &Arc<NotionClient>,
+    schema_cache: &SchemaCache,
 ) -> Result<String, String> {
     let db = crate::get_db(config, &params.database)
         .ok_or_else(|| format!("Unknown database: {}", params.database))?;
@@ -105,7 +178,7 @@ pub async fn execute(
         "create" => {
             let props = params.properties.as_ref()
                 .ok_or("properties required for create")?;
-            let mapped = map_properties(props, &db.properties);
+            let mapped = map_properties(props, &db.properties, &params.database, schema_cache);
             let body = serde_json::json!({
                 "parent": { "data_source_id": db.ds_id() },
                 "properties": mapped
@@ -118,7 +191,7 @@ pub async fn execute(
             let page_id = resolve_page_id(params, notion, config).await?;
             let props = params.properties.as_ref()
                 .ok_or("properties required for update")?;
-            let mapped = map_properties(props, &db.properties);
+            let mapped = map_properties(props, &db.properties, &params.database, schema_cache);
             let page = notion.update_page(&page_id, &mapped).await?;
             let title = crate::transform::extract_title(&page);
             Ok(format!("Updated: {} ({})", title, page.id))
@@ -148,7 +221,7 @@ pub async fn execute(
 
             let props = params.properties.as_ref()
                 .ok_or("properties required for upsert")?;
-            let mapped = map_properties(props, &db.properties);
+            let mapped = map_properties(props, &db.properties, &params.database, schema_cache);
 
             if let Some(page) = result.results.first() {
                 notion.update_page(&page.id, &mapped).await?;
@@ -190,4 +263,3 @@ async fn resolve_page_id(
     }
     result.id.ok_or_else(|| format!("Could not resolve '{}' in {} database", name, params.database))
 }
-

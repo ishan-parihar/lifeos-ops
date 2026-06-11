@@ -159,7 +159,7 @@ async fn push_updated_page(
     if let Some(yaml_str) = frontmatter {
         let yaml_val: serde_yaml::Value = serde_yaml::from_str(yaml_str)
             .map_err(|e| format!("Parse YAML: {e}"))?;
-        let properties = yaml_to_properties(&yaml_val, property_map);
+        let properties = yaml_to_properties(&yaml_val, property_map, None);
 
         if !properties.is_empty() {
             if dry_run {
@@ -210,7 +210,7 @@ async fn push_created_page(
     let mut properties: HashMap<String, Value> = if let Some(yaml_str) = frontmatter {
         serde_yaml::from_str(yaml_str)
             .ok()
-            .map(|v: serde_yaml::Value| yaml_to_properties(&v, property_map))
+            .map(|v: serde_yaml::Value| yaml_to_properties(&v, property_map, None))
             .unwrap_or_default()
     } else {
         HashMap::new()

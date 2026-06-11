@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use lifeos_core::{LifeosServer, load_config, NotionClient, resolve_all_data_sources};
+use lifeos_core::{LifeosServer, load_config, NotionClient, resolve_all_data_sources, SchemaCache};
 
 pub async fn run_server() {
     let mut config = match load_config() {
@@ -34,8 +34,15 @@ pub async fn run_server() {
     }
 
     // Create the actual client with resolved config
-    let notion = Arc::new(NotionClient::new(config.clone(), token));
-    let server = LifeosServer::new(config, notion);
+    let config = Arc::new(config);
+    let notion = Arc::new(NotionClient::new((*config).clone(), token));
+
+    tracing::info!("Pre-warming schema cache...");
+    let schema_cache = SchemaCache::init(&config, &notion).await;
+    let schema_cache = Arc::new(schema_cache);
+    tracing::info!("Schema cache ready with {} databases", schema_cache.db_keys().len());
+
+    let server = LifeosServer::new((*config).clone(), notion, schema_cache);
 
     tracing::info!("Starting LifeOS MCP server on stdio");
 

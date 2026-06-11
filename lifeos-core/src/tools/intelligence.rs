@@ -5,6 +5,7 @@ use serde::Deserialize;
 
 use crate::config::LifeOSConfig;
 use crate::notion::client::NotionClient;
+use crate::util::schema_engine::SchemaCache;
 
 /// Intelligence briefing parameters
 #[derive(Debug, Deserialize)]
@@ -22,17 +23,34 @@ pub struct IntelligenceParams {
 /// Execute intelligence briefing
 
 /// Generate JSON Schema for this tool
-pub fn schema() -> serde_json::Value {
-    serde_json::json!({
+pub fn schema(schema_cache: &SchemaCache) -> serde_json::Value {
+    let mut obj = serde_json::json!({
         "type": "object",
         "properties": {
             "mode": { "type": "string", "enum": ["role", "module"], "description": "Briefing mode" },
             "role": { "type": "string", "enum": ["CEO", "COO", "CMO", "CRO", "CFO", "CHO"], "description": "Role key when mode=role" },
-            "module": { "type": "string", "description": "Module key when mode=module. Options: productivity (tasks, activity_log), health (diet_log, activity_log), strategic (annual_goals, quarterly_goals, projects), financial (financial_log, financial_accounts), content (campaigns, content_pipeline), journaling (subjective_journal, relational_journal, systemic_journal)" },
+            "module": { "type": "string", "enum": ["productivity", "health", "strategic", "financial", "content", "journaling"], "description": "Module key when mode=module" },
             "range": { "type": "string", "description": "Date range: today, this_week, this_month, this_quarter or ISO date" }
         },
         "required": ["mode"]
-    })
+    });
+
+    // Inject database property context
+    let db_help: serde_json::Value = serde_json::Value::Object(
+        schema_cache.db_keys().iter().map(|db_key| {
+            let desc = schema_cache.describe_db_properties(db_key);
+            (db_key.clone(), serde_json::Value::String(desc))
+        }).collect()
+    );
+    if let Some(props) = obj.get_mut("properties").and_then(|p| p.as_object_mut()) {
+        props.insert("_db_schemas".to_string(), serde_json::json!({
+            "type": "object",
+            "description": "Available databases and their property schemas with valid select/status/multi_select options",
+            "properties": db_help
+        }));
+    }
+
+    obj
 }
 
 fn build_target_query(target: &crate::config::BriefingTarget, db: &crate::config::DbConfig, range: &str) -> serde_json::Value {
@@ -63,6 +81,7 @@ pub async fn execute(
     params: &IntelligenceParams,
     config: &Arc<LifeOSConfig>,
     notion: &Arc<NotionClient>,
+    _schema_cache: &SchemaCache,
 ) -> Result<String, String> {
     let range = params.range.as_deref().unwrap_or("this_week");
 

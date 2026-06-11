@@ -7,16 +7,18 @@ use serde_json::{json, Value};
 use crate::config::LifeOSConfig;
 use crate::notion::client::NotionClient;
 use crate::tools;
+use crate::util::schema_engine::SchemaCache;
 
 /// LifeOS MCP Server — manual JSON-RPC over stdio
 pub struct LifeosServer {
     pub config: Arc<LifeOSConfig>,
     pub notion: Arc<NotionClient>,
+    pub schema_cache: Arc<SchemaCache>,
 }
 
 impl LifeosServer {
-    pub fn new(config: LifeOSConfig, notion: Arc<NotionClient>) -> Self {
-        Self { config: Arc::new(config), notion }
+    pub fn new(config: LifeOSConfig, notion: Arc<NotionClient>, schema_cache: Arc<SchemaCache>) -> Self {
+        Self { config: Arc::new(config), notion, schema_cache }
     }
 
     /// Run stdio MCP server (reads line-by-line, writes single-line JSON)
@@ -88,7 +90,7 @@ impl LifeosServer {
             "ping" => self.ok(&id, json!({})),
 
             "tools/list" => {
-                let tools = tools::get_tool_definitions(&self.config, &self.notion).await;
+                let tools = tools::get_tool_definitions(&self.config, &self.notion, &self.schema_cache).await;
                 self.ok(&id, json!({ "tools": tools }));
             }
 
@@ -99,7 +101,7 @@ impl LifeosServer {
 
                 tracing::info!("Tool call: {}", tool_name);
 
-                match tools::call_tool(&tool_name, &args, &self.config, &self.notion).await {
+                match tools::call_tool(&tool_name, &args, &self.config, &self.notion, &self.schema_cache).await {
                     Ok(text) => self.ok(&id, json!({
                         "content": [{ "type": "text", "text": text }]
                     })),
