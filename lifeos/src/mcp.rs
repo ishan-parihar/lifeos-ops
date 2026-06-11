@@ -18,7 +18,20 @@ pub async fn run_server() {
 
     // Create a temporary client to resolve data source IDs
     let resolver = NotionClient::new(config.clone(), token.clone());
-    resolve_all_data_sources(&mut config, &resolver).await;
+    let failures = resolve_all_data_sources(&mut config, &resolver).await;
+
+    if !failures.is_empty() {
+        for (db_key, err) in &failures {
+            tracing::error!("  ✗ {db_key}: {err}");
+        }
+        tracing::warn!(
+            "MCP server starting with {}/{} databases unresolved — tools targeting these databases will fail",
+            failures.len(),
+            config.databases.len()
+        );
+    } else {
+        tracing::info!("All {} databases resolved successfully", config.databases.len());
+    }
 
     // Create the actual client with resolved config
     let notion = Arc::new(NotionClient::new(config.clone(), token));

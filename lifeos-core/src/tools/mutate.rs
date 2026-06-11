@@ -180,6 +180,14 @@ async fn resolve_page_id(
     let result = crate::util::id_resolver::resolve_target_id(
         notion, config, &params.database, Some(name), None
     ).await;
-    result.id.ok_or_else(|| format!("Could not resolve '{}'", name))
+    if let Some(ref matches) = result.matches {
+        return Err(format!(
+            "Ambiguous name '{}': {} matches found. Use page_id instead:\n  - {}",
+            name,
+            matches.len(),
+            matches.join("\n  - ")
+        ));
+    }
+    result.id.ok_or_else(|| format!("Could not resolve '{}' in {} database", name, params.database))
 }
 

@@ -82,10 +82,13 @@ pub async fn execute(
             let mut by_status: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
             let mut projects: Vec<serde_json::Value> = Vec::new();
 
+            let status_prop = db.properties.get("status").map(|s| s.as_str()).unwrap_or("Status");
+            let progress_prop = db.properties.get("progress").map(|s| s.as_str()).unwrap_or("Progress");
+
             for page in &result.results {
                 let title = crate::transform::extract_title(page);
-                let status = crate::transform::extract_string(page, "Status");
-                let progress = crate::transform::extract_number(page, "Progress")
+                let status = crate::transform::extract_string(page, status_prop);
+                let progress = crate::transform::extract_number(page, progress_prop)
                     .unwrap_or(0.0);
                 *by_status.entry(status.clone()).or_insert(0) += 1;
                 projects.push(serde_json::json!({
@@ -109,12 +112,16 @@ pub async fn execute(
             let query = serde_json::json!({ "page_size": 50 });
             let result = notion.query_data_source(db.ds_id(), &query).await?;
 
+            let status_prop = db.properties.get("status").map(|s| s.as_str()).unwrap_or("Status");
+            let progress_prop = db.properties.get("progress").map(|s| s.as_str()).unwrap_or("Progress");
+            let target_prop = db.properties.get("target").map(|s| s.as_str()).unwrap_or("Target");
+
             let mut okrs: Vec<serde_json::Value> = Vec::new();
             for page in &result.results {
                 let title = crate::transform::extract_title(page);
-                let status = crate::transform::extract_string(page, "Status");
-                let progress = crate::transform::extract_number(page, "Progress");
-                let target = crate::transform::extract_number(page, "Target");
+                let status = crate::transform::extract_string(page, status_prop);
+                let progress = crate::transform::extract_number(page, progress_prop);
+                let target = crate::transform::extract_number(page, target_prop);
                 okrs.push(serde_json::json!({
                     "title": title, "status": status,
                     "progress": progress, "target": target
@@ -158,13 +165,18 @@ pub async fn execute(
             let query = serde_json::json!({ "page_size": 50 });
             let result = notion.query_data_source(db.ds_id(), &query).await?;
 
+            let status_prop = db.properties.get("status").map(|s| s.as_str()).unwrap_or("Status");
+            let roi_prop = db.properties.get("roi").map(|s| s.as_str()).unwrap_or("ROI");
+            let budget_prop = db.properties.get("budget").map(|s| s.as_str()).unwrap_or("Budget");
+            let spent_prop = db.properties.get("spent").map(|s| s.as_str()).unwrap_or("Spent");
+
             let mut campaigns: Vec<serde_json::Value> = Vec::new();
             for page in &result.results {
                 let title = crate::transform::extract_title(page);
-                let status = crate::transform::extract_string(page, "Status");
-                let roi = crate::transform::extract_number(page, "ROI");
-                let budget = crate::transform::extract_number(page, "Budget");
-                let spent = crate::transform::extract_number(page, "Spent");
+                let status = crate::transform::extract_string(page, status_prop);
+                let roi = crate::transform::extract_number(page, roi_prop);
+                let budget = crate::transform::extract_number(page, budget_prop);
+                let spent = crate::transform::extract_number(page, spent_prop);
                 campaigns.push(serde_json::json!({
                     "title": title, "status": status,
                     "roi": roi, "budget": budget, "spent": spent

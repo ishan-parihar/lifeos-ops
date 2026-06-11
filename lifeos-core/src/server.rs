@@ -73,11 +73,15 @@ impl LifeosServer {
             "initialize" => {
                 tracing::info!("Client initialized (protocol: {})",
                     req["params"]["protocolVersion"].as_str().unwrap_or("unknown"));
+                let db_count = self.config.databases.len();
                 self.ok(&id, json!({
                     "protocolVersion": "2024-11-05",
                     "capabilities": { "tools": {} },
                     "serverInfo": { "name": "lifeos-mcp", "version": "0.1.0" },
-                    "instructions": "LifeOS MCP server for Notion-based LifeOS databases"
+                    "instructions": format!(
+                        "LifeOS MCP server with {} databases and 7 tools: query, mutate, intelligence_briefing, data_science, review_pipeline, strategic_simulator, sync_note",
+                        db_count
+                    )
                 }));
             }
 

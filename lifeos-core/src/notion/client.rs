@@ -238,8 +238,9 @@ impl NotionClient {
 }
 
 /// Resolve all database_ids in config to their data_source_ids.
-/// Mutates config in place. Logs warnings for databases that can't be resolved.
-pub async fn resolve_all_data_sources(config: &mut LifeOSConfig, notion: &NotionClient) {
+/// Mutates config in place. Returns list of (db_key, error) for each failure.
+pub async fn resolve_all_data_sources(config: &mut LifeOSConfig, notion: &NotionClient) -> Vec<(String, String)> {
+    let mut failures = Vec::new();
     for (key, db) in config.databases.iter_mut() {
         match notion.resolve_data_source_id(&db.database_id).await {
             Ok(ds_id) => {
@@ -247,8 +248,18 @@ pub async fn resolve_all_data_sources(config: &mut LifeOSConfig, notion: &Notion
                 db.resolved_data_source_id = Some(ds_id);
             }
             Err(e) => {
-                tracing::warn!("Could not resolve data_source_id for {key} ({}): {e}", db.database_id);
+                let msg = format!("Could not resolve data_source_id for {key} ({}): {e}", db.database_id);
+                tracing::warn!("{msg}");
+                failures.push((key.clone(), e));
             }
         }
     }
+    if !failures.is_empty() {
+        tracing::error!(
+            "Data source resolution: {}/{} databases failed",
+            failures.len(),
+            config.databases.len()
+        );
+    }
+    failures
 }

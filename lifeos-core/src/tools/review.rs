@@ -37,24 +37,15 @@ pub async fn execute(
     config: &Arc<LifeOSConfig>,
     notion: &Arc<NotionClient>,
 ) -> Result<String, String> {
-    let (_date_filter, period_label, days_back) = match params.review_type.as_str() {
+    let (period_label, days_back): (String, i64) = match params.review_type.as_str() {
         "daily" => {
             let d = params.date.clone().unwrap_or_else(|| chrono::Utc::now().format("%Y-%m-%d").to_string());
-            (format!("on_or_after:{}", d), format!("Day: {}", &d[..10]), 1i64)
+            (format!("Day: {}", &d[..10]), 1)
         }
-        "weekly" => {
-            let d = (chrono::Utc::now() - chrono::Duration::days(7)).format("%Y-%m-%d").to_string();
-            (format!("on_or_after:{}", d), "This Week".into(), 7)
-        }
-        "monthly" => {
-            let d = (chrono::Utc::now() - chrono::Duration::days(30)).format("%Y-%m-%d").to_string();
-            (format!("on_or_after:{}", d), "This Month".into(), 30)
-        }
-        "quarterly" => {
-            let d = (chrono::Utc::now() - chrono::Duration::days(90)).format("%Y-%m-%d").to_string();
-            (format!("on_or_after:{}", d), "This Quarter".into(), 90)
-        }
-        "journal" => ("all".into(), "Journal Review".into(), 0),
+        "weekly" => ("This Week".into(), 7),
+        "monthly" => ("This Month".into(), 30),
+        "quarterly" => ("This Quarter".into(), 90),
+        "journal" => ("Journal Review".into(), 0),
         _ => return Err(format!("Unknown review type: {}", params.review_type)),
     };
 

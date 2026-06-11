@@ -54,14 +54,13 @@ pub async fn execute(
         "temporal" => {
             let db = crate::get_db(config, &params.database)
                 .ok_or_else(|| format!("Unknown database: {}", params.database))?;
-            let date_prop = date_prop_for(db);
+            let date_prop = date_prop_for(db)?;
             let query = serde_json::json!({
                 "page_size": 100,
                 "filter": { "property": date_prop, "date": { "on_or_after": since } }
             });
             let result = notion.query_data_source(db.ds_id(), &query).await?;
 
-            // Group by date
             let mut by_date: std::collections::BTreeMap<String, i64> = std::collections::BTreeMap::new();
             for page in &result.results {
                 let d = crate::transform::extract_date(page, date_prop);
@@ -87,7 +86,7 @@ pub async fn execute(
             let metric = params.metric_property.as_deref()
                 .or_else(|| db.properties.keys().find(|k| k.as_str() == "energy" || k.as_str() == "mood" || k.as_str() == "score").map(|s| s.as_str()))
                 .ok_or("metric_property required for trajectories")?;
-            let date_prop = date_prop_for(db);
+            let date_prop = date_prop_for(db)?;
 
             let query = serde_json::json!({
                 "page_size": 100,
@@ -116,7 +115,7 @@ pub async fn execute(
         "weekday_profile" => {
             let db = crate::get_db(config, &params.database)
                 .ok_or_else(|| format!("Unknown database: {}", params.database))?;
-            let date_prop = date_prop_for(db);
+            let date_prop = date_prop_for(db)?;
             let query = serde_json::json!({
                 "page_size": 100,
                 "filter": { "property": date_prop, "date": { "on_or_after": since } }
@@ -145,10 +144,11 @@ pub async fn execute(
     }
 }
 
-fn date_prop_for(db: &crate::config::DbConfig) -> &str {
+/// Resolve a Notion date property name from config keys, or return an error.
+fn date_prop_for(db: &crate::config::DbConfig) -> Result<&str, String> {
     db.properties.get("date")
         .or_else(|| db.properties.get("action_date"))
         .or_else(|| db.properties.get("created_date"))
         .map(|s| s.as_str())
-        .unwrap_or("Last edited time")
+        .ok_or_else(|| format!("No date property configured for '{}' — expected one of: date, action_date, created_date", db.name))
 }

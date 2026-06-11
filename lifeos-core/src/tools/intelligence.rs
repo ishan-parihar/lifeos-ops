@@ -45,17 +45,19 @@ pub async fn execute(
 
     match params.mode.as_str() {
         "role" => {
-            let role = params.role.as_deref().unwrap_or("CEO");
+            let role_display = params.role.as_deref().unwrap_or("CEO");
+            let role_key = role_display.to_lowercase();
             let targets = config.briefings.as_ref()
-                .and_then(|b| b.roles.get(role))
-                .ok_or_else(|| format!("Unknown role: {}", role))?;
+                .and_then(|b| b.roles.get(role_key.as_str()))
+                .ok_or_else(|| format!("Unknown role: {} — valid roles: CEO, COO, CMO, CRO, CFO, CHO", role_display))?;
 
             let mut data = serde_json::json!({
                 "briefing_type": "role",
-                "role": role,
+                "role": role_display,
                 "range": range
             });
 
+            let mut errors: Vec<String> = Vec::new();
             for target in targets {
                 if let Some(db) = crate::get_db(config, &target.db) {
                     let mut query = serde_json::json!({ "page_size": target.limit.unwrap_or(10) });
@@ -64,31 +66,41 @@ pub async fn execute(
                             query["filter"] = date_filter.clone();
                         }
                     }
-                    if let Ok(result) = notion.query_data_source(db.ds_id(), &query).await {
-                        let items: Vec<serde_json::Value> = result.results.iter()
-                            .map(|p| {
-                                let title = crate::transform::extract_title(p);
-                                serde_json::json!({ "title": title, "id": p.id })
-                            }).collect();
-                        data[&target.db] = serde_json::json!(items);
+                    match notion.query_data_source(db.ds_id(), &query).await {
+                        Ok(result) => {
+                            let items: Vec<serde_json::Value> = result.results.iter()
+                                .map(|p| {
+                                    let title = crate::transform::extract_title(p);
+                                    serde_json::json!({ "title": title, "id": p.id })
+                                }).collect();
+                            data[&target.db] = serde_json::json!(items);
+                        }
+                        Err(e) => {
+                            errors.push(format!("{}: {}", target.db, e));
+                        }
                     }
                 }
+            }
+            if !errors.is_empty() {
+                data["_errors"] = serde_json::json!(errors);
             }
 
             Ok(crate::toon_format::encode(&data))
         }
         "module" => {
-            let module = params.module.as_deref().unwrap_or("productivity");
+            let module_display = params.module.as_deref().unwrap_or("productivity");
+            let module_key = module_display.to_lowercase();
             let targets = config.briefings.as_ref()
-                .and_then(|b| b.modules.get(module))
-                .ok_or_else(|| format!("Unknown module: {}", module))?;
+                .and_then(|b| b.modules.get(module_key.as_str()))
+                .ok_or_else(|| format!("Unknown module: {}", module_display))?;
 
             let mut data = serde_json::json!({
                 "briefing_type": "module",
-                "module": module,
+                "module": module_display,
                 "range": range
             });
 
+            let mut errors: Vec<String> = Vec::new();
             for target in targets {
                 if let Some(db) = crate::get_db(config, &target.db) {
                     let mut query = serde_json::json!({ "page_size": target.limit.unwrap_or(10) });
@@ -97,15 +109,23 @@ pub async fn execute(
                             query["filter"] = date_filter.clone();
                         }
                     }
-                    if let Ok(result) = notion.query_data_source(db.ds_id(), &query).await {
-                        let items: Vec<serde_json::Value> = result.results.iter()
-                            .map(|p| {
-                                let title = crate::transform::extract_title(p);
-                                serde_json::json!({ "title": title, "id": p.id })
-                            }).collect();
-                        data[&target.db] = serde_json::json!(items);
+                    match notion.query_data_source(db.ds_id(), &query).await {
+                        Ok(result) => {
+                            let items: Vec<serde_json::Value> = result.results.iter()
+                                .map(|p| {
+                                    let title = crate::transform::extract_title(p);
+                                    serde_json::json!({ "title": title, "id": p.id })
+                                }).collect();
+                            data[&target.db] = serde_json::json!(items);
+                        }
+                        Err(e) => {
+                            errors.push(format!("{}: {}", target.db, e));
+                        }
                     }
                 }
+            }
+            if !errors.is_empty() {
+                data["_errors"] = serde_json::json!(errors);
             }
 
             Ok(crate::toon_format::encode(&data))
