@@ -28,11 +28,35 @@ pub fn schema() -> serde_json::Value {
         "properties": {
             "mode": { "type": "string", "enum": ["role", "module"], "description": "Briefing mode" },
             "role": { "type": "string", "enum": ["CEO", "COO", "CMO", "CRO", "CFO", "CHO"], "description": "Role key when mode=role" },
-            "module": { "type": "string", "description": "Module key when mode=module" },
+            "module": { "type": "string", "description": "Module key when mode=module. Options: productivity (tasks, activity_log), health (diet_log, activity_log), strategic (annual_goals, quarterly_goals, projects), financial (financial_log, financial_accounts), content (campaigns, content_pipeline), journaling (subjective_journal, relational_journal, systemic_journal)" },
             "range": { "type": "string", "description": "Date range: today, this_week, this_month, this_quarter or ISO date" }
         },
         "required": ["mode"]
     })
+}
+
+fn build_target_query(target: &crate::config::BriefingTarget, db: &crate::config::DbConfig, range: &str) -> serde_json::Value {
+    let mut query = serde_json::json!({ "page_size": target.limit.unwrap_or(10) });
+
+    if let Some(ref static_filter) = target.filter {
+        query["filter"] = static_filter.clone();
+    }
+
+    if target.date_filter.unwrap_or(false) {
+        let date_prop = db.properties.get("date").map(|s| s.as_str()).unwrap_or("Date");
+        if let Some(df) = build_date_filter(range, date_prop) {
+            if query.get("filter").is_some() {
+                let combined = serde_json::json!({
+                    "and": [query["filter"].clone(), df]
+                });
+                query["filter"] = combined;
+            } else {
+                query["filter"] = df;
+            }
+        }
+    }
+
+    query
 }
 
 pub async fn execute(
@@ -41,7 +65,6 @@ pub async fn execute(
     notion: &Arc<NotionClient>,
 ) -> Result<String, String> {
     let range = params.range.as_deref().unwrap_or("this_week");
-    let date_filter = build_date_filter(range);
 
     match params.mode.as_str() {
         "role" => {
@@ -60,12 +83,7 @@ pub async fn execute(
             let mut errors: Vec<String> = Vec::new();
             for target in targets {
                 if let Some(db) = crate::get_db(config, &target.db) {
-                    let mut query = serde_json::json!({ "page_size": target.limit.unwrap_or(10) });
-                    if let Some(ref date_filter) = date_filter {
-                        if target.date_filter.unwrap_or(false) {
-                            query["filter"] = date_filter.clone();
-                        }
-                    }
+                    let query = build_target_query(target, db, range);
                     match notion.query_data_source(db.ds_id(), &query).await {
                         Ok(result) => {
                             let items: Vec<serde_json::Value> = result.results.iter()
@@ -92,7 +110,7 @@ pub async fn execute(
             let module_key = module_display.to_lowercase();
             let targets = config.briefings.as_ref()
                 .and_then(|b| b.modules.get(module_key.as_str()))
-                .ok_or_else(|| format!("Unknown module: {}", module_display))?;
+                .ok_or_else(|| format!("Unknown module: {} — valid modules: productivity, health, strategic, financial, content, journaling", module_display))?;
 
             let mut data = serde_json::json!({
                 "briefing_type": "module",
@@ -103,12 +121,7 @@ pub async fn execute(
             let mut errors: Vec<String> = Vec::new();
             for target in targets {
                 if let Some(db) = crate::get_db(config, &target.db) {
-                    let mut query = serde_json::json!({ "page_size": target.limit.unwrap_or(10) });
-                    if let Some(ref date_filter) = date_filter {
-                        if target.date_filter.unwrap_or(false) {
-                            query["filter"] = date_filter.clone();
-                        }
-                    }
+                    let query = build_target_query(target, db, range);
                     match notion.query_data_source(db.ds_id(), &query).await {
                         Ok(result) => {
                             let items: Vec<serde_json::Value> = result.results.iter()
@@ -134,23 +147,33 @@ pub async fn execute(
     }
 }
 
-fn build_date_filter(range: &str) -> Option<serde_json::Value> {
+fn build_date_filter(range: &str, date_prop: &str) -> Option<serde_json::Value> {
     let now = chrono::Utc::now();
     match range {
         "today" => Some(serde_json::json!({
+            "property": date_prop,
             "date": { "equals": now.format("%Y-%m-%d").to_string() }
         })),
         "this_week" => {
             let start = (now - chrono::Duration::days(7)).format("%Y-%m-%d").to_string();
-            Some(serde_json::json!({ "date": { "on_or_after": start } }))
+            Some(serde_json::json!({
+                "property": date_prop,
+                "date": { "on_or_after": start }
+            }))
         }
         "this_month" => {
             let start = (now - chrono::Duration::days(30)).format("%Y-%m-%d").to_string();
-            Some(serde_json::json!({ "date": { "on_or_after": start } }))
+            Some(serde_json::json!({
+                "property": date_prop,
+                "date": { "on_or_after": start }
+            }))
         }
         "this_quarter" => {
             let start = (now - chrono::Duration::days(90)).format("%Y-%m-%d").to_string();
-            Some(serde_json::json!({ "date": { "on_or_after": start } }))
+            Some(serde_json::json!({
+                "property": date_prop,
+                "date": { "on_or_after": start }
+            }))
         }
         _ => None,
     }
