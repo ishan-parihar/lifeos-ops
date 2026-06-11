@@ -105,7 +105,7 @@ pub async fn execute(
             Ok(crate::toon_format::encode(&data))
         }
         "okr_progress" => {
-            let db_key = params.okr_database.as_deref().unwrap_or("okrs");
+            let db_key = params.okr_database.as_deref().unwrap_or("quarterly_goals");
             let db = crate::get_db(config, db_key)
                 .ok_or_else(|| format!("Unknown database: {}", db_key))?;
 

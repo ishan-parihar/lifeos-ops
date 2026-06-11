@@ -349,7 +349,7 @@ async fn push_page_changes(
         .ok_or_else(|| format!("Unknown db: {db_key}"))?;
 
     let merged_yaml = serde_yaml::Value::Mapping(merge_result.merged_frontmatter.clone());
-    let properties = yaml_to_properties(&merged_yaml, &db.properties);
+    let properties = yaml_to_properties(&merged_yaml, &db.properties, None);
 
     if !properties.is_empty() {
         let prop_body = serde_json::json!({ "properties": properties });

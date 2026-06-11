@@ -30,7 +30,7 @@ pub fn schema() -> serde_json::Value {
     serde_json::json!({
         "type": "object",
         "properties": {
-            "analysis_type": { "type": "string", "enum": ["temporal", "trajectories", "weekday_profile"], "description": "Analysis type" },
+            "analysis_type": { "type": "string", "enum": ["temporal", "trajectories", "correlations", "weekday_profile", "patterns"], "description": "Analysis type" },
             "database": { "type": "string", "description": "Primary database to analyze" },
             "database_b": { "type": "string", "description": "Secondary database for correlations" },
             "days_back": { "type": "integer", "description": "Days to look back (default: 30)" },
