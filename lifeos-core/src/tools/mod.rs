@@ -51,6 +51,9 @@ pub async fn get_tool_definitions(config: &LifeOSConfig, _notion: &NotionClient,
         tool_def("query", format!(
             "Unified high-fidelity query tool. Supports property filters, sort orders, limit 100, and presets (active, this_week, this_month, needs_review). Returns TOON-encoded results.\n\nDatabase schemas:\n{}\n\nUse the _db_schemas field in inputSchema for valid config-keys and their types/options.", db_schema_desc
         ), query_schema),
+        tool_def("query_override", format!(
+            "Schema-validated query with AI override. Validates filter property names and types against the database schema before execution. Use when you need to override a briefing's default filter or apply custom filters with type safety.\n\nDatabase schemas:\n{}", db_schema_desc
+        ), query::schema_override(config, schema_cache)),
         tool_def("mutate", format!(
             "Create, update, delete, or upsert entries across all LifeOS databases. Returns TOON operation summary. Values auto-map to correct Notion types (select, status, url, email, multi_select, people, relation, files, date, number, checkbox) based on schema.\n\nDatabase schemas:\n{}", db_schema_desc
         ), mutate_schema),
@@ -89,6 +92,11 @@ pub async fn call_tool(
             let params: query::QueryParams = serde_json::from_value(args.clone())
                 .map_err(|e| format!("Invalid query params: {}", e))?;
             query::execute(&params, config, notion, schema_cache).await
+        }
+        "query_override" => {
+            let params: query::QueryOverrideParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid query_override params: {}", e))?;
+            query::execute_override(&params, config, notion, schema_cache).await
         }
         "mutate" => {
             let params: mutate::MutateParams = serde_json::from_value(args.clone())

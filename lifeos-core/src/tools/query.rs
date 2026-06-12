@@ -7,6 +7,9 @@ use crate::config::LifeOSConfig;
 use crate::notion::client::NotionClient;
 use crate::util::schema_engine::SchemaCache;
 
+/// Property types that cannot be used in Notion filters
+const NON_FILTERABLE: &[&str] = &["formula", "rollup", "button", "unique_id"];
+
 /// Query tool parameters
 #[derive(Debug, Deserialize)]
 pub struct QueryParams {
@@ -196,4 +199,164 @@ fn build_filter(property: &str, filter_type: &str, value: &str) -> serde_json::V
 /// Build filter given a Notion property name and schema-derived type.
 fn build_filter_with_prop(notion_prop: &str, actual_type: &str, value: &str) -> serde_json::Value {
     build_filter(notion_prop, actual_type, value)
+}
+
+// ─── query_override tool ────────────────────────────────────────────
+
+/// Parameters for query_override — AI-validated query with override capability
+#[derive(Debug, Deserialize)]
+pub struct QueryOverrideParams {
+    pub database: String,
+    pub filter: Option<serde_json::Value>,
+    pub sort: Option<serde_json::Value>,
+    pub limit: Option<u32>,
+    pub return_properties: Option<Vec<String>>,
+}
+
+/// MCP schema for query_override tool
+pub fn schema_override(config: &LifeOSConfig, schema_cache: &SchemaCache) -> serde_json::Value {
+    let mut obj = serde_json::json!({
+        "type": "object",
+        "properties": {
+            "database": { "type": "string", "description": "Database key (activity_log, tasks, projects, etc.)" },
+            "filter": {
+                "type": "object",
+                "description": "Notion filter object. Validate property names and types against the database schema before passing.",
+                "properties": {
+                    "property": { "type": "string", "description": "Config-key of the property (will be resolved to Notion name)" },
+                    "operator": { "type": "string", "enum": ["equals", "contains", "starts_with", "ends_with", "before", "after", "on_or_before", "on_or_after"], "description": "Filter operator" },
+                    "value": { "type": "string", "description": "Filter value" }
+                }
+            },
+            "sort": {
+                "type": "object",
+                "description": "Sort configuration",
+                "properties": {
+                    "property": { "type": "string", "description": "Config-key to sort by" },
+                    "direction": { "type": "string", "enum": ["ascending", "descending"] }
+                }
+            },
+            "limit": { "type": "integer", "minimum": 1, "maximum": 100, "description": "Max results (default: 50)" },
+            "return_properties": { "type": "array", "items": { "type": "string" }, "description": "Specific config-keys to return" }
+        },
+        "required": ["database"]
+    });
+
+    let db_help: serde_json::Value = serde_json::Value::Object(
+        config.databases.keys().map(|db_key| {
+            let desc = schema_cache.describe_db_properties(db_key);
+            (db_key.clone(), serde_json::Value::String(desc))
+        }).collect()
+    );
+    if let Some(props) = obj.get_mut("properties").and_then(|p| p.as_object_mut()) {
+        props.insert("_db_schemas".to_string(), serde_json::json!({
+            "type": "object",
+            "description": "Available database keys and their property schemas — validate against these before sending",
+            "properties": db_help
+        }));
+    }
+
+    obj
+}
+
+/// Execute query_override — validates filter against SchemaCache, then executes
+pub async fn execute_override(
+    params: &QueryOverrideParams,
+    config: &Arc<LifeOSConfig>,
+    notion: &Arc<NotionClient>,
+    schema_cache: &SchemaCache,
+) -> Result<String, String> {
+    let db = crate::get_db(config, &params.database)
+        .ok_or_else(|| format!("Unknown database: {}", params.database))?;
+
+    let limit = params.limit.unwrap_or(50).min(100) as u64;
+    let mut body = serde_json::json!({ "page_size": limit });
+
+    if let Some(ref filter_obj) = params.filter {
+        let prop_key = filter_obj.get("property")
+            .and_then(|v| v.as_str())
+            .ok_or("Filter missing 'property' field")?;
+        let operator = filter_obj.get("operator")
+            .and_then(|v| v.as_str())
+            .unwrap_or("equals");
+        let value = filter_obj.get("value")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        let notion_prop = db.properties.get(prop_key)
+            .map(|s| s.as_str())
+            .unwrap_or(prop_key);
+
+        let prop_type = schema_cache.get_prop_type(&params.database, prop_key)
+            .unwrap_or("rich_text");
+        if NON_FILTERABLE.contains(&prop_type) {
+            return Err(format!(
+                "Property '{}' is type '{}' which cannot be filtered. Valid filterable properties: {}",
+                prop_key, prop_type,
+                db.properties.keys().filter(|k| {
+                    schema_cache.get_prop_type(&params.database, k)
+                        .map(|t| !NON_FILTERABLE.contains(&t))
+                        .unwrap_or(true)
+                }).map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
+            ));
+        }
+
+        body["filter"] = match operator {
+            "equals" => build_filter(notion_prop, prop_type, value),
+            "contains" => serde_json::json!({ "property": notion_prop, "rich_text": { "contains": value } }),
+            "starts_with" => serde_json::json!({ "property": notion_prop, "rich_text": { "starts_with": value } }),
+            "ends_with" => serde_json::json!({ "property": notion_prop, "rich_text": { "ends_with": value } }),
+            "before" => serde_json::json!({ "property": notion_prop, "date": { "before": value } }),
+            "after" => serde_json::json!({ "property": notion_prop, "date": { "after": value } }),
+            "on_or_before" => serde_json::json!({ "property": notion_prop, "date": { "on_or_before": value } }),
+            "on_or_after" => serde_json::json!({ "property": notion_prop, "date": { "on_or_after": value } }),
+            _ => build_filter(notion_prop, prop_type, value),
+        };
+    }
+
+    if let Some(ref sort_obj) = params.sort {
+        let sort_prop = sort_obj.get("property")
+            .and_then(|v| v.as_str())
+            .unwrap_or("date");
+        let direction = sort_obj.get("direction")
+            .and_then(|v| v.as_str())
+            .unwrap_or("descending");
+        body["sorts"] = serde_json::json!([
+            { "property": sort_prop, "direction": direction }
+        ]);
+    }
+
+    let result = notion.query_data_source(db.ds_id(), &body).await?;
+
+    let items: Vec<serde_json::Value> = result.results.iter().map(|page| {
+        let title = crate::transform::extract_title(page);
+        let mut item = serde_json::json!({ "title": title, "id": page.id });
+
+        if let Some(ref props) = params.return_properties {
+            for prop_key in props {
+                if let Some(notion_name) = db.properties.get(prop_key) {
+                    let val = crate::transform::extract_string(page, notion_name);
+                    if !val.is_empty() {
+                        item[prop_key] = serde_json::json!(val);
+                    }
+                }
+            }
+        }
+        item
+    }).collect();
+
+    let mut data = serde_json::Map::new();
+    data.insert("__schema".into(), serde_json::json!({
+        "database": &params.database, "name": &db.name
+    }));
+    data.insert(params.database.clone(), serde_json::json!(items));
+    data.insert("meta".into(), serde_json::json!({
+        "count": result.results.len(),
+        "has_more": result.has_more,
+        "applied_filter": params.filter,
+        "applied_sort": params.sort,
+    }));
+    let toon_data = serde_json::Value::Object(data);
+
+    Ok(crate::toon_format::encode(&toon_data))
 }

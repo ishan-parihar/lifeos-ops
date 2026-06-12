@@ -30,17 +30,52 @@ pub struct RateLimitConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BriefingFilters {
+    #[serde(rename = "static")]
+    pub default_filter: Option<serde_json::Value>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BriefingTarget {
     pub db: String,
+    pub intent: Option<String>,
+    pub description: Option<String>,
+    /// Legacy field — `filters.static` takes precedence when both present
+    #[serde(default)]
     pub filter: Option<serde_json::Value>,
+    /// Nested filter with description — takes precedence over `filter`
+    #[serde(default)]
+    pub filters: Option<BriefingFilters>,
     pub limit: Option<usize>,
     pub date_filter: Option<bool>,
+    #[serde(default)]
+    pub sort: Option<serde_json::Value>,
+}
+
+impl BriefingTarget {
+    pub fn effective_filter(&self) -> Option<&serde_json::Value> {
+        self.filters.as_ref()
+            .and_then(|f| f.default_filter.as_ref())
+            .or(self.filter.as_ref())
+    }
+
+    pub fn filter_description(&self) -> Option<&str> {
+        self.filters.as_ref()
+            .and_then(|f| f.description.as_deref())
+            .or(self.description.as_deref())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BriefingConfig {
     pub roles: HashMap<String, Vec<BriefingTarget>>,
     pub modules: HashMap<String, Vec<BriefingTarget>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NotionConfig {
+    pub api_key: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,6 +87,8 @@ pub struct LifeOSConfig {
     pub databases: HashMap<String, DbConfig>,
     #[serde(default)]
     pub briefings: Option<BriefingConfig>,
+    #[serde(default)]
+    pub notion: Option<NotionConfig>,
 }
 
 fn default_api_version() -> String {

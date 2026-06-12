@@ -18,6 +18,8 @@ pub struct IntelligenceParams {
     pub module: Option<String>,
     /// Date range: "today", "this_week", "this_month", "this_quarter" or ISO date
     pub range: Option<String>,
+    /// Per-database overrides: { db_key: { filter: {...}, sort: {...} } }
+    pub overrides: Option<std::collections::HashMap<String, serde_json::Value>>,
 }
 
 /// Execute intelligence briefing
@@ -30,7 +32,18 @@ pub fn schema(schema_cache: &SchemaCache) -> serde_json::Value {
             "mode": { "type": "string", "enum": ["role", "module"], "description": "Briefing mode" },
             "role": { "type": "string", "enum": ["CEO", "COO", "CMO", "CRO", "CFO", "CHO"], "description": "Role key when mode=role" },
             "module": { "type": "string", "enum": ["productivity", "health", "strategic", "financial", "content", "journaling"], "description": "Module key when mode=module" },
-            "range": { "type": "string", "description": "Date range: today, this_week, this_month, this_quarter or ISO date" }
+            "range": { "type": "string", "description": "Date range: today, this_week, this_month, this_quarter or ISO date" },
+            "overrides": {
+                "type": "object",
+                "description": "Per-database overrides: { db_key: { filter: {...}, sort: {...} } }. Schema-aware: use _db_schemas to check valid property names and select/status options before overriding.",
+                "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                        "filter": { "type": "object", "description": "Notion API filter to override the static default" },
+                        "sort": { "type": "object", "description": "Notion API sort to override the default sort" }
+                    }
+                }
+            }
         },
         "required": ["mode"]
     });
@@ -154,11 +167,17 @@ fn build_target_query(
     db_key: &str,
     range: &str,
     schema_cache: &SchemaCache,
-) -> serde_json::Value {
+    override_filter: Option<&serde_json::Value>,
+    override_sort: Option<&serde_json::Value>,
+) -> (serde_json::Value, serde_json::Value) {
     let mut query = serde_json::json!({ "page_size": target.limit.unwrap_or(10) });
 
-    if let Some(ref static_filter) = target.filter {
-        let corrected = correct_filter_type(static_filter, db_key, schema_cache, &db.properties);
+    // Priority: override_filter > filters.static > filter
+    let static_filter = target.effective_filter();
+    let final_filter = override_filter.or(static_filter);
+
+    if let Some(ref f) = final_filter {
+        let corrected = correct_filter_type(f, db_key, schema_cache, &db.properties);
         if !corrected.is_null() {
             query["filter"] = corrected;
         }
@@ -178,7 +197,23 @@ fn build_target_query(
         }
     }
 
-    query
+    // Priority: override_sort > target.sort
+    if let Some(sort) = override_sort.or(target.sort.as_ref()) {
+        query["sorts"] = sort.clone();
+    }
+
+    let meta = serde_json::json!({
+        "applied_filters": {
+            "database": db_key,
+            "static_filter": static_filter,
+            "override_filter": override_filter,
+            "final_filter": final_filter,
+            "sort": override_sort.or(target.sort.as_ref()),
+            "description": target.filter_description()
+        }
+    });
+
+    (query, meta)
 }
 
 pub async fn execute(
@@ -203,10 +238,16 @@ pub async fn execute(
                 "range": range
             });
 
+            let mut all_meta: Vec<serde_json::Value> = Vec::new();
             let mut errors: Vec<String> = Vec::new();
             for target in targets {
                 if let Some(db) = crate::get_db(config, &target.db) {
-                    let query = build_target_query(target, db, &target.db, range, schema_cache);
+                    let target_override = params.overrides.as_ref()
+                        .and_then(|o| o.get(&target.db));
+                    let ov_filter = target_override.and_then(|o| o.get("filter"));
+                    let ov_sort = target_override.and_then(|o| o.get("sort"));
+                    let (query, meta) = build_target_query(target, db, &target.db, range, schema_cache, ov_filter, ov_sort);
+                    all_meta.push(meta);
                     match notion.query_data_source(db.ds_id(), &query).await {
                         Ok(result) => {
                             let items: Vec<serde_json::Value> = result.results.iter()
@@ -224,6 +265,9 @@ pub async fn execute(
             }
             if !errors.is_empty() {
                 data["_errors"] = serde_json::json!(errors);
+            }
+            if !all_meta.is_empty() {
+                data["_meta"] = serde_json::json!({ "per_database": all_meta });
             }
 
             Ok(crate::toon_format::encode(&data))
@@ -241,10 +285,16 @@ pub async fn execute(
                 "range": range
             });
 
+            let mut all_meta: Vec<serde_json::Value> = Vec::new();
             let mut errors: Vec<String> = Vec::new();
             for target in targets {
                 if let Some(db) = crate::get_db(config, &target.db) {
-                    let query = build_target_query(target, db, &target.db, range, schema_cache);
+                    let target_override = params.overrides.as_ref()
+                        .and_then(|o| o.get(&target.db));
+                    let ov_filter = target_override.and_then(|o| o.get("filter"));
+                    let ov_sort = target_override.and_then(|o| o.get("sort"));
+                    let (query, meta) = build_target_query(target, db, &target.db, range, schema_cache, ov_filter, ov_sort);
+                    all_meta.push(meta);
                     match notion.query_data_source(db.ds_id(), &query).await {
                         Ok(result) => {
                             let items: Vec<serde_json::Value> = result.results.iter()
@@ -262,6 +312,9 @@ pub async fn execute(
             }
             if !errors.is_empty() {
                 data["_errors"] = serde_json::json!(errors);
+            }
+            if !all_meta.is_empty() {
+                data["_meta"] = serde_json::json!({ "per_database": all_meta });
             }
 
             Ok(crate::toon_format::encode(&data))

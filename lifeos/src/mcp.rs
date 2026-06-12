@@ -12,8 +12,14 @@ pub async fn run_server() {
     };
 
     let token = std::env::var("NOTION_API_TOKEN").unwrap_or_else(|_| {
-        eprintln!("NOTION_API_TOKEN environment variable is required");
-        std::process::exit(1);
+        config
+            .notion
+            .as_ref()
+            .and_then(|n| n.api_key.clone())
+            .unwrap_or_else(|| {
+                eprintln!("NOTION_API_TOKEN environment variable or notion.api_key in config is required");
+                std::process::exit(1);
+            })
     });
 
     // Create a temporary client to resolve data source IDs
