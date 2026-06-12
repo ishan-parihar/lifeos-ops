@@ -70,6 +70,12 @@ pub async fn execute(
     let limit = params.limit.unwrap_or(50).min(100) as u64;
     let mut body = serde_json::json!({ "page_size": limit });
 
+    // Non-filterable Notion types that presets must skip
+    const NON_FILTERABLE: &[&str] = &[
+        "formula", "rollup", "created_by", "last_edited_by",
+        "created_time", "last_edited_time", "button", "unique_id",
+    ];
+
     // Handle preset filters — schema-aware: detect actual prop_type + use valid enum values
     if let Some(ref preset) = params.preset {
         let now = chrono::Utc::now();
@@ -77,7 +83,9 @@ pub async fn execute(
             "active" => {
                 if let Some(prop) = db.properties.get("status") {
                     let actual_type = schema_cache.get_prop_type(&params.database, "status").unwrap_or("select");
-                    body["filter"] = build_filter_with_prop(prop, actual_type, "Active");
+                    if !NON_FILTERABLE.contains(&actual_type) {
+                        body["filter"] = build_filter_with_prop(prop, actual_type, "Active");
+                    }
                 }
             }
             "this_week" => {
@@ -99,7 +107,9 @@ pub async fn execute(
             "needs_review" => {
                 if let Some(prop) = db.properties.get("status") {
                     let actual_type = schema_cache.get_prop_type(&params.database, "status").unwrap_or("select");
-                    body["filter"] = build_filter_with_prop(prop, actual_type, "Needs Review");
+                    if !NON_FILTERABLE.contains(&actual_type) {
+                        body["filter"] = build_filter_with_prop(prop, actual_type, "Needs Review");
+                    }
                 }
             }
             _ => {}

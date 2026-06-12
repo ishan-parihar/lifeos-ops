@@ -53,8 +53,18 @@ pub fn schema(schema_cache: &SchemaCache) -> serde_json::Value {
     obj
 }
 
-/// Walk a filter tree and correct `"status"` ↔ `"select"` type keys
-/// when they don't match the actual Notion property type from SchemaCache.
+/// Non-filterable Notion property types that cannot be used in filters.
+const NON_FILTERABLE_TYPES: &[&str] = &[
+    "formula", "rollup", "created_by", "last_edited_by",
+    "created_time", "last_edited_time", "button", "unique_id",
+];
+
+/// Walk a filter tree and correct type keys (`"status"` ↔ `"select"`)
+/// based on the actual Notion property type from SchemaCache.
+///
+/// - Returns `Value::Null` for filter conditions on non-filterable properties (formula, rollup, …)
+/// - Uses case-insensitive matching for property name reverse-lookup
+/// - Filters out null conditions from compound filters (`or`/`and`)
 fn correct_filter_type(
     filter: &serde_json::Value,
     db_key: &str,
@@ -64,12 +74,23 @@ fn correct_filter_type(
     use serde_json::Value;
     match filter {
         Value::Object(map) => {
-            // Compound filter: "or" or "and"
+            // Compound filter: "or" or "and" — recurse + filter nulls
             if let Some(compound_key) = map.get("or").or_else(|| map.get("and")) {
                 let key = if map.contains_key("or") { "or" } else { "and" };
                 let corrected: Vec<Value> = compound_key.as_array()
-                    .map(|arr| arr.iter().map(|c| correct_filter_type(c, db_key, schema_cache, property_mapping)).collect())
+                    .map(|arr| {
+                        arr.iter()
+                            .map(|c| correct_filter_type(c, db_key, schema_cache, property_mapping))
+                            .filter(|v| !v.is_null())
+                            .collect()
+                    })
                     .unwrap_or_default();
+                if corrected.is_empty() {
+                    return Value::Null;
+                }
+                if corrected.len() == 1 {
+                    return corrected.into_iter().next().unwrap();
+                }
                 let mut result = serde_json::Map::new();
                 result.insert(key.to_string(), Value::Array(corrected));
                 return Value::Object(result);
@@ -77,13 +98,21 @@ fn correct_filter_type(
 
             // Simple filter with "property" key
             if let Some(prop_name) = map.get("property").and_then(|v| v.as_str()) {
+                // Case-insensitive reverse lookup: find config-key whose Notion prop name matches
+                let prop_lower = prop_name.to_lowercase();
                 let config_key = property_mapping.iter()
-                    .find(|(_, v)| v.as_str() == prop_name)
+                    .find(|(_, v)| v.to_lowercase() == prop_lower)
                     .map(|(k, _)| k.as_str());
 
                 if let Some(cfg_key) = config_key {
                     let actual_type = schema_cache.get_prop_type(db_key, cfg_key);
                     if let Some(actual) = actual_type {
+                        // Non-filterable type → remove this condition entirely
+                        if NON_FILTERABLE_TYPES.contains(&actual) {
+                            return Value::Null;
+                        }
+
+                        // Remap wrong type key (status↔select etc.)
                         let filterable = ["select", "status", "rich_text", "title", "date", "checkbox", "url", "email", "phone_number", "number", "multi_select"];
                         for type_key in &filterable {
                             if map.contains_key(*type_key) && *type_key != actual {
@@ -105,7 +134,15 @@ fn correct_filter_type(
             filter.clone()
         }
         Value::Array(arr) => {
-            Value::Array(arr.iter().map(|v| correct_filter_type(v, db_key, schema_cache, property_mapping)).collect())
+            let corrected: Vec<Value> = arr.iter()
+                .map(|v| correct_filter_type(v, db_key, schema_cache, property_mapping))
+                .filter(|v| !v.is_null())
+                .collect();
+            if corrected.is_empty() {
+                Value::Null
+            } else {
+                Value::Array(corrected)
+            }
         }
         _ => filter.clone(),
     }
@@ -122,7 +159,9 @@ fn build_target_query(
 
     if let Some(ref static_filter) = target.filter {
         let corrected = correct_filter_type(static_filter, db_key, schema_cache, &db.properties);
-        query["filter"] = corrected;
+        if !corrected.is_null() {
+            query["filter"] = corrected;
+        }
     }
 
     if target.date_filter.unwrap_or(false) {
