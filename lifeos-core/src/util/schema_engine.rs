@@ -190,7 +190,10 @@ fn build_prop_info_map(
 ) -> Option<HashMap<String, PropInfo>> {
     let mut result = HashMap::new();
     for (config_key, notion_name) in property_mapping {
-        let prop_schema = schema.properties.get(notion_name)?;
+        // Skip properties not found in the Notion schema (don't abort entire map)
+        let Some(prop_schema) = schema.properties.get(notion_name) else {
+            continue;
+        };
         let options = extract_options(&prop_schema);
         result.insert(
             config_key.clone(),
