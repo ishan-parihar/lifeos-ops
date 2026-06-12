@@ -53,11 +53,76 @@ pub fn schema(schema_cache: &SchemaCache) -> serde_json::Value {
     obj
 }
 
-fn build_target_query(target: &crate::config::BriefingTarget, db: &crate::config::DbConfig, range: &str) -> serde_json::Value {
+/// Walk a filter tree and correct `"status"` ↔ `"select"` type keys
+/// when they don't match the actual Notion property type from SchemaCache.
+fn correct_filter_type(
+    filter: &serde_json::Value,
+    db_key: &str,
+    schema_cache: &SchemaCache,
+    property_mapping: &std::collections::HashMap<String, String>,
+) -> serde_json::Value {
+    use serde_json::Value;
+    match filter {
+        Value::Object(map) => {
+            // Compound filter: "or" or "and"
+            if let Some(compound_key) = map.get("or").or_else(|| map.get("and")) {
+                let key = if map.contains_key("or") { "or" } else { "and" };
+                let corrected: Vec<Value> = compound_key.as_array()
+                    .map(|arr| arr.iter().map(|c| correct_filter_type(c, db_key, schema_cache, property_mapping)).collect())
+                    .unwrap_or_default();
+                let mut result = serde_json::Map::new();
+                result.insert(key.to_string(), Value::Array(corrected));
+                return Value::Object(result);
+            }
+
+            // Simple filter with "property" key
+            if let Some(prop_name) = map.get("property").and_then(|v| v.as_str()) {
+                let config_key = property_mapping.iter()
+                    .find(|(_, v)| v.as_str() == prop_name)
+                    .map(|(k, _)| k.as_str());
+
+                if let Some(cfg_key) = config_key {
+                    let actual_type = schema_cache.get_prop_type(db_key, cfg_key);
+                    if let Some(actual) = actual_type {
+                        let filterable = ["select", "status", "rich_text", "title", "date", "checkbox", "url", "email", "phone_number", "number", "multi_select"];
+                        for type_key in &filterable {
+                            if map.contains_key(*type_key) && *type_key != actual {
+                                let mut result = serde_json::Map::new();
+                                for (k, v) in map.iter() {
+                                    if k == type_key {
+                                        result.insert(actual.to_string(), v.clone());
+                                    } else {
+                                        result.insert(k.clone(), v.clone());
+                                    }
+                                }
+                                return Value::Object(result);
+                            }
+                        }
+                    }
+                }
+            }
+
+            filter.clone()
+        }
+        Value::Array(arr) => {
+            Value::Array(arr.iter().map(|v| correct_filter_type(v, db_key, schema_cache, property_mapping)).collect())
+        }
+        _ => filter.clone(),
+    }
+}
+
+fn build_target_query(
+    target: &crate::config::BriefingTarget,
+    db: &crate::config::DbConfig,
+    db_key: &str,
+    range: &str,
+    schema_cache: &SchemaCache,
+) -> serde_json::Value {
     let mut query = serde_json::json!({ "page_size": target.limit.unwrap_or(10) });
 
     if let Some(ref static_filter) = target.filter {
-        query["filter"] = static_filter.clone();
+        let corrected = correct_filter_type(static_filter, db_key, schema_cache, &db.properties);
+        query["filter"] = corrected;
     }
 
     if target.date_filter.unwrap_or(false) {
@@ -81,7 +146,7 @@ pub async fn execute(
     params: &IntelligenceParams,
     config: &Arc<LifeOSConfig>,
     notion: &Arc<NotionClient>,
-    _schema_cache: &SchemaCache,
+    schema_cache: &SchemaCache,
 ) -> Result<String, String> {
     let range = params.range.as_deref().unwrap_or("this_week");
 
@@ -102,7 +167,7 @@ pub async fn execute(
             let mut errors: Vec<String> = Vec::new();
             for target in targets {
                 if let Some(db) = crate::get_db(config, &target.db) {
-                    let query = build_target_query(target, db, range);
+                    let query = build_target_query(target, db, &target.db, range, schema_cache);
                     match notion.query_data_source(db.ds_id(), &query).await {
                         Ok(result) => {
                             let items: Vec<serde_json::Value> = result.results.iter()
@@ -140,7 +205,7 @@ pub async fn execute(
             let mut errors: Vec<String> = Vec::new();
             for target in targets {
                 if let Some(db) = crate::get_db(config, &target.db) {
-                    let query = build_target_query(target, db, range);
+                    let query = build_target_query(target, db, &target.db, range, schema_cache);
                     match notion.query_data_source(db.ds_id(), &query).await {
                         Ok(result) => {
                             let items: Vec<serde_json::Value> = result.results.iter()
