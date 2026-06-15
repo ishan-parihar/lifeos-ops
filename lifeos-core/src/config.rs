@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 pub struct DbConfig {
     pub name: String,
     /// The Notion database container ID (what you see in URLs)
-    #[serde(alias = "data_source_id")]
+    #[serde(rename = "data_source_id")]
     pub database_id: String,
     pub agent: String,
     pub properties: HashMap<String, String>,
@@ -24,6 +24,7 @@ impl DbConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RateLimitConfig {
     pub requests_per_second: f64,
     pub cache_ttl_seconds: u64,
@@ -79,6 +80,7 @@ pub struct NotionConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LifeOSConfig {
     #[serde(default = "default_api_version")]
     pub api_version: String,
@@ -99,9 +101,31 @@ fn default_rate_limit() -> RateLimitConfig {
     RateLimitConfig { requests_per_second: 3.0, cache_ttl_seconds: 300 }
 }
 
+/// Returns the resolved path to the config file (same search order as load_config).
+pub fn config_path() -> Option<PathBuf> {
+    let paths = vec![
+        std::env::var("LIFEOS_CONFIG").ok().map(PathBuf::from),
+        std::env::var("LIFEOs_CONFIG").ok().map(PathBuf::from),
+        Some(PathBuf::from("lifeos.config.json")),
+        Some(PathBuf::from("../lifeos.config.json")),
+    ];
+    paths.into_iter().flatten().find(|p| p.exists())
+}
+
+/// Save config back to disk, preserving the original file location.
+pub fn save_config(config: &LifeOSConfig, path: &PathBuf) -> Result<(), ConfigError> {
+    let json = serde_json::to_string_pretty(config)
+        .map_err(|e| ConfigError::Parse(path.clone(), e))?;
+    std::fs::write(path, json)
+        .map_err(|e| ConfigError::Io(path.clone(), e))?;
+    tracing::info!("Config saved to {}", path.display());
+    Ok(())
+}
+
 pub fn load_config() -> Result<LifeOSConfig, ConfigError> {
     let paths = vec![
         std::env::var("LIFEOS_CONFIG").ok().map(PathBuf::from),
+        std::env::var("LIFEOs_CONFIG").ok().map(PathBuf::from),
         Some(PathBuf::from("lifeos.config.json")),
         Some(PathBuf::from("../lifeos.config.json")),
     ];

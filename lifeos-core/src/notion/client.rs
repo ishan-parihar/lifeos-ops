@@ -235,6 +235,36 @@ impl NotionClient {
         self.execute::<Value>(Method::DELETE, &format!("/v1/blocks/{block_id}"), None).await?;
         Ok(())
     }
+
+    /// Search all databases accessible by the integration token.
+    /// Returns list of (id, title) pairs for database-type objects only.
+    pub async fn search_databases(&self) -> Result<Vec<(String, String)>, String> {
+        let mut all = Vec::new();
+        let mut cursor: Option<String> = None;
+        loop {
+            let mut body = serde_json::json!({
+                "filter": { "value": "data_source", "property": "object" },
+                "page_size": 100
+            });
+            if let Some(c) = &cursor {
+                body["start_cursor"] = serde_json::json!(c);
+            }
+            let resp: SearchResponse = self.execute(Method::POST, "/v1/search", Some(&body)).await?;
+            for item in resp.results {
+                let title: String = item.title.iter()
+                    .filter_map(|rt| rt.plain_text.as_deref())
+                    .collect();
+                all.push((item.id, title));
+            }
+            if resp.has_more {
+                cursor = resp.next_cursor;
+            } else {
+                break;
+            }
+        }
+        tracing::info!("Found {} databases via Notion Search API", all.len());
+        Ok(all)
+    }
 }
 
 /// Resolve all database_ids in config to their data_source_ids.
@@ -246,6 +276,9 @@ pub async fn resolve_all_data_sources(config: &mut LifeOSConfig, notion: &Notion
             Ok(ds_id) => {
                 tracing::info!("Resolved {key}: {} → {ds_id}", db.database_id);
                 db.resolved_data_source_id = Some(ds_id);
+            }
+            Err(e) if e.contains("404") => {
+                tracing::debug!("{key}: ID {} is already a data_source_id, skipping resolution", db.database_id);
             }
             Err(e) => {
                 let msg = format!("Could not resolve data_source_id for {key} ({}): {e}", db.database_id);

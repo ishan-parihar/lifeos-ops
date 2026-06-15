@@ -576,3 +576,20 @@ pub struct UpdatePageBody {
     #[serde(default)]
     pub cover: Option<Value>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchResponse {
+    pub object: String,
+    pub results: Vec<SearchResult>,
+    pub has_more: bool,
+    pub next_cursor: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SearchResult {
+    pub id: String,
+    #[serde(default)]
+    pub title: Vec<RichTextItem>,
+    #[serde(default)]
+    pub object: String,
+}

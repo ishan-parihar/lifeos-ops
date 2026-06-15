@@ -69,6 +69,13 @@ pub enum Commands {
 
     /// Run as MCP server (stdio JSON-RPC)
     MCP,
+
+    /// Scan Notion for databases and update config with correct IDs
+    Discover {
+        /// Path to lifeos.config.json
+        #[arg(short, long)]
+        config: Option<String>,
+    },
 }
 
 #[derive(clap::Subcommand, Debug)]
