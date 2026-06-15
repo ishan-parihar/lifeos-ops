@@ -143,13 +143,13 @@ pub async fn execute(
         let title = crate::transform::extract_title(page);
         let mut item = serde_json::json!({ "title": title, "id": page.id });
 
-        // Add requested properties
         if let Some(ref props) = params.return_properties {
             for prop_key in props {
                 if let Some(notion_name) = db.properties.get(prop_key) {
-                    let val = crate::transform::extract_string(page, notion_name);
-                    if !val.is_empty() {
-                        item[prop_key] = serde_json::json!(val);
+                    if let Some(val) = crate::transform::extract_property_value(page, notion_name) {
+                        if !val.is_null() {
+                            item[prop_key] = val;
+                        }
                     }
                 }
             }
@@ -335,9 +335,10 @@ pub async fn execute_override(
         if let Some(ref props) = params.return_properties {
             for prop_key in props {
                 if let Some(notion_name) = db.properties.get(prop_key) {
-                    let val = crate::transform::extract_string(page, notion_name);
-                    if !val.is_empty() {
-                        item[prop_key] = serde_json::json!(val);
+                    if let Some(val) = crate::transform::extract_property_value(page, notion_name) {
+                        if !val.is_null() {
+                            item[prop_key] = val;
+                        }
                     }
                 }
             }

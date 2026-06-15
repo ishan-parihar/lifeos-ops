@@ -329,3 +329,60 @@ pub fn extract_boolean(page: &NotionPage, prop_name: &str) -> Option<bool> {
         _ => None,
     }
 }
+
+/// Extract any property value as a serde_json::Value (handles all types)
+pub fn extract_property_value(page: &NotionPage, prop_name: &str) -> Option<serde_json::Value> {
+    let prop = page.properties.get(prop_name)?;
+    Some(match prop {
+        PropertyValue::Title { title, .. } => serde_json::json!(rich_text_to_plain(title)),
+        PropertyValue::RichText { rich_text, .. } => serde_json::json!(rich_text_to_plain(rich_text)),
+        PropertyValue::Select { select, .. } => select.as_ref().map_or(serde_json::Value::Null, |o| serde_json::json!(o.name)),
+        PropertyValue::Status { status, .. } => status.as_ref().map_or(serde_json::Value::Null, |o| serde_json::json!(o.name)),
+        PropertyValue::MultiSelect { multi_select, .. } => {
+            let names: Vec<String> = multi_select.iter().map(|o| o.name.clone()).collect();
+            serde_json::json!(names)
+        }
+        PropertyValue::Number { number, .. } => number.map_or(serde_json::Value::Null, |n| serde_json::json!(n)),
+        PropertyValue::Checkbox { checkbox, .. } => serde_json::json!(checkbox),
+        PropertyValue::Date { date, .. } => date.as_ref().map_or(serde_json::Value::Null, |d| {
+            serde_json::json!({ "start": d.start, "end": d.end, "time_zone": d.time_zone })
+        }),
+        PropertyValue::Relation { relation, .. } => {
+            let ids: Vec<String> = relation.iter().map(|r| r.id.clone()).collect();
+            serde_json::json!(ids)
+        }
+        PropertyValue::Url { url, .. } => url.as_ref().map_or(serde_json::Value::Null, |u| serde_json::json!(u)),
+        PropertyValue::Email { email, .. } => email.as_ref().map_or(serde_json::Value::Null, |e| serde_json::json!(e)),
+        PropertyValue::PhoneNumber { phone_number, .. } => phone_number.as_ref().map_or(serde_json::Value::Null, |p| serde_json::json!(p)),
+        PropertyValue::Formula { formula, .. } => match formula.formula_type.as_str() {
+            "string" => formula.string.as_ref().map_or(serde_json::Value::Null, |s| serde_json::json!(s)),
+            "number" => formula.number.map_or(serde_json::Value::Null, |n| serde_json::json!(n)),
+            "boolean" => formula.boolean.map_or(serde_json::Value::Null, |b| serde_json::json!(b)),
+            "date" => formula.date.as_ref().map_or(serde_json::Value::Null, |d| serde_json::json!({ "start": d.start })),
+            _ => serde_json::Value::Null,
+        },
+        PropertyValue::Rollup { rollup, .. } => match rollup.rollup_type.as_str() {
+            "number" => rollup.number.map_or(serde_json::Value::Null, |n| serde_json::json!(n)),
+            "string" => rollup.string.as_ref().map_or(serde_json::Value::Null, |s| serde_json::json!(s)),
+            _ => serde_json::Value::Null,
+        },
+        PropertyValue::CreatedTime { created_time, .. } => serde_json::json!(created_time),
+        PropertyValue::LastEditedTime { last_edited_time, .. } => serde_json::json!(last_edited_time),
+        PropertyValue::People { people, .. } => {
+            let users: Vec<serde_json::Value> = people.iter().map(|u| {
+                serde_json::json!({ "id": u.id, "name": u.name })
+            }).collect();
+            serde_json::json!(users)
+        }
+        PropertyValue::Files { files, .. } => {
+            let file_list: Vec<serde_json::Value> = files.iter().map(|f| {
+                let url = f.external.as_ref().map(|e| e.url.clone())
+                    .or_else(|| f.file.as_ref().map(|fu| fu.url.clone()))
+                    .unwrap_or_default();
+                serde_json::json!({ "name": f.name, "url": url })
+            }).collect();
+            serde_json::json!(file_list)
+        }
+        _ => serde_json::Value::Null,
+    })
+}

@@ -10,6 +10,7 @@ use lifeos_core::{
     vault::{read_index, write_index},
     sync::{self},
 };
+use lifeos_core::config::{config_path, save_config};
 
 #[tokio::main]
 async fn main() {
@@ -24,99 +25,112 @@ async fn main() {
 
     dotenvy::dotenv().ok();
 
-    let notion_token = match std::env::var("NOTION_API_TOKEN") {
-        Ok(t) => t,
-        Err(_) => {
-            tracing::error!("NOTION_API_TOKEN not set in environment or .env file");
-            std::process::exit(1);
-        }
-    };
-
     match cli.command {
-        Commands::Init { config: config_path } => {
-            let cfg = resolve_config(config_path.as_deref());
-            let vault_dir = resolve_vault_dir();
-            let notion = NotionClient::new(cfg, notion_token);
-            if let Err(e) = cmd_init(&notion, &vault_dir).await {
-                tracing::error!("Init failed: {e}");
-                std::process::exit(1);
-            }
-        }
-        Commands::Pull {
-            databases,
-            exclude,
-            incremental,
-            config: config_path,
-        } => {
-            let (cfg, notion) = resolve_config_with_ds(config_path.as_deref(), &notion_token).await;
-            let vault_dir = resolve_vault_dir();
-            if let Err(e) = cmd_pull(&notion, &cfg, &vault_dir, databases.as_deref(), exclude.as_deref(), incremental).await {
-                tracing::error!("Pull failed: {e}");
-                std::process::exit(1);
-            }
-        }
-        Commands::Push {
-            databases,
-            config: config_path,
-            dry_run,
-        } => {
-            let (cfg, notion) = resolve_config_with_ds(config_path.as_deref(), &notion_token).await;
-            let vault_dir = resolve_vault_dir();
-            if let Err(e) = cmd_push(&notion, &cfg, &vault_dir, databases.as_deref(), dry_run).await {
-                tracing::error!("Push failed: {e}");
-                std::process::exit(1);
-            }
-        }
-        Commands::Watch {
-            config: config_path,
-            debounce_ms,
-        } => {
-            let (cfg, notion) = resolve_config_with_ds(config_path.as_deref(), &notion_token).await;
-            let vault_dir = resolve_vault_dir();
-            if let Err(e) = cmd_watch(&notion, &cfg, &vault_dir, debounce_ms).await {
-                tracing::error!("Watch failed: {e}");
-                std::process::exit(1);
-            }
-        }
-        Commands::Page { action } => {
-            let (cfg, notion) = resolve_config_with_ds(None, &notion_token).await;
-            let vault_dir = resolve_vault_dir();
-            match action {
-                PageCommand::New { db_key, title, config: _ } => {
-                    if let Err(e) = sync::cmd_page_new(&notion, &cfg, &vault_dir, &db_key, &title).await {
-                        tracing::error!("Page new failed: {e}");
-                        std::process::exit(1);
-                    }
-                }
-                PageCommand::Edit { page_id, config: _ } => {
-                    if let Err(e) = sync::cmd_page_edit(&notion, &cfg, &vault_dir, &page_id).await {
-                        tracing::error!("Page edit failed: {e}");
-                        std::process::exit(1);
-                    }
-                }
-                PageCommand::Diff { page_id, config: _ } => {
-                    if let Err(e) = sync::cmd_page_diff(&notion, &cfg, &vault_dir, &page_id).await {
-                        tracing::error!("Page diff failed: {e}");
-                        std::process::exit(1);
-                    }
-                }
-                PageCommand::Merge { page_id, config: _ } => {
-                    if let Err(e) = sync::cmd_page_merge(&notion, &cfg, &vault_dir, &page_id).await {
-                        tracing::error!("Page merge failed: {e}");
-                        std::process::exit(1);
-                    }
-                }
-            }
-        }
+        // MCP has its own token/config resolution (fallback to config.notion.api_key)
         Commands::MCP => {
             mcp::run_server().await;
+        }
+        command => {
+            let notion_token = match std::env::var("NOTION_API_TOKEN") {
+                Ok(t) => t,
+                Err(_) => {
+                    tracing::error!("NOTION_API_TOKEN not set in environment or .env file");
+                    std::process::exit(1);
+                }
+            };
+
+            match command {
+                Commands::Init { config: config_path } => {
+                    let cfg = resolve_config(config_path.as_deref());
+                    let vault_dir = resolve_vault_dir();
+                    let notion = NotionClient::new(cfg, notion_token);
+                    if let Err(e) = cmd_init(&notion, &vault_dir).await {
+                        tracing::error!("Init failed: {e}");
+                        std::process::exit(1);
+                    }
+                }
+                Commands::Pull {
+                    databases,
+                    exclude,
+                    incremental,
+                    config: config_path,
+                } => {
+                    let (cfg, notion) = resolve_config_with_ds(config_path.as_deref(), &notion_token).await;
+                    let vault_dir = resolve_vault_dir();
+                    if let Err(e) = cmd_pull(&notion, &cfg, &vault_dir, databases.as_deref(), exclude.as_deref(), incremental).await {
+                        tracing::error!("Pull failed: {e}");
+                        std::process::exit(1);
+                    }
+                }
+                Commands::Push {
+                    databases,
+                    config: config_path,
+                    dry_run,
+                } => {
+                    let (cfg, notion) = resolve_config_with_ds(config_path.as_deref(), &notion_token).await;
+                    let vault_dir = resolve_vault_dir();
+                    if let Err(e) = cmd_push(&notion, &cfg, &vault_dir, databases.as_deref(), dry_run).await {
+                        tracing::error!("Push failed: {e}");
+                        std::process::exit(1);
+                    }
+                }
+                Commands::Watch {
+                    config: config_path,
+                    debounce_ms,
+                } => {
+                    let (cfg, notion) = resolve_config_with_ds(config_path.as_deref(), &notion_token).await;
+                    let vault_dir = resolve_vault_dir();
+                    if let Err(e) = cmd_watch(&notion, &cfg, &vault_dir, debounce_ms).await {
+                        tracing::error!("Watch failed: {e}");
+                        std::process::exit(1);
+                    }
+                }
+                Commands::Page { action } => {
+                    let (cfg, notion) = resolve_config_with_ds(None, &notion_token).await;
+                    let vault_dir = resolve_vault_dir();
+                    match action {
+                        PageCommand::New { db_key, title, config: _ } => {
+                            if let Err(e) = sync::cmd_page_new(&notion, &cfg, &vault_dir, &db_key, &title).await {
+                                tracing::error!("Page new failed: {e}");
+                                std::process::exit(1);
+                            }
+                        }
+                        PageCommand::Edit { page_id, config: _ } => {
+                            if let Err(e) = sync::cmd_page_edit(&notion, &cfg, &vault_dir, &page_id).await {
+                                tracing::error!("Page edit failed: {e}");
+                                std::process::exit(1);
+                            }
+                        }
+                        PageCommand::Diff { page_id, config: _ } => {
+                            if let Err(e) = sync::cmd_page_diff(&notion, &cfg, &vault_dir, &page_id).await {
+                                tracing::error!("Page diff failed: {e}");
+                                std::process::exit(1);
+                            }
+                        }
+                        PageCommand::Merge { page_id, config: _ } => {
+                            if let Err(e) = sync::cmd_page_merge(&notion, &cfg, &vault_dir, &page_id).await {
+                                tracing::error!("Page merge failed: {e}");
+                                std::process::exit(1);
+                            }
+                        }
+                    }
+                }
+                Commands::MCP => unreachable!(),
+                Commands::Discover { config: config_path_arg } => {
+                    let cfg = resolve_config(config_path_arg.as_deref());
+                    if let Err(e) = cmd_discover(cfg, &notion_token).await {
+                        tracing::error!("Discover failed: {e}");
+                        std::process::exit(1);
+                    }
+                }
+            }
         }
     }
 }
 
 fn resolve_config(config_path: Option<&str>) -> LifeOSConfig {
     if let Some(path) = config_path {
-        std::env::set_var("LIFEOs_CONFIG", path);
+        std::env::set_var("LIFEOS_CONFIG", path);
     }
     match load_config() {
         Ok(c) => c,
@@ -336,4 +350,43 @@ async fn cmd_watch(
         vault_dir.display()
     );
     sync::watch_vault(notion, config, vault_dir, debounce_ms).await
+}
+
+async fn cmd_discover(mut cfg: LifeOSConfig, token: &str) -> Result<(), String> {
+    let path = config_path()
+        .ok_or_else(|| "Could not find lifeos.config.json. Run from project root or set LIFEOS_CONFIG.".to_string())?;
+
+    let notion = NotionClient::new(cfg.clone(), token.to_string());
+
+    println!("Scanning Notion for databases...");
+    let notion_dbs = notion.search_databases().await?;
+    println!("Found {} databases in Notion", notion_dbs.len());
+
+    let mut updated = 0;
+    let mut not_found = Vec::new();
+
+    for db_config in cfg.databases.values_mut() {
+        if let Some((id, _)) = notion_dbs.iter().find(|(_, title)| title == &db_config.name) {
+            let old_id = std::mem::replace(&mut db_config.database_id, id.clone());
+            if old_id != db_config.database_id {
+                println!("  [UPDATED] {} : {} -> {}", db_config.name, &old_id[..8.min(old_id.len())], &db_config.database_id[..8.min(db_config.database_id.len())]);
+            }
+            updated += 1;
+        } else {
+            not_found.push(db_config.name.clone());
+        }
+    }
+
+    save_config(&cfg, &path).map_err(|e| e.to_string())?;
+
+    println!("\nDiscover complete:");
+    println!("  Updated: {} databases", updated);
+    println!("  Not found: {}", not_found.len());
+    if !not_found.is_empty() {
+        for name in &not_found {
+            println!("    - {name}");
+        }
+    }
+
+    Ok(())
 }
