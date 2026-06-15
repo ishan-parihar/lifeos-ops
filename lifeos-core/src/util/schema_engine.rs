@@ -88,6 +88,7 @@ impl SchemaCache {
         let mut db_keys: Vec<String> = Vec::new();
 
         let engine = Arc::new(SchemaEngine::new(notion.clone()));
+        let semaphore = Arc::new(tokio::sync::Semaphore::new(4));
 
         let mut futures = Vec::new();
         for (db_key, db_cfg) in &config.databases {
@@ -95,7 +96,9 @@ impl SchemaCache {
             let ds_id = db_cfg.ds_id().to_string();
             let eng = engine.clone();
             let props = db_cfg.properties.clone();
+            let sem = semaphore.clone();
             futures.push(async move {
+                let _permit = sem.acquire().await;
                 let info = eng.get_schema(&ds_id).await.ok().and_then(|schema| {
                     build_prop_info_map(&props, &schema)
                 });
