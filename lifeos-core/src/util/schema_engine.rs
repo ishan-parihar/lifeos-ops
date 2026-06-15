@@ -103,10 +103,7 @@ impl SchemaCache {
             });
         }
 
-        let mut results: Vec<(String, Option<HashMap<String, PropInfo>>)> = Vec::new();
-        for fut in futures {
-            results.push(fut.await);
-        }
+        let results = futures::future::join_all(futures).await;
 
         for (key, info_opt) in results {
             db_keys.push(key.clone());
