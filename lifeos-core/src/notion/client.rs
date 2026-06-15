@@ -34,13 +34,8 @@ impl NotionClient {
     }
 
     async fn rate_limit(&self) {
-        let min_interval = Duration::from_secs_f64(1.0 / self.config.rate_limit.requests_per_second);
-        let mut last = self.last_request.lock().await;
-        let elapsed = last.elapsed();
-        if elapsed < min_interval {
-            tokio::time::sleep(min_interval - elapsed).await;
-        }
-        *last = Instant::now();
+        // Pre-emptive rate limiting is disabled to allow concurrent/parallel requests.
+        // Reactive rate limiting (retry on 429) is handled in execute() and resolve_data_source_id().
     }
 
     fn request(&self, method: Method, path: &str) -> RequestBuilder {
@@ -142,29 +137,42 @@ impl NotionClient {
     pub async fn resolve_data_source_id(&self, database_id: &str) -> Result<String, String> {
         self.rate_limit().await;
         let url = format!("{}/v1/databases/{}", BASE_URL, database_id);
-        let resp = self.http
-            .get(&url)
-            .header("Authorization", format!("Bearer {}", self.token))
-            .header("Notion-Version", "2025-09-03")
-            .header("Content-Type", "application/json")
-            .send()
-            .await
-            .map_err(|e| format!("Connection: {}", e))?;
-        let bytes = resp.bytes().await.map_err(|e| format!("Read: {}", e))?;
-        let val: Value = serde_json::from_slice(&bytes).map_err(|e| format!("Parse: {}", e))?;
-        if val.get("code").is_some() {
-            return Err(format!("Notion {} /v1/databases/{}: {}", 
-                val.get("status").and_then(|s| s.as_u64()).unwrap_or(0),
-                database_id,
-                val.get("message").and_then(|m| m.as_str()).unwrap_or("unknown error")));
+        let mut attempt = 0;
+        loop {
+            let resp = self.http
+                .get(&url)
+                .header("Authorization", format!("Bearer {}", self.token))
+                .header("Notion-Version", "2025-09-03")
+                .header("Content-Type", "application/json")
+                .send()
+                .await
+                .map_err(|e| format!("Connection: {}", e))?;
+            
+            let status = resp.status();
+            if status == StatusCode::TOO_MANY_REQUESTS && attempt < MAX_RETRIES {
+                attempt += 1;
+                let delay = RETRY_BASE_DELAY_MS * 2u64.pow(attempt);
+                tracing::warn!("Rate limited on resolve_data_source_id, retry {}ms (attempt {})", delay, attempt);
+                tokio::time::sleep(Duration::from_millis(delay)).await;
+                continue;
+            }
+
+            let bytes = resp.bytes().await.map_err(|e| format!("Read: {}", e))?;
+            let val: Value = serde_json::from_slice(&bytes).map_err(|e| format!("Parse: {}", e))?;
+            if !status.is_success() || val.get("code").is_some() {
+                return Err(format!("Notion {} /v1/databases/{}: {}", 
+                    status.as_u16(),
+                    database_id,
+                    val.get("message").and_then(|m| m.as_str()).unwrap_or("unknown error")));
+            }
+            return val.get("data_sources")
+                .and_then(|v| v.as_array())
+                .and_then(|arr| arr.first())
+                .and_then(|ds| ds.get("id"))
+                .and_then(|id| id.as_str())
+                .map(|s| s.to_string())
+                .ok_or_else(|| format!("No data_sources found for database {database_id}"));
         }
-        val.get("data_sources")
-            .and_then(|v| v.as_array())
-            .and_then(|arr| arr.first())
-            .and_then(|ds| ds.get("id"))
-            .and_then(|id| id.as_str())
-            .map(|s| s.to_string())
-            .ok_or_else(|| format!("No data_sources found for database {database_id}"))
     }
 
     // --- Page APIs ---
@@ -271,22 +279,39 @@ impl NotionClient {
 /// Mutates config in place. Returns list of (db_key, error) for each failure.
 pub async fn resolve_all_data_sources(config: &mut LifeOSConfig, notion: &NotionClient) -> Vec<(String, String)> {
     let mut failures = Vec::new();
-    for (key, db) in config.databases.iter_mut() {
-        match notion.resolve_data_source_id(&db.database_id).await {
+    let mut tasks = Vec::new();
+
+    for (key, db) in config.databases.iter() {
+        let key = key.clone();
+        let db_id = db.database_id.clone();
+        let notion_clone = notion.clone();
+        tasks.push(async move {
+            let res = notion_clone.resolve_data_source_id(&db_id).await;
+            (key, db_id, res)
+        });
+    }
+
+    let results = futures::future::join_all(tasks).await;
+
+    for (key, db_id, res) in results {
+        match res {
             Ok(ds_id) => {
-                tracing::info!("Resolved {key}: {} → {ds_id}", db.database_id);
-                db.resolved_data_source_id = Some(ds_id);
+                tracing::info!("Resolved {key}: {db_id} → {ds_id}");
+                if let Some(db) = config.databases.get_mut(&key) {
+                    db.resolved_data_source_id = Some(ds_id);
+                }
             }
             Err(e) if e.contains("404") => {
-                tracing::debug!("{key}: ID {} is already a data_source_id, skipping resolution", db.database_id);
+                tracing::debug!("{key}: ID {db_id} is already a data_source_id, skipping resolution");
             }
             Err(e) => {
-                let msg = format!("Could not resolve data_source_id for {key} ({}): {e}", db.database_id);
+                let msg = format!("Could not resolve data_source_id for {key} ({db_id}): {e}");
                 tracing::warn!("{msg}");
-                failures.push((key.clone(), e));
+                failures.push((key, e));
             }
         }
     }
+
     if !failures.is_empty() {
         tracing::error!(
             "Data source resolution: {}/{} databases failed",

@@ -66,6 +66,7 @@ impl LifeosServer {
             Err(e) => { tracing::warn!("Parse error: {}", e); return; }
         };
 
+        let is_notification = req.get("id").is_none();
         let id = req.get("id").unwrap_or(&json!(null)).clone();
         let method = req.get("method").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
@@ -114,7 +115,9 @@ impl LifeosServer {
 
             _ => {
                 tracing::warn!("Unknown method: {}", method);
-                self.err(&id, -32601, &format!("Method not found: {method}"));
+                if !is_notification {
+                    self.err(&id, -32601, &format!("Method not found: {method}"));
+                }
             }
         }
     }
