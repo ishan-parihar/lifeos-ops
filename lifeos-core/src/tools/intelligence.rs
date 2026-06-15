@@ -52,7 +52,10 @@ pub fn schema(schema_cache: &SchemaCache) -> serde_json::Value {
     let db_help: serde_json::Value = serde_json::Value::Object(
         schema_cache.db_keys().iter().map(|db_key| {
             let desc = schema_cache.describe_db_properties(db_key);
-            (db_key.clone(), serde_json::Value::String(desc))
+            (db_key.clone(), serde_json::json!({
+                "type": "string",
+                "description": desc
+            }))
         }).collect()
     );
     if let Some(props) = obj.get_mut("properties").and_then(|p| p.as_object_mut()) {
