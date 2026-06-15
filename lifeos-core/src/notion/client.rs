@@ -8,8 +8,17 @@ use crate::config::LifeOSConfig;
 use crate::notion::types::*;
 
 const BASE_URL: &str = "https://api.notion.com";
-const MAX_RETRIES: u32 = 3;
+const MAX_RETRIES: u32 = 5;
 const RETRY_BASE_DELAY_MS: u64 = 1000;
+
+fn get_jitter_ms() -> u64 {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let seed = (nanos ^ (nanos >> 17)) as u64;
+    seed % 500
+}
 
 #[derive(Clone)]
 pub struct NotionClient {
@@ -64,7 +73,7 @@ impl NotionClient {
             let status = resp.status();
             if status == StatusCode::TOO_MANY_REQUESTS && attempt < MAX_RETRIES {
                 attempt += 1;
-                let delay = RETRY_BASE_DELAY_MS * 2u64.pow(attempt);
+                let delay = RETRY_BASE_DELAY_MS * 2u64.pow(attempt) + get_jitter_ms();
                 tracing::warn!("Rate limited, retry {}ms (attempt {})", delay, attempt);
                 tokio::time::sleep(Duration::from_millis(delay)).await;
                 continue;
@@ -151,7 +160,7 @@ impl NotionClient {
             let status = resp.status();
             if status == StatusCode::TOO_MANY_REQUESTS && attempt < MAX_RETRIES {
                 attempt += 1;
-                let delay = RETRY_BASE_DELAY_MS * 2u64.pow(attempt);
+                let delay = RETRY_BASE_DELAY_MS * 2u64.pow(attempt) + get_jitter_ms();
                 tracing::warn!("Rate limited on resolve_data_source_id, retry {}ms (attempt {})", delay, attempt);
                 tokio::time::sleep(Duration::from_millis(delay)).await;
                 continue;
@@ -280,12 +289,15 @@ impl NotionClient {
 pub async fn resolve_all_data_sources(config: &mut LifeOSConfig, notion: &NotionClient) -> Vec<(String, String)> {
     let mut failures = Vec::new();
     let mut tasks = Vec::new();
+    let semaphore = Arc::new(tokio::sync::Semaphore::new(4));
 
     for (key, db) in config.databases.iter() {
         let key = key.clone();
         let db_id = db.database_id.clone();
         let notion_clone = notion.clone();
+        let sem = semaphore.clone();
         tasks.push(async move {
+            let _permit = sem.acquire().await;
             let res = notion_clone.resolve_data_source_id(&db_id).await;
             (key, db_id, res)
         });
