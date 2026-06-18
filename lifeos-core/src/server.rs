@@ -79,10 +79,10 @@ impl LifeosServer {
                 let db_count = self.config.databases.len();
                 self.ok(&id, json!({
                     "protocolVersion": "2024-11-05",
-                    "capabilities": { "tools": {} },
+                    "capabilities": { "tools": {}, "resources": {} },
                     "serverInfo": { "name": "lifeos-mcp", "version": "0.1.0" },
                     "instructions": format!(
-                        "LifeOS MCP server with {} databases and 7 tools: query, mutate, intelligence_briefing, data_science, review_pipeline, strategic_simulator, sync_note",
+                        "LifeOS MCP server with {} databases and 9 tools: get_schema, query, query_override, mutate, intelligence_briefing, data_science, review_pipeline, strategic_simulator, sync_note. Call get_schema first to see available databases.",
                         db_count
                     )
                 }));
@@ -99,9 +99,7 @@ impl LifeosServer {
                 let params = req["params"].clone();
                 let tool_name = params["name"].as_str().unwrap_or("").to_string();
                 let args = params.get("arguments").cloned().unwrap_or(json!({}));
-
                 tracing::info!("Tool call: {}", tool_name);
-
                 match tools::call_tool(&tool_name, &args, &self.config, &self.notion, &self.schema_cache).await {
                     Ok(text) => self.ok(&id, json!({
                         "content": [{ "type": "text", "text": text }]
@@ -110,6 +108,38 @@ impl LifeosServer {
                         tracing::error!("Tool {} failed: {}", tool_name, e);
                         self.err(&id, -32603, &format!("Tool execution failed: {}", e));
                     }
+                }
+            }
+            "resources/list" => {
+                self.ok(&id, json!({
+                    "resources": [{
+                        "uri": "lifeos://db-schemas",
+                        "name": "Database Schemas",
+                        "description": "All LifeOS database schemas with property names, types, and valid enum options",
+                        "mimeType": "text/plain"
+                    }]
+                }));
+            }
+
+            "resources/read" => {
+                let uri = req["params"]["uri"].as_str().unwrap_or("");
+                match uri {
+                    "lifeos://db-schemas" => {
+                        let mut output = String::new();
+                        for key in self.schema_cache.db_keys() {
+                            let desc = self.schema_cache.describe_db_properties(key);
+                            output.push_str(&format!("  {}: {}\n", key, desc));
+                        }
+                        let text = format!("Database schemas:\n{}", output);
+                        self.ok(&id, json!({
+                            "contents": [{
+                                "uri": uri,
+                                "mimeType": "text/plain",
+                                "text": text
+                            }]
+                        }));
+                    }
+                    _ => self.err(&id, -32601, &format!("Unknown resource: {}", uri)),
                 }
             }
 

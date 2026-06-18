@@ -25,8 +25,8 @@ pub struct IntelligenceParams {
 /// Execute intelligence briefing
 
 /// Generate JSON Schema for this tool
-pub fn schema(schema_cache: &SchemaCache) -> serde_json::Value {
-    let mut obj = serde_json::json!({
+pub fn schema(_schema_cache: &SchemaCache) -> serde_json::Value {
+    let obj = serde_json::json!({
         "type": "object",
         "properties": {
             "mode": { "type": "string", "enum": ["role", "module"], "description": "Briefing mode" },
@@ -47,24 +47,6 @@ pub fn schema(schema_cache: &SchemaCache) -> serde_json::Value {
         },
         "required": ["mode"]
     });
-
-    // Inject database property context
-    let db_help: serde_json::Value = serde_json::Value::Object(
-        schema_cache.db_keys().iter().map(|db_key| {
-            let desc = schema_cache.describe_db_properties(db_key);
-            (db_key.clone(), serde_json::json!({
-                "type": "string",
-                "description": desc
-            }))
-        }).collect()
-    );
-    if let Some(props) = obj.get_mut("properties").and_then(|p| p.as_object_mut()) {
-        props.insert("_db_schemas".to_string(), serde_json::json!({
-            "type": "object",
-            "description": "Available databases and their property schemas with valid select/status/multi_select options",
-            "properties": db_help
-        }));
-    }
 
     obj
 }
