@@ -25,8 +25,8 @@ pub struct QueryParams {
 }
 
 /// Tool schema for MCP tools/list — enriched with schema cache context
-pub fn schema(config: &LifeOSConfig, schema_cache: &SchemaCache) -> serde_json::Value {
-    let mut obj = serde_json::json!({
+pub fn schema(_config: &LifeOSConfig, _schema_cache: &SchemaCache) -> serde_json::Value {
+    let obj = serde_json::json!({
         "type": "object",
         "properties": {
             "database": { "type": "string", "description": "Database key (activity_log, tasks, projects, etc.)" },
@@ -41,24 +41,6 @@ pub fn schema(config: &LifeOSConfig, schema_cache: &SchemaCache) -> serde_json::
         },
         "required": ["database"]
     });
-
-    // Inject per-database property descriptions for AI-agent context
-    let db_help: serde_json::Value = serde_json::Value::Object(
-        config.databases.keys().map(|db_key| {
-            let desc = schema_cache.describe_db_properties(db_key);
-            (db_key.clone(), serde_json::json!({
-                "type": "string",
-                "description": desc
-            }))
-        }).collect()
-    );
-    if let Some(props) = obj.get_mut("properties").and_then(|p| p.as_object_mut()) {
-        props.insert("_db_schemas".to_string(), serde_json::json!({
-            "type": "object",
-            "description": "Available database keys and their property schemas",
-            "properties": db_help
-        }));
-    }
 
     obj
 }
@@ -217,8 +199,8 @@ pub struct QueryOverrideParams {
 }
 
 /// MCP schema for query_override tool
-pub fn schema_override(config: &LifeOSConfig, schema_cache: &SchemaCache) -> serde_json::Value {
-    let mut obj = serde_json::json!({
+pub fn schema_override(_config: &LifeOSConfig, _schema_cache: &SchemaCache) -> serde_json::Value {
+    let obj = serde_json::json!({
         "type": "object",
         "properties": {
             "database": { "type": "string", "description": "Database key (activity_log, tasks, projects, etc.)" },
@@ -244,23 +226,6 @@ pub fn schema_override(config: &LifeOSConfig, schema_cache: &SchemaCache) -> ser
         },
         "required": ["database"]
     });
-
-    let db_help: serde_json::Value = serde_json::Value::Object(
-        config.databases.keys().map(|db_key| {
-            let desc = schema_cache.describe_db_properties(db_key);
-            (db_key.clone(), serde_json::json!({
-                "type": "string",
-                "description": desc
-            }))
-        }).collect()
-    );
-    if let Some(props) = obj.get_mut("properties").and_then(|p| p.as_object_mut()) {
-        props.insert("_db_schemas".to_string(), serde_json::json!({
-            "type": "object",
-            "description": "Available database keys and their property schemas — validate against these before sending",
-            "properties": db_help
-        }));
-    }
 
     obj
 }
