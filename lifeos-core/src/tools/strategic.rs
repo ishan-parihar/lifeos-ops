@@ -56,14 +56,14 @@ pub async fn execute(
                             "accessible": true,
                             "has_entries": !result.results.is_empty(),
                             "has_more": result.has_more,
-                            "agent": db.agent
+                            "archetype": db.archetype.as_deref().unwrap_or("unknown")
                         });
                     }
                     Err(_) => {
                         overview["databases"][key] = serde_json::json!({
                             "name": db.name,
                             "accessible": false,
-                            "agent": db.agent
+                            "archetype": db.archetype.as_deref().unwrap_or("unknown")
                         });
                     }
                 }
@@ -140,7 +140,7 @@ pub async fn execute(
             let mut data = serde_json::json!({ "analysis": "alignment" });
 
             for (key, db) in &config.databases {
-                if db.agent != "strategy" { continue; }
+                if db.archetype.as_deref() != Some("greatway") && db.archetype.as_deref() != Some("significator") { continue; }
                 let query = serde_json::json!({ "page_size": 20 });
                 if let Ok(result) = notion.query_data_source(db.ds_id(), &query).await {
                     let items: Vec<serde_json::Value> = result.results.iter().map(|p| {

@@ -25,7 +25,7 @@ pub struct NotionClient {
     config: LifeOSConfig,
     token: String,
     http: Client,
-    last_request: Arc<Mutex<Instant>>,
+    _last_request: Arc<Mutex<Instant>>,
 }
 
 impl NotionClient {
@@ -34,7 +34,7 @@ impl NotionClient {
             config,
             token,
             http: Client::new(),
-            last_request: Arc::new(Mutex::new(Instant::now())),
+            _last_request: Arc::new(Mutex::new(Instant::now())),
         }
     }
 
@@ -285,32 +285,54 @@ impl NotionClient {
 }
 
 /// Resolve all database_ids in config to their data_source_ids.
+/// Resolves both reservoirs and their nested satellites.
 /// Mutates config in place. Returns list of (db_key, error) for each failure.
 pub async fn resolve_all_data_sources(config: &mut LifeOSConfig, notion: &NotionClient) -> Vec<(String, String)> {
     let mut failures = Vec::new();
-    let mut tasks = Vec::new();
     let semaphore = Arc::new(tokio::sync::Semaphore::new(4));
 
+    // Collect all (key, db_id) pairs to resolve
+    let mut work_items: Vec<(String, String)> = Vec::new();
     for (key, db) in config.databases.iter() {
-        let key = key.clone();
-        let db_id = db.database_id.clone();
+        work_items.push((key.clone(), db.database_id.clone()));
+        for (sat_key, sat) in &db.satellites {
+            work_items.push((sat_key.clone(), sat.database_id.clone()));
+        }
+    }
+
+    // Resolve all concurrently using a helper
+    let mut handles = Vec::new();
+    for (key, db_id) in work_items {
         let notion_clone = notion.clone();
         let sem = semaphore.clone();
-        tasks.push(async move {
+        handles.push(tokio::task::spawn(async move {
             let _permit = sem.acquire().await;
             let res = notion_clone.resolve_data_source_id(&db_id).await;
             (key, db_id, res)
-        });
+        }));
     }
 
-    let results = futures::future::join_all(tasks).await;
+    let mut results = Vec::new();
+    for handle in handles {
+        match handle.await {
+            Ok(r) => results.push(r),
+            Err(e) => tracing::error!("Resolution task panicked: {:?}", e),
+        }
+    }
 
     for (key, db_id, res) in results {
         match res {
             Ok(ds_id) => {
                 tracing::info!("Resolved {key}: {db_id} → {ds_id}");
+                // Try reservoir first
                 if let Some(db) = config.databases.get_mut(&key) {
-                    db.resolved_data_source_id = Some(ds_id);
+                    db.resolved_data_source_id = Some(ds_id.clone());
+                }
+                // Try satellites
+                for db in config.databases.values_mut() {
+                    if let Some(sat) = db.satellites.get_mut(&key) {
+                        sat.resolved_data_source_id = Some(ds_id.clone());
+                    }
                 }
             }
             Err(e) if e.contains("404") => {

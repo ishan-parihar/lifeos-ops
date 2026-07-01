@@ -2,33 +2,112 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
+// ── v4 Holonic Architecture ─────────────────────────────────────────
+
+/// A satellite database nested under a core reservoir.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DbConfig {
+pub struct SatelliteDbConfig {
     pub name: String,
-    /// The Notion database container ID (what you see in URLs)
     #[serde(rename = "data_source_id")]
     pub database_id: String,
-    pub agent: String,
+    /// Role within the reservoir, e.g. "potentiator_logs", "greatway_commitments"
+    #[serde(default)]
+    pub role: Option<String>,
     pub properties: HashMap<String, String>,
     /// Resolved at runtime via GET /v1/databases/{database_id} → data_sources[0].id
     #[serde(skip)]
     pub resolved_data_source_id: Option<String>,
 }
 
-impl DbConfig {
-    /// Returns the data_source_id if resolved, otherwise falls back to database_id
-    /// (fallback enables graceful degradation with older API versions)
+impl SatelliteDbConfig {
     pub fn ds_id(&self) -> &str {
         self.resolved_data_source_id.as_deref().unwrap_or(&self.database_id)
     }
 }
 
+/// Top-level holonic architecture configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RateLimitConfig {
-    pub requests_per_second: f64,
-    pub cache_ttl_seconds: u64,
+pub struct HolonicConfig {
+    pub version: String,
+    pub currencies: Vec<String>,
+    pub drives: Vec<String>,
+    pub cycles: CycleConfig,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CycleConfig {
+    pub lesser: CycleDefinition,
+    pub greater: CycleDefinition,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CycleDefinition {
+    pub reservoirs: Vec<String>,
+    pub metric: String,
+}
+
+// ── Core Database Config ────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DbConfig {
+    pub name: String,
+    /// The Notion database container ID (what you see in URLs)
+    #[serde(rename = "data_source_id")]
+    pub database_id: String,
+    pub properties: HashMap<String, String>,
+
+    // ── v4 Holonic Metadata ──
+    /// Archetype role: "matrix", "potentiator", "significator", "greatway", "nexus"
+    #[serde(default)]
+    pub archetype: Option<String>,
+    /// Scale: "current-stage" or "all-stage"
+    #[serde(default)]
+    pub scale: Option<String>,
+    /// Dimension: "intra-holonic", "extra-holonic", "inter-holonic", or "both"
+    #[serde(default)]
+    pub dimension: Option<String>,
+    /// Primary currency this reservoir ingests
+    #[serde(default)]
+    pub currency_in: Option<String>,
+    /// Primary currency this reservoir produces
+    #[serde(default)]
+    pub currency_out: Option<String>,
+    /// Which cycle: "lesser", "greater", or "both"
+    #[serde(default)]
+    pub cycle: Option<String>,
+    /// Nested satellite databases (only for core reservoirs)
+    #[serde(default)]
+    pub satellites: HashMap<String, SatelliteDbConfig>,
+
+    /// Resolved at runtime via GET /v1/databases/{database_id} → data_sources[0].id
+    #[serde(skip)]
+    pub resolved_data_source_id: Option<String>,
+}
+
+impl DbConfig {
+    /// Returns the data_source_id if resolved, otherwise falls back to database_id.
+    pub fn ds_id(&self) -> &str {
+        self.resolved_data_source_id.as_deref().unwrap_or(&self.database_id)
+    }
+
+    /// Returns all satellite DBs as (key, config) pairs.
+    pub fn all_satellites(&self) -> Vec<(&str, &SatelliteDbConfig)> {
+        self.satellites.iter().map(|(k, v)| (k.as_str(), v)).collect()
+    }
+
+    /// Returns all properties from this reservoir + all its satellites merged.
+    pub fn all_properties(&self) -> HashMap<String, String> {
+        let mut props = self.properties.clone();
+        for sat in self.satellites.values() {
+            for (k, v) in &sat.properties {
+                props.entry(k.clone()).or_insert_with(|| v.clone());
+            }
+        }
+        props
+    }
+}
+
+// ── Briefing Config ─────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BriefingFilters {
@@ -42,10 +121,8 @@ pub struct BriefingTarget {
     pub db: String,
     pub intent: Option<String>,
     pub description: Option<String>,
-    /// Legacy field — `filters.static` takes precedence when both present
     #[serde(default)]
     pub filter: Option<serde_json::Value>,
-    /// Nested filter with description — takes precedence over `filter`
     #[serde(default)]
     pub filters: Option<BriefingFilters>,
     pub limit: Option<usize>,
@@ -74,9 +151,18 @@ pub struct BriefingConfig {
     pub modules: HashMap<String, Vec<BriefingTarget>>,
 }
 
+// ── Top-Level Config ────────────────────────────────────────────────
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NotionConfig {
     pub api_key: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RateLimitConfig {
+    pub requests_per_second: f64,
+    pub cache_ttl_seconds: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -86,7 +172,10 @@ pub struct LifeOSConfig {
     pub api_version: String,
     #[serde(default = "default_rate_limit")]
     pub rate_limit: RateLimitConfig,
+    /// Only the 5 core reservoirs. Satellites are nested inside each.
     pub databases: HashMap<String, DbConfig>,
+    #[serde(default)]
+    pub holonic: Option<HolonicConfig>,
     #[serde(default)]
     pub briefings: Option<BriefingConfig>,
     #[serde(default)]
@@ -101,7 +190,8 @@ fn default_rate_limit() -> RateLimitConfig {
     RateLimitConfig { requests_per_second: 3.0, cache_ttl_seconds: 300 }
 }
 
-/// Returns the resolved path to the config file (same search order as load_config).
+// ── Config Loading / Saving ─────────────────────────────────────────
+
 pub fn config_path() -> Option<PathBuf> {
     let paths = vec![
         std::env::var("LIFEOS_CONFIG").ok().map(PathBuf::from),
@@ -112,7 +202,6 @@ pub fn config_path() -> Option<PathBuf> {
     paths.into_iter().flatten().find(|p| p.exists())
 }
 
-/// Save config back to disk, preserving the original file location.
 pub fn save_config(config: &LifeOSConfig, path: &PathBuf) -> Result<(), ConfigError> {
     let json = serde_json::to_string_pretty(config)
         .map_err(|e| ConfigError::Parse(path.clone(), e))?;
@@ -141,12 +230,55 @@ pub fn load_config() -> Result<LifeOSConfig, ConfigError> {
     Err(ConfigError::NotFound)
 }
 
+// ── Resolution Helpers ──────────────────────────────────────────────
+
+/// Get a core reservoir by key.
 pub fn get_db<'a>(config: &'a LifeOSConfig, key: &str) -> Option<&'a DbConfig> {
     config.databases.get(key)
 }
 
-pub fn get_dbs_by_agent<'a>(config: &'a LifeOSConfig, agent: &str) -> Vec<(&'a String, &'a DbConfig)> {
-    config.databases.iter().filter(|(_, db)| db.agent == agent).collect()
+/// Resolve a database key — checks reservoirs first, then satellites.
+/// Returns (reservoir_key, DbConfig or SatelliteDbConfig).
+pub enum ResolvedDb<'a> {
+    Reservoir(&'a str, &'a DbConfig),
+    Satellite(&'a str, &'a str, &'a SatelliteDbConfig), // (reservoir_key, sat_key, sat_config)
+}
+
+pub fn resolve_db<'a>(config: &'a LifeOSConfig, key: &str) -> Option<ResolvedDb<'a>> {
+    // Direct reservoir match — use iterator key for correct lifetime
+    for (k, db) in &config.databases {
+        if k == key {
+            return Some(ResolvedDb::Reservoir(k, db));
+        }
+    }
+    // Search satellites — iterate to get correct lifetime on sat_key
+    for (res_key, res_db) in &config.databases {
+        for (sat_key, sat) in &res_db.satellites {
+            if sat_key == key {
+                return Some(ResolvedDb::Satellite(res_key, sat_key, sat));
+            }
+        }
+    }
+    None
+}
+
+/// Get a satellite DB by reservoir key + satellite key.
+pub fn get_satellite<'a>(config: &'a LifeOSConfig, reservoir: &str, satellite: &str) -> Option<&'a SatelliteDbConfig> {
+    config.databases.get(reservoir)
+        .and_then(|db| db.satellites.get(satellite))
+}
+
+/// Iterate ALL databases (reservoirs + satellites) as flat (key, name) pairs.
+/// Useful for schema cache warming and discovery.
+pub fn iter_all_dbs(config: &LifeOSConfig) -> Vec<(String, String, bool)> {
+    let mut result = Vec::new();
+    for (key, db) in &config.databases {
+        result.push((key.clone(), db.name.clone(), true)); // is_reservoir = true
+        for (sat_key, sat) in &db.satellites {
+            result.push((sat_key.clone(), sat.name.clone(), false));
+        }
+    }
+    result
 }
 
 #[derive(Debug)]

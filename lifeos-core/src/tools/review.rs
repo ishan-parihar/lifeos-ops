@@ -62,7 +62,7 @@ pub async fn execute(
         .unwrap_or_default();
 
     for (key, db) in &config.databases {
-        if params.review_type == "journal" && db.agent != "journal" { continue; }
+        if params.review_type == "journal" && db.archetype.as_deref() != Some("potentiator") { continue; }
         if !db_filters.is_empty() && !db_filters.contains(&key.as_str()) { continue; }
 
         let since = (chrono::Utc::now() - chrono::Duration::days(days_back))
