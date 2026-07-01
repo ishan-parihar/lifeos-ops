@@ -170,7 +170,7 @@ fn build_target_query(
 
     if target.date_filter.unwrap_or(false) {
         let date_prop = db.properties.get("date").map(|s| s.as_str()).unwrap_or("Date");
-        if let Some(df) = build_date_filter(range, date_prop) {
+        if let Some(df) = crate::util::date_filter::build_date_filter(range, Some(date_prop)) {
             if query.get("filter").is_some() {
                 let combined = serde_json::json!({
                     "and": [query["filter"].clone(), df]
@@ -315,7 +315,7 @@ pub async fn execute(
                 if let Some(db) = crate::config::get_db(config, key) {
                     let mut query = serde_json::json!({ "page_size": 20 });
                     if let Some(date_prop) = db.properties.get("date") {
-                        if let Some(df) = build_date_filter(range, date_prop) {
+                        if let Some(df) = crate::util::date_filter::build_date_filter(range, Some(date_prop)) {
                             query["filter"] = df;
                         }
                     }
@@ -377,7 +377,7 @@ pub async fn execute(
             if let Some(db) = crate::config::get_db(config, "nexus") {
                 let mut query = serde_json::json!({ "page_size": 20 });
                 if let Some(date_prop) = db.properties.get("date") {
-                    if let Some(df) = build_date_filter(range, date_prop) {
+                    if let Some(df) = crate::util::date_filter::build_date_filter(range, Some(date_prop)) {
                         query["filter"] = df;
                     }
                 }
@@ -477,34 +477,4 @@ fn nexus_interpretation(count: usize, categories: &std::collections::HashMap<Str
     }
 }
 
-fn build_date_filter(range: &str, date_prop: &str) -> Option<serde_json::Value> {
-    let now = chrono::Utc::now();
-    match range {
-        "today" => Some(serde_json::json!({
-            "property": date_prop,
-            "date": { "equals": now.format("%Y-%m-%d").to_string() }
-        })),
-        "this_week" => {
-            let start = (now - chrono::Duration::days(7)).format("%Y-%m-%d").to_string();
-            Some(serde_json::json!({
-                "property": date_prop,
-                "date": { "on_or_after": start }
-            }))
-        }
-        "this_month" => {
-            let start = (now - chrono::Duration::days(30)).format("%Y-%m-%d").to_string();
-            Some(serde_json::json!({
-                "property": date_prop,
-                "date": { "on_or_after": start }
-            }))
-        }
-        "this_quarter" => {
-            let start = (now - chrono::Duration::days(90)).format("%Y-%m-%d").to_string();
-            Some(serde_json::json!({
-                "property": date_prop,
-                "date": { "on_or_after": start }
-            }))
-        }
-        _ => None,
-    }
-}
+

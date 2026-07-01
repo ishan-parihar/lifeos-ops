@@ -31,7 +31,7 @@ pub async fn execute(
     notion: &Arc<NotionClient>,
 ) -> Result<String, String> {
     let range = params.range.as_deref().unwrap_or("this_week");
-    let date_filter = build_date_filter(range);
+    let date_filter = crate::util::date_filter::build_date_filter(range, None);
 
     let mut result = serde_json::json!({
         "analysis": "health_metrics",
@@ -230,24 +230,4 @@ fn metabolic_status(gz: f64, pz: f64) -> &'static str {
     }
 }
 
-fn build_date_filter(range: &str) -> Option<serde_json::Value> {
-    let now = chrono::Utc::now();
-    match range {
-        "today" => Some(serde_json::json!({
-            "date": { "equals": now.format("%Y-%m-%d").to_string() }
-        })),
-        "this_week" => {
-            let start = (now - chrono::Duration::days(7)).format("%Y-%m-%d").to_string();
-            Some(serde_json::json!({ "date": { "on_or_after": start } }))
-        }
-        "this_month" => {
-            let start = (now - chrono::Duration::days(30)).format("%Y-%m-%d").to_string();
-            Some(serde_json::json!({ "date": { "on_or_after": start } }))
-        }
-        "this_quarter" => {
-            let start = (now - chrono::Duration::days(90)).format("%Y-%m-%d").to_string();
-            Some(serde_json::json!({ "date": { "on_or_after": start } }))
-        }
-        _ => None,
-    }
-}
+
