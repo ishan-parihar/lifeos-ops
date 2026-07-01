@@ -35,7 +35,7 @@ pub fn schema(_schema_cache: &SchemaCache) -> serde_json::Value {
             "range": { "type": "string", "description": "Date range: today, this_week, this_month, this_quarter or ISO date" },
             "overrides": {
                 "type": "object",
-                "description": "Per-database overrides: { db_key: { filter: {...}, sort: {...} } }. Schema-aware: use _db_schemas to check valid property names and select/status options before overriding.",
+                "description": "Per-database overrides: { db_key: { filter: {...}, sort: {...} } }.",
                 "additionalProperties": {
                     "type": "object",
                     "properties": {

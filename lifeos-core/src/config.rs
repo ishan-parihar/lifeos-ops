@@ -89,22 +89,6 @@ impl DbConfig {
     pub fn ds_id(&self) -> &str {
         self.resolved_data_source_id.as_deref().unwrap_or(&self.database_id)
     }
-
-    /// Returns all satellite DBs as (key, config) pairs.
-    pub fn all_satellites(&self) -> Vec<(&str, &SatelliteDbConfig)> {
-        self.satellites.iter().map(|(k, v)| (k.as_str(), v)).collect()
-    }
-
-    /// Returns all properties from this reservoir + all its satellites merged.
-    pub fn all_properties(&self) -> HashMap<String, String> {
-        let mut props = self.properties.clone();
-        for sat in self.satellites.values() {
-            for (k, v) in &sat.properties {
-                props.entry(k.clone()).or_insert_with(|| v.clone());
-            }
-        }
-        props
-    }
 }
 
 // ── Briefing Config ─────────────────────────────────────────────────
@@ -262,24 +246,7 @@ pub fn resolve_db<'a>(config: &'a LifeOSConfig, key: &str) -> Option<ResolvedDb<
     None
 }
 
-/// Get a satellite DB by reservoir key + satellite key.
-pub fn get_satellite<'a>(config: &'a LifeOSConfig, reservoir: &str, satellite: &str) -> Option<&'a SatelliteDbConfig> {
-    config.databases.get(reservoir)
-        .and_then(|db| db.satellites.get(satellite))
-}
 
-/// Iterate ALL databases (reservoirs + satellites) as flat (key, name) pairs.
-/// Useful for schema cache warming and discovery.
-pub fn iter_all_dbs(config: &LifeOSConfig) -> Vec<(String, String, bool)> {
-    let mut result = Vec::new();
-    for (key, db) in &config.databases {
-        result.push((key.clone(), db.name.clone(), true)); // is_reservoir = true
-        for (sat_key, sat) in &db.satellites {
-            result.push((sat_key.clone(), sat.name.clone(), false));
-        }
-    }
-    result
-}
 
 #[derive(Debug)]
 pub enum ConfigError {

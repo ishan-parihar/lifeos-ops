@@ -44,26 +44,22 @@ pub async fn get_tool_definitions(config: &LifeOSConfig, _notion: &NotionClient,
     enrich_database_param(&mut strategic_schema, "okr_database", schema_cache);
     enrich_database_param(&mut strategic_schema, "campaign_database", schema_cache);
 
-    let mut energy_flow_schema = energy_flow::schema();
-    enrich_database_param(&mut energy_flow_schema, "database", schema_cache);
-
     let health_schema = health_metrics::schema();
-
     let drive_schema = drive_assessment::schema();
 
     vec![
-        tool_def("get_schema", "Returns v4 holonic database schemas organized by reservoir → satellite hierarchy. Call this first to see available databases. Pass a reservoir name (matrix, potentiator, significator, greatway, nexus) to filter to one reservoir and its satellites.".to_string(), get_schema_schema()),
-        tool_def("query", "Unified high-fidelity query tool. Supports property filters, sort orders, limit 100, presets, and reservoir/cycle queries. Use reservoir='potentiator' to query all potentiator satellites. Use cycle='lesser' to query both matrix and potentiator.".to_string(), query_schema),
-        tool_def("query_override", "Schema-validated query with AI override. Validates filter property names and types against the database schema before execution.".to_string(), query::schema_override(config, schema_cache)),
-        tool_def("mutate", "Create, update, delete, or upsert entries across all LifeOS databases (reservoirs and satellites). Values auto-map to correct Notion types based on schema.".to_string(), mutate_schema),
-        tool_def("intelligence_briefing", "Role-based analysis: CEO, COO, CMO, CRO, CFO, CHO, or module-focused. Also supports holonic briefings: lesser_cycle, greater_cycle, nexus, drive_balance, reservoir_health. Returns TOON-encoded analysis.".to_string(), intelligence::schema(schema_cache)),
-        tool_def("data_science", "Temporal patterns, trajectories, correlations, and weekday profiles. Returns TOON-encoded insights.".to_string(), data_science_schema),
-        tool_def("review_pipeline", "Periodic reviews: daily, weekly, monthly, quarterly, journal. Returns TOON-encoded review.".to_string(), review::schema()),
-        tool_def("strategic_simulator", "Cross-database strategic analysis: OKR alignment, project health, campaign performance. Returns TOON-encoded analysis.".to_string(), strategic_schema),
-        tool_def("sync_note", "Bidirectional Notion ↔ local markdown sync. Returns sync summary in TOON format.".to_string(), sync_note::schema()),
-        tool_def("energy_flow", "Trace currency flow (Catalyst, Experience, Transformation, Choice) across the holonic spiral through Matrix, Potentiator, Significator, GreatWay, and Nexus. Shows how energy moves through the system.".to_string(), energy_flow_schema),
-        tool_def("drive_assessment", "Evaluate Agency/Communion/Eros/Agape drive balance at each boundary (lesser: Matrix⇌Potentiator, greater: Significator⇌GreatWay). Returns balance metrics and recommendations.".to_string(), drive_schema),
-        tool_def("health_metrics", "Calculate G_z (integrative coherence of lesser cycle) and P_z (transcendental tension of greater cycle) health metrics. Shows overall holonic metabolic health.".to_string(), health_schema),
+        tool_def("get_schema", "Database schemas by reservoir → satellite. Call first.".to_string(), get_schema_schema()),
+        tool_def("query", "Query any DB with filters, sort, reservoir, or cycle.".to_string(), query_schema),
+        tool_def("query_override", "Schema-validated query with AI filter override.".to_string(), query::schema_override(config, schema_cache)),
+        tool_def("mutate", "Create/update/delete entries across all databases.".to_string(), mutate_schema),
+        tool_def("intelligence_briefing", "Role or cycle briefing (CEO-CFO, lesser/greater/nexus).".to_string(), intelligence::schema(schema_cache)),
+        tool_def("data_science", "Temporal patterns, trajectories, correlations.".to_string(), data_science_schema),
+        tool_def("review_pipeline", "Daily/weekly/monthly/quarterly reviews.".to_string(), review::schema()),
+        tool_def("strategic_simulator", "Cross-DB strategic analysis: OKRs, projects, campaigns.".to_string(), strategic_schema),
+        tool_def("sync_note", "Bidirectional Notion ↔ markdown sync.".to_string(), sync_note::schema()),
+        tool_def("energy_flow", "Trace currency flow across the holonic spiral.".to_string(), energy_flow::schema()),
+        tool_def("drive_assessment", "Assess 4 drives at lesser/greater boundary.".to_string(), drive_schema),
+        tool_def("health_metrics", "G_z + P_z holonic health metrics.".to_string(), health_schema),
     ]
 }
 

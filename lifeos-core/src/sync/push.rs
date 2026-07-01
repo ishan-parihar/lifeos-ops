@@ -58,7 +58,6 @@ fn simple_glob_match(name: &str, pattern: &str) -> bool {
 }
 
 pub struct PushReport {
-    #[allow(dead_code)]
     pub db_key: String,
     pub pages_created: usize,
     pub pages_updated: usize,

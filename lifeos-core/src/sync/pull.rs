@@ -10,7 +10,6 @@ use crate::vault::{self, vault_path, IndexEntry};
 use crate::sync::merge::store_base_snapshot;
 
 pub struct PullReport {
-    #[allow(dead_code)]
     pub db_key: String,
     pub pages_processed: usize,
     pub files_created: usize,
@@ -59,18 +58,7 @@ fn extract_page_date(properties: &HashMap<String, PropertyValue>) -> Option<chro
     None
 }
 
-#[allow(dead_code)]
-pub async fn pull_database(
-    notion: &NotionClient,
-    config: &LifeOSConfig,
-    db_key: &str,
-    vault_dir: &Path,
-    index: &mut HashMap<String, IndexEntry>,
-) -> Result<PullReport, String> {
-    pull_database_since(notion, config, db_key, vault_dir, index, None).await
-}
-
-/// Like `pull_database` but accepts an optional `since` timestamp.
+/// Pull pages from Notion, optionally filtering by `since` timestamp.
 /// When `since` is `Some(iso_timestamp)`, only pages modified after that
 /// time are fetched from Notion, making repeated pulls much cheaper.
 /// Supports both reservoir and satellite keys via `resolve_db`.
