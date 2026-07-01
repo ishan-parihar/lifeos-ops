@@ -152,6 +152,29 @@ async fn main() {
                     ).await;
                     match result { Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); } }
                 }
+                Commands::Backlinks { page_id, database } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let result = lifeos_core::tools::relations::execute_backlinks(
+                        &lifeos_core::tools::relations::BacklinksParams { page_id, database },
+                        &cfg, &notion, &sc,
+                    ).await;
+                    match result { Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); } }
+                }
+                Commands::Link { source, target, property } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let result = lifeos_core::tools::relations::execute_link(
+                        &lifeos_core::tools::relations::LinkParams { source_page: source, target_page: target, property },
+                        &cfg, &notion, &sc,
+                    ).await;
+                    match result { Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); } }
+                }
+                Commands::GraphMetrics => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let result = lifeos_core::tools::relations::execute_graph_metrics(
+                        &cfg, &notion, &sc,
+                    ).await;
+                    match result { Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); } }
+                }
                 Commands::Schema { database } => {
                     let (cfg, _notion, sc) = resolve_with_schema(None, &notion_token).await;
                     let result = lifeos_core::tools::execute_get_schema(database.as_deref(), &sc, &cfg);
