@@ -190,27 +190,25 @@ async fn cmd_pull(
         .map(|s| s.split(',').map(|k| k.trim().to_string()).collect())
         .unwrap_or_default();
 
-    let db_keys: Vec<&String> = if let Some(filter) = db_filter {
+    // Expand to include satellites alongside reservoirs
+    let all_db_keys: Vec<String> = if let Some(filter) = db_filter {
         filter
             .split(',')
             .map(|s| s.trim().to_string())
-            .collect::<Vec<_>>()
-            .iter()
-            .filter_map(|k| {
-                if config.databases.contains_key(k) {
-                    Some(config.databases.keys().find(|dk| *dk == k).unwrap())
-                } else {
-                    tracing::warn!("Unknown database key: {k}");
-                    None
-                }
-            })
             .collect()
     } else {
-        config.databases.keys().collect()
+        let mut keys = Vec::new();
+        for (key, db) in &config.databases {
+            keys.push(key.clone());
+            for sat_key in db.satellites.keys() {
+                keys.push(sat_key.clone());
+            }
+        }
+        keys
     };
 
-    let db_keys: Vec<&String> = db_keys
-        .into_iter()
+    let db_keys: Vec<&String> = all_db_keys
+        .iter()
         .filter(|k| !exclude_set.contains(k.as_str()))
         .collect();
 
@@ -285,24 +283,24 @@ async fn cmd_push(
     db_filter: Option<&str>,
     dry_run: bool,
 ) -> Result<(), String> {
-    let db_keys: Vec<&String> = if let Some(filter) = db_filter {
+    // Expand to include satellites alongside reservoirs
+    let all_db_keys: Vec<String> = if let Some(filter) = db_filter {
         filter
             .split(',')
             .map(|s| s.trim().to_string())
-            .collect::<Vec<_>>()
-            .iter()
-            .filter_map(|k| {
-                if config.databases.contains_key(k) {
-                    Some(config.databases.keys().find(|dk| *dk == k).unwrap())
-                } else {
-                    tracing::warn!("Unknown database key: {k}");
-                    None
-                }
-            })
             .collect()
     } else {
-        config.databases.keys().collect()
+        let mut keys = Vec::new();
+        for (key, db) in &config.databases {
+            keys.push(key.clone());
+            for sat_key in db.satellites.keys() {
+                keys.push(sat_key.clone());
+            }
+        }
+        keys
     };
+
+    let db_keys: Vec<&String> = all_db_keys.iter().collect();
 
     let index = read_index(vault_dir)?;
     let mut global_report = sync::push::PushReport {

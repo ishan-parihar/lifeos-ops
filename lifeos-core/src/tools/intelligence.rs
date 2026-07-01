@@ -371,20 +371,72 @@ pub async fn execute(
                 "description": "Contact-boundary transmutation: all 4 currencies (Catalyst, Experience, Transformation, Choice)",
                 "range": range
             });
+            let mut errors: Vec<String> = Vec::new();
+
+            // Query Nexus reservoir
             if let Some(db) = crate::config::get_db(config, "nexus") {
-                let query = serde_json::json!({ "page_size": 20 });
+                let mut query = serde_json::json!({ "page_size": 20 });
+                if let Some(date_prop) = db.properties.get("date") {
+                    if let Some(df) = build_date_filter(range, date_prop) {
+                        query["filter"] = df;
+                    }
+                }
                 match notion.query_data_source(db.ds_id(), &query).await {
                     Ok(result) => {
                         let items: Vec<serde_json::Value> = result.results.iter()
-                            .map(|p| serde_json::json!({
-                                "title": crate::transform::extract_title(p),
-                                "id": p.id,
-                            })).collect();
-                        data["nexus"] = serde_json::json!({ "entries": items, "count": items.len() });
+                            .map(|p| {
+                                let title = crate::transform::extract_title(p);
+                                let category = crate::transform::extract_string(p, "Category");
+                                let log_type = crate::transform::extract_string(p, "Log Type");
+                                serde_json::json!({
+                                    "title": title,
+                                    "id": p.id,
+                                    "category": category,
+                                    "log_type": log_type
+                                })
+                            }).collect();
+
+                        // Analyze transmutation patterns
+                        let mut category_dist: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+                        let mut log_type_dist: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+                        for item in &items {
+                            let cat = item["category"].as_str().unwrap_or("unknown");
+                            let lt = item["log_type"].as_str().unwrap_or("unknown");
+                            *category_dist.entry(cat.to_string()).or_insert(0) += 1;
+                            *log_type_dist.entry(lt.to_string()).or_insert(0) += 1;
+                        }
+
+                        data["nexus"] = serde_json::json!({
+                            "entries": items,
+                            "count": items.len(),
+                            "transmutation_analysis": {
+                                "category_distribution": category_dist,
+                                "log_type_distribution": log_type_dist,
+                                "currencies_active": ["Catalyst", "Experience", "Transformation", "Choice"],
+                                "interpretation": nexus_interpretation(items.len(), &category_dist)
+                            }
+                        });
                     }
-                    Err(e) => { data["_errors"] = serde_json::json!([e]); }
+                    Err(e) => { errors.push(format!("nexus: {}", e)); }
                 }
             }
+
+            // Also query nexus satellites for completeness
+            if let Some(db) = crate::config::get_db(config, "nexus") {
+                for (sat_key, sat_cfg) in &db.satellites {
+                    let query = serde_json::json!({ "page_size": 10 });
+                    if let Ok(result) = notion.query_data_source(sat_cfg.ds_id(), &query).await {
+                        let count = result.results.len();
+                        data["satellites"][sat_key] = serde_json::json!({
+                            "name": sat_cfg.name,
+                            "role": sat_cfg.role,
+                            "entry_count": count
+                        });
+                    }
+                }
+            }
+
+            if !errors.is_empty() { data["_errors"] = serde_json::json!(errors); }
             Ok(crate::toon_format::encode(&data))
         }
         "drive_balance" | "reservoir_health" => {
@@ -408,6 +460,20 @@ pub async fn execute(
             }
         }
         _ => Err(format!("Unknown mode: {}", params.mode)),
+    }
+}
+
+fn nexus_interpretation(count: usize, categories: &std::collections::HashMap<String, i64>) -> String {
+    if count == 0 {
+        "No nexus entries in range — contact-boundary is dormant".to_string()
+    } else if count > 20 {
+        format!("High nexus activity ({count} entries) — active transmutation across all 4 currencies")
+    } else {
+        let dominant = categories.iter()
+            .max_by_key(|(_, v)| *v)
+            .map(|(k, v)| format!("{} ({})", k, v))
+            .unwrap_or_else(|| "unknown".to_string());
+        format!("Moderate nexus activity ({count} entries) — dominant category: {}", dominant)
     }
 }
 
