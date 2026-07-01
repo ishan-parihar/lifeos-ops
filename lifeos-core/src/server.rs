@@ -82,7 +82,7 @@ impl LifeosServer {
                     "capabilities": { "tools": {}, "resources": {} },
                     "serverInfo": { "name": "lifeos-mcp", "version": "0.1.0" },
                     "instructions": format!(
-                        "LifeOS v4 Holonic MCP server with {} reservoir databases (matrix, potentiator, significator, greatway, nexus) + satellites. 12 tools: get_schema, query, query_override, mutate, intelligence_briefing, data_science, review_pipeline, strategic_simulator, sync_note, energy_flow, drive_assessment, health_metrics. Call get_schema first.",
+                        "LifeOS v4 Holonic MCP server with {} reservoir databases (matrix, potentiator, significator, greatway, nexus) + satellites. 16 tools: get_schema, query, query_override, mutate, intelligence_briefing, data_science, review_pipeline, strategic_simulator, sync_note, energy_flow, drive_assessment, health_metrics, get_page, expand, trace, ancestors. Relations are shown as (relation→target_db) in schemas. Call get_schema first.",
                         db_count
                     )
                 }));
@@ -117,6 +117,11 @@ impl LifeosServer {
                         "name": "Database Schemas",
                         "description": "All LifeOS database schemas with property names, types, and valid enum options",
                         "mimeType": "text/plain"
+                    }, {
+                        "uri": "lifeos://relation-graph",
+                        "name": "Relational Graph",
+                        "description": "Full DB-to-DB relation map showing which properties link which databases",
+                        "mimeType": "text/plain"
                     }]
                 }));
             }
@@ -131,6 +136,16 @@ impl LifeosServer {
                             output.push_str(&format!("  {}: {}\n", key, desc));
                         }
                         let text = format!("Database schemas:\n{}", output);
+                        self.ok(&id, json!({
+                            "contents": [{
+                                "uri": uri,
+                                "mimeType": "text/plain",
+                                "text": text
+                            }]
+                        }));
+                    }
+                    "lifeos://relation-graph" => {
+                        let text = self.schema_cache.describe_relation_graph();
                         self.ok(&id, json!({
                             "contents": [{
                                 "uri": uri,

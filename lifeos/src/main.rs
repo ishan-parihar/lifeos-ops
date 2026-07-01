@@ -4,11 +4,13 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use clap::Parser;
 
+use std::sync::Arc;
 use lifeos_core::{
     Cli, Commands, PageCommand, load_config, LifeOSConfig, NotionClient,
     resolve_all_data_sources,
     vault::{read_index, write_index},
     sync::{self},
+    SchemaCache,
 };
 use lifeos_core::config::{config_path, save_config};
 
@@ -117,6 +119,39 @@ async fn main() {
                         }
                     }
                 }
+                Commands::GetPage { page_id, database } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let result = lifeos_core::tools::relations::execute_get_page(
+                        &lifeos_core::tools::relations::GetPageParams { page_id, database },
+                        &cfg, &notion, &sc,
+                    ).await;
+                    match result { Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); } }
+                }
+                Commands::Expand { ids } => {
+                    let page_ids: Vec<String> = ids.split(',').map(|s| s.trim().to_string()).collect();
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let result = lifeos_core::tools::relations::execute_expand(
+                        &lifeos_core::tools::relations::ExpandParams { page_ids },
+                        &cfg, &notion, &sc,
+                    ).await;
+                    match result { Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); } }
+                }
+                Commands::Trace { page_id, depth } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let result = lifeos_core::tools::relations::execute_trace(
+                        &lifeos_core::tools::relations::TraceParams { page_id, depth: Some(depth) },
+                        &cfg, &notion, &sc,
+                    ).await;
+                    match result { Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); } }
+                }
+                Commands::Ancestors { page_id, max_levels } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let result = lifeos_core::tools::relations::execute_ancestors(
+                        &lifeos_core::tools::relations::AncestorsParams { page_id, max_levels: Some(max_levels) },
+                        &cfg, &notion, &sc,
+                    ).await;
+                    match result { Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); } }
+                }
                 Commands::MCP => unreachable!(),
                 Commands::Discover { config: config_path_arg } => {
                     let cfg = resolve_config(config_path_arg.as_deref());
@@ -155,6 +190,15 @@ async fn resolve_config_with_ds(config_path: Option<&str>, token: &str) -> (Life
     }
     let notion = NotionClient::new(cfg.clone(), token.to_string());
     (cfg, notion)
+}
+
+/// Resolve config + Notion client + SchemaCache in one call.
+async fn resolve_with_schema(config_path: Option<&str>, token: &str) -> (Arc<LifeOSConfig>, Arc<NotionClient>, Arc<SchemaCache>) {
+    let (cfg, notion) = resolve_config_with_ds(config_path, token).await;
+    let cfg = Arc::new(cfg);
+    let notion = Arc::new(notion);
+    let sc = SchemaCache::init(&cfg, &notion).await;
+    (cfg, notion, Arc::new(sc))
 }
 
 fn resolve_vault_dir() -> PathBuf {

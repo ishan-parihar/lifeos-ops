@@ -67,6 +67,39 @@ pub enum Commands {
         action: PageCommand,
     },
 
+    /// Fetch a single entry with all relations resolved to titles
+    GetPage {
+        /// Notion page ID
+        page_id: String,
+        /// Optional database key hint
+        #[arg(short, long)]
+        database: Option<String>,
+    },
+
+    /// Batch resolve relation IDs to titled entries
+    Expand {
+        /// Comma-separated page IDs to expand
+        ids: String,
+    },
+
+    /// Follow relations N levels deep from any entry
+    Trace {
+        /// Starting page ID
+        page_id: String,
+        /// Max depth (default: 2, max: 3)
+        #[arg(short, long, default_value = "2")]
+        depth: u32,
+    },
+
+    /// Walk up hierarchy from entry to root (task→project→QG→AG)
+    Ancestors {
+        /// Starting page ID
+        page_id: String,
+        /// Max levels to walk up (default: 5)
+        #[arg(short, long, default_value = "5")]
+        max_levels: u32,
+    },
+
     /// Run as MCP server (stdio JSON-RPC)
     MCP,
 
