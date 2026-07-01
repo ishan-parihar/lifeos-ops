@@ -100,6 +100,159 @@ pub enum Commands {
         max_levels: u32,
     },
 
+    /// Show database schemas with property types and relation targets
+    Schema {
+        /// Optional reservoir to filter (matrix, potentiator, significator, greatway, nexus)
+        #[arg(short, long)]
+        database: Option<String>,
+    },
+
+    /// Query a database with filters, sorts, and presets
+    Query {
+        /// Database key (tasks, projects, activity_log, etc.)
+        database: String,
+        /// Property to filter on
+        #[arg(short, long)]
+        filter_property: Option<String>,
+        /// Filter value
+        #[arg(short, long)]
+        filter_value: Option<String>,
+        /// Filter type (select, status, rich_text, date, etc.)
+        #[arg(long)]
+        filter_type: Option<String>,
+        /// Sort property
+        #[arg(short, long)]
+        sort_property: Option<String>,
+        /// Sort direction (ascending/descending)
+        #[arg(short, long)]
+        sort_direction: Option<String>,
+        /// Max results (default: 50)
+        #[arg(short, long, default_value = "50")]
+        limit: u32,
+        /// Preset: active, this_week, this_month, needs_review
+        #[arg(short, long)]
+        preset: Option<String>,
+        /// Query a reservoir + all its satellites
+        #[arg(short, long)]
+        reservoir: Option<String>,
+        /// Query all reservoirs in a cycle (lesser/greater)
+        #[arg(short, long)]
+        cycle: Option<String>,
+    },
+
+    /// Create, update, or delete an entry
+    Mutate {
+        /// Operation: create, update, delete
+        #[arg(short, long)]
+        operation: String,
+        /// Database key
+        #[arg(short, long)]
+        database: String,
+        /// Page ID (for update/delete)
+        #[arg(short, long)]
+        page_id: Option<String>,
+        /// Properties as JSON string (for create/update)
+        #[arg(short, long)]
+        properties: Option<String>,
+        /// Dry run — show what would happen
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Get a role or cycle intelligence briefing
+    Intelligence {
+        /// Briefing mode: role, module, lesser_cycle, greater_cycle, nexus, drive_balance, reservoir_health
+        #[arg(short, long)]
+        mode: String,
+        /// Role key (CEO, COO, CMO, CRO, CFO, CHO)
+        #[arg(short, long)]
+        role: Option<String>,
+        /// Module key (productivity, health, strategic, financial, content, journaling)
+        #[arg(short, long)]
+        module: Option<String>,
+        /// Date range: today, this_week, this_month, this_quarter
+        #[arg(short, long)]
+        range: Option<String>,
+    },
+
+    /// Run data science analysis (temporal, trajectories, correlations)
+    DataScience {
+        /// Analysis type: temporal, trajectories, weekday_profile, correlations, patterns
+        #[arg(short, long)]
+        analysis_type: String,
+        /// Primary database key
+        #[arg(short, long)]
+        database: String,
+        /// Secondary database (for correlations)
+        #[arg(short, long)]
+        database_b: Option<String>,
+        /// Days to look back (default: 30)
+        #[arg(short, long)]
+        days_back: Option<i64>,
+        /// Property to analyze
+        #[arg(short, long)]
+        property: Option<String>,
+        /// Metric property for numerical analysis
+        #[arg(short, long)]
+        metric_property: Option<String>,
+    },
+
+    /// Run daily/weekly/monthly/quarterly review pipeline
+    Review {
+        /// Review type: daily, weekly, monthly, quarterly
+        #[arg(short, long)]
+        review_type: String,
+    },
+
+    /// Cross-DB strategic analysis: OKRs, projects, campaigns
+    Strategic {
+        /// Analysis type: overview, alignment, project_health, okr_progress, campaign_metrics
+        #[arg(short, long)]
+        analysis_type: String,
+        /// Project database key
+        #[arg(short, long)]
+        project_database: Option<String>,
+        /// OKR database key
+        #[arg(short, long)]
+        okr_database: Option<String>,
+        /// Campaign database key
+        #[arg(short, long)]
+        campaign_database: Option<String>,
+    },
+
+    /// Trace currency flow across the holonic spiral
+    EnergyFlow {
+        /// Scope: lesser_cycle, greater_cycle, full_spiral, or specific reservoir
+        #[arg(short, long)]
+        scope: String,
+        /// Currency to trace: Catalyst, Experience, Transformation, Choice, all
+        #[arg(short, long)]
+        currency: Option<String>,
+        /// Limit per database (default: 10)
+        #[arg(short, long)]
+        limit: Option<u32>,
+    },
+
+    /// Assess 4 drives at lesser/greater boundary
+    DriveAssessment {
+        /// Boundary: lesser, greater, both
+        #[arg(short, long, default_value = "both")]
+        boundary: String,
+        /// Date range
+        #[arg(short, long)]
+        range: Option<String>,
+    },
+
+    /// Holonic health metrics (G_z + P_z)
+    HealthMetrics {
+        /// Metric: lesser, greater, both
+        #[arg(short, long, default_value = "both")]
+        metric: String,
+        /// Date range
+        #[arg(short, long)]
+        range: Option<String>,
+    },
+
     /// Run as MCP server (stdio JSON-RPC)
     MCP,
 
