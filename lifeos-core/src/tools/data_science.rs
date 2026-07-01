@@ -23,8 +23,6 @@ pub struct DataScienceParams {
     pub metric_property: Option<String>,
 }
 
-/// Execute data science analysis
-
 /// Generate JSON Schema for this tool
 pub fn schema() -> serde_json::Value {
     serde_json::json!({
@@ -41,6 +39,25 @@ pub fn schema() -> serde_json::Value {
     })
 }
 
+/// Resolve a database key to (data_source_id, properties, display_name).
+/// Supports both reservoir and satellite keys.
+fn resolve_ds(config: &LifeOSConfig, key: &str) -> Result<(String, std::collections::HashMap<String, String>, String), String> {
+    match crate::config::resolve_db(config, key) {
+        Some(crate::config::ResolvedDb::Reservoir(_k, db)) => Ok((db.ds_id().to_string(), db.properties.clone(), db.name.clone())),
+        Some(crate::config::ResolvedDb::Satellite(_rk, _sk, sat)) => Ok((sat.ds_id().to_string(), sat.properties.clone(), sat.name.clone())),
+        None => Err(format!("Unknown database: {}", key)),
+    }
+}
+
+/// Resolve a Notion date property name from a properties map, or return an error.
+fn date_prop_for<'a>(props: &'a std::collections::HashMap<String, String>, name: &str) -> Result<&'a str, String> {
+    props.get("date")
+        .or_else(|| props.get("action_date"))
+        .or_else(|| props.get("created_date"))
+        .map(|s| s.as_str())
+        .ok_or_else(|| format!("No date property configured for '{}' — expected one of: date, action_date, created_date", name))
+}
+
 pub async fn execute(
     params: &DataScienceParams,
     config: &Arc<LifeOSConfig>,
@@ -52,14 +69,13 @@ pub async fn execute(
 
     match params.analysis_type.as_str() {
         "temporal" => {
-            let db = crate::config::get_db(config, &params.database)
-                .ok_or_else(|| format!("Unknown database: {}", params.database))?;
-            let date_prop = date_prop_for(db)?;
+            let (ds_id, props, name) = resolve_ds(config, &params.database)?;
+            let date_prop = date_prop_for(&props, &name)?;
             let query = serde_json::json!({
                 "page_size": 100,
                 "filter": { "property": date_prop, "date": { "on_or_after": since } }
             });
-            let result = notion.query_data_source(db.ds_id(), &query).await?;
+            let result = notion.query_data_source(&ds_id, &query).await?;
 
             let mut by_date: std::collections::BTreeMap<String, i64> = std::collections::BTreeMap::new();
             for page in &result.results {
@@ -81,18 +97,17 @@ pub async fn execute(
             Ok(crate::toon_format::encode(&data))
         }
         "trajectories" => {
-            let db = crate::config::get_db(config, &params.database)
-                .ok_or_else(|| format!("Unknown database: {}", params.database))?;
+            let (ds_id, props, name) = resolve_ds(config, &params.database)?;
             let metric = params.metric_property.as_deref()
-                .or_else(|| db.properties.keys().find(|k| k.as_str() == "energy" || k.as_str() == "mood" || k.as_str() == "score").map(|s| s.as_str()))
+                .or_else(|| props.keys().find(|k| k.as_str() == "energy" || k.as_str() == "mood" || k.as_str() == "score").map(|s| s.as_str()))
                 .ok_or("metric_property required for trajectories")?;
-            let date_prop = date_prop_for(db)?;
+            let date_prop = date_prop_for(&props, &name)?;
 
             let query = serde_json::json!({
                 "page_size": 100,
                 "filter": { "property": date_prop, "date": { "on_or_after": since } }
             });
-            let result = notion.query_data_source(db.ds_id(), &query).await?;
+            let result = notion.query_data_source(&ds_id, &query).await?;
 
             let mut trajectory: Vec<serde_json::Value> = Vec::new();
             for page in &result.results {
@@ -113,14 +128,13 @@ pub async fn execute(
             Ok(crate::toon_format::encode(&data))
         }
         "weekday_profile" => {
-            let db = crate::config::get_db(config, &params.database)
-                .ok_or_else(|| format!("Unknown database: {}", params.database))?;
-            let date_prop = date_prop_for(db)?;
+            let (ds_id, props, name) = resolve_ds(config, &params.database)?;
+            let date_prop = date_prop_for(&props, &name)?;
             let query = serde_json::json!({
                 "page_size": 100,
                 "filter": { "property": date_prop, "date": { "on_or_after": since } }
             });
-            let result = notion.query_data_source(db.ds_id(), &query).await?;
+            let result = notion.query_data_source(&ds_id, &query).await?;
 
             let mut profile: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
             for page in &result.results {
@@ -142,13 +156,4 @@ pub async fn execute(
         }
         _ => Err(format!("Unknown analysis type: {}", params.analysis_type)),
     }
-}
-
-/// Resolve a Notion date property name from config keys, or return an error.
-fn date_prop_for(db: &crate::config::DbConfig) -> Result<&str, String> {
-    db.properties.get("date")
-        .or_else(|| db.properties.get("action_date"))
-        .or_else(|| db.properties.get("created_date"))
-        .map(|s| s.as_str())
-        .ok_or_else(|| format!("No date property configured for '{}' — expected one of: date, action_date, created_date", db.name))
 }
