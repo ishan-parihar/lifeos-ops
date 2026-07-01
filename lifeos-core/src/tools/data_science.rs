@@ -52,7 +52,7 @@ pub async fn execute(
 
     match params.analysis_type.as_str() {
         "temporal" => {
-            let db = crate::get_db(config, &params.database)
+            let db = crate::config::get_db(config, &params.database)
                 .ok_or_else(|| format!("Unknown database: {}", params.database))?;
             let date_prop = date_prop_for(db)?;
             let query = serde_json::json!({
@@ -81,7 +81,7 @@ pub async fn execute(
             Ok(crate::toon_format::encode(&data))
         }
         "trajectories" => {
-            let db = crate::get_db(config, &params.database)
+            let db = crate::config::get_db(config, &params.database)
                 .ok_or_else(|| format!("Unknown database: {}", params.database))?;
             let metric = params.metric_property.as_deref()
                 .or_else(|| db.properties.keys().find(|k| k.as_str() == "energy" || k.as_str() == "mood" || k.as_str() == "score").map(|s| s.as_str()))
@@ -113,7 +113,7 @@ pub async fn execute(
             Ok(crate::toon_format::encode(&data))
         }
         "weekday_profile" => {
-            let db = crate::get_db(config, &params.database)
+            let db = crate::config::get_db(config, &params.database)
                 .ok_or_else(|| format!("Unknown database: {}", params.database))?;
             let date_prop = date_prop_for(db)?;
             let query = serde_json::json!({

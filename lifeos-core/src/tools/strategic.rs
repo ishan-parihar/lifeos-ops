@@ -73,7 +73,7 @@ pub async fn execute(
         }
         "project_health" => {
             let db_key = params.project_database.as_deref().unwrap_or("projects");
-            let db = crate::get_db(config, db_key)
+            let db = crate::config::get_db(config, db_key)
                 .ok_or_else(|| format!("Unknown database: {}", db_key))?;
 
             let query = serde_json::json!({ "page_size": 50 });
@@ -106,7 +106,7 @@ pub async fn execute(
         }
         "okr_progress" => {
             let db_key = params.okr_database.as_deref().unwrap_or("quarterly_goals");
-            let db = crate::get_db(config, db_key)
+            let db = crate::config::get_db(config, db_key)
                 .ok_or_else(|| format!("Unknown database: {}", db_key))?;
 
             let query = serde_json::json!({ "page_size": 50 });
@@ -159,7 +159,7 @@ pub async fn execute(
         }
         "campaign_metrics" => {
             let db_key = params.campaign_database.as_deref().unwrap_or("campaigns");
-            let db = crate::get_db(config, db_key)
+            let db = crate::config::get_db(config, db_key)
                 .ok_or_else(|| format!("Unknown database: {}", db_key))?;
 
             let query = serde_json::json!({ "page_size": 50 });

@@ -226,7 +226,7 @@ pub async fn execute(
             let mut all_meta: Vec<serde_json::Value> = Vec::new();
             let mut errors: Vec<String> = Vec::new();
             for target in targets {
-                if let Some(db) = crate::get_db(config, &target.db) {
+                if let Some(db) = crate::config::get_db(config, &target.db) {
                     let target_override = params.overrides.as_ref()
                         .and_then(|o| o.get(&target.db));
                     let ov_filter = target_override.and_then(|o| o.get("filter"));
@@ -273,7 +273,7 @@ pub async fn execute(
             let mut all_meta: Vec<serde_json::Value> = Vec::new();
             let mut errors: Vec<String> = Vec::new();
             for target in targets {
-                if let Some(db) = crate::get_db(config, &target.db) {
+                if let Some(db) = crate::config::get_db(config, &target.db) {
                     let target_override = params.overrides.as_ref()
                         .and_then(|o| o.get(&target.db));
                     let ov_filter = target_override.and_then(|o| o.get("filter"));

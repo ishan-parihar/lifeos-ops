@@ -85,24 +85,30 @@ pub async fn execute(
     });
 
     for res_key in &reservoirs {
-        let db = match crate::config::get_db(config, res_key) {
-            Some(db) => db,
+        // Use resolve_db to support both reservoir and satellite keys
+        let (ds_id, archetype, cycle, currency_in, currency_out, satellites) = match crate::config::resolve_db(config, res_key) {
+            Some(crate::config::ResolvedDb::Reservoir(_k, db)) => {
+                (db.ds_id().to_string(), db.archetype.as_deref().unwrap_or("unknown").to_string(),
+                 db.cycle.as_deref().unwrap_or("unknown").to_string(),
+                 db.currency_in.as_deref().unwrap_or("?").to_string(),
+                 db.currency_out.as_deref().unwrap_or("?").to_string(),
+                 db.satellites.clone())
+            }
+            Some(crate::config::ResolvedDb::Satellite(_rk, _sk, sat)) => {
+                (sat.ds_id().to_string(), "satellite".to_string(),
+                 "unknown".to_string(), "?".to_string(), "?".to_string(),
+                 std::collections::HashMap::new())
+            }
             None => continue,
         };
 
-        // Query the reservoir itself
         let query = serde_json::json!({ "page_size": limit });
-        if let Ok(page_result) = notion.query_data_source(db.ds_id(), &query).await {
+        if let Ok(page_result) = notion.query_data_source(&ds_id, &query).await {
             let items: Vec<serde_json::Value> = page_result.results.iter().map(|p| {
                 let title = crate::transform::extract_title(p);
                 let status = crate::transform::extract_string(p, "Status");
                 serde_json::json!({ "title": title, "status": status })
             }).collect();
-
-            let archetype = db.archetype.as_deref().unwrap_or("unknown");
-            let cycle = db.cycle.as_deref().unwrap_or("unknown");
-            let currency_in = db.currency_in.as_deref().unwrap_or("?");
-            let currency_out = db.currency_out.as_deref().unwrap_or("?");
 
             result["reservoirs"][res_key] = serde_json::json!({
                 "archetype": archetype,
@@ -114,7 +120,7 @@ pub async fn execute(
             });
 
             // Query satellites
-            for (sat_key, sat_cfg) in &db.satellites {
+            for (sat_key, sat_cfg) in &satellites {
                 let sat_query = serde_json::json!({ "page_size": limit });
                 if let Ok(sat_result) = notion.query_data_source(sat_cfg.ds_id(), &sat_query).await {
                     let sat_items: Vec<serde_json::Value> = sat_result.results.iter().map(|p| {
