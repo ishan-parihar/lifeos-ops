@@ -100,6 +100,31 @@ pub enum Commands {
         max_levels: u32,
     },
 
+    /// Find all entries that reference a given page (reverse relation lookup)
+    Backlinks {
+        /// Page ID to find backlinks for
+        page_id: String,
+        /// Optional database key to search within
+        #[arg(short, long)]
+        database: Option<String>,
+    },
+
+    /// Create a relation between two entries in one step
+    Link {
+        /// Source page ID
+        #[arg(short, long)]
+        source: String,
+        /// Target page ID to link to
+        #[arg(short, long)]
+        target: String,
+        /// Relation property name on source page
+        #[arg(short, long)]
+        property: String,
+    },
+
+    /// Graph metrics: orphan detection, relation density, broken links
+    GraphMetrics,
+
     /// Show database schemas with property types and relation targets
     Schema {
         /// Optional reservoir to filter (matrix, potentiator, significator, greatway, nexus)

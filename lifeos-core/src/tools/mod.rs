@@ -66,6 +66,9 @@ pub async fn get_tool_definitions(config: &LifeOSConfig, _notion: &NotionClient,
         tool_def("expand", "Batch resolve relation IDs to titled entries.".to_string(), relations::schema_expand()),
         tool_def("trace", "Follow relations N levels deep from any entry.".to_string(), relations::schema_trace()),
         tool_def("ancestors", "Walk up hierarchy from entry to root.".to_string(), relations::schema_ancestors()),
+        tool_def("backlinks", "Find all entries that reference a given page.".to_string(), relations::schema_backlinks()),
+        tool_def("link", "Create a relation between two entries.".to_string(), relations::schema_link()),
+        tool_def("graph_metrics", "Orphan detection, relation density, broken links.".to_string(), relations::schema_graph_metrics()),
     ]
 }
 
@@ -172,6 +175,19 @@ pub async fn call_tool(
             let params: relations::AncestorsParams = serde_json::from_value(args.clone())
                 .map_err(|e| format!("Invalid ancestors params: {}", e))?;
             relations::execute_ancestors(&params, config, notion, schema_cache).await
+        }
+        "backlinks" => {
+            let params: relations::BacklinksParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid backlinks params: {}", e))?;
+            relations::execute_backlinks(&params, config, notion, schema_cache).await
+        }
+        "link" => {
+            let params: relations::LinkParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid link params: {}", e))?;
+            relations::execute_link(&params, config, notion, schema_cache).await
+        }
+        "graph_metrics" => {
+            relations::execute_graph_metrics(config, notion, schema_cache).await
         }
         _ => Err(format!("Unknown tool: {}", name)),
     }

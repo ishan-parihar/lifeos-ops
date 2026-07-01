@@ -362,6 +362,266 @@ pub async fn execute_ancestors(
     Ok(crate::toon_format::encode(&data))
 }
 
+// ── get_backlinks ────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct BacklinksParams {
+    /// Page ID to find backlinks for
+    pub page_id: String,
+    /// Optional database key to search within (searches all if omitted)
+    pub database: Option<String>,
+}
+
+pub fn schema_backlinks() -> serde_json::Value {
+    serde_json::json!({
+        "type": "object",
+        "properties": {
+            "page_id": { "type": "string", "description": "Page ID to find backlinks for" },
+            "database": { "type": "string", "description": "Optional DB key to search within" }
+        },
+        "required": ["page_id"]
+    })
+}
+
+pub async fn execute_backlinks(
+    params: &BacklinksParams,
+    config: &Arc<LifeOSConfig>,
+    notion: &Arc<NotionClient>,
+    schema_cache: &SchemaCache,
+) -> Result<String, String> {
+    // Determine which databases to search
+    let db_keys: Vec<String> = if let Some(ref db) = params.database {
+        vec![db.clone()]
+    } else {
+        // Search all databases (reservoirs + satellites)
+        schema_cache.db_keys().iter().cloned().collect()
+    };
+
+    let mut backlinks: Vec<serde_json::Value> = Vec::new();
+
+    for db_key in &db_keys {
+        // Get the data source ID for this database
+        let ds_id = match crate::config::resolve_db(config, db_key) {
+            Some(crate::config::ResolvedDb::Reservoir(_, db)) => db.ds_id().to_string(),
+            Some(crate::config::ResolvedDb::Satellite(_, _, sat)) => sat.ds_id().to_string(),
+            None => continue,
+        };
+
+        // Query all pages in this database and check for relation properties
+        // that reference our target page_id
+        let query = serde_json::json!({ "page_size": 100 });
+        if let Ok(result) = notion.query_data_source(&ds_id, &query).await {
+            for page in &result.results {
+                for (prop_name, prop_value) in &page.properties {
+                    if let PropertyValue::Relation { relation, .. } = prop_value {
+                        if relation.iter().any(|r| r.id == params.page_id) {
+                            let title = crate::transform::extract_title(page);
+                            backlinks.push(serde_json::json!({
+                                "id": page.id,
+                                "title": title,
+                                "database": db_key,
+                                "property": prop_name,
+                            }));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let data = serde_json::json!({
+        "backlinks": {
+            "target": params.page_id,
+            "entries": backlinks,
+            "count": backlinks.len(),
+        }
+    });
+
+    Ok(crate::toon_format::encode(&data))
+}
+
+// ── link ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct LinkParams {
+    /// Source page ID
+    pub source_page: String,
+    /// Target page ID to link to
+    pub target_page: String,
+    /// Relation property name on the source page
+    pub property: String,
+}
+
+pub fn schema_link() -> serde_json::Value {
+    serde_json::json!({
+        "type": "object",
+        "properties": {
+            "source_page": { "type": "string", "description": "Source page ID" },
+            "target_page": { "type": "string", "description": "Target page ID to link to" },
+            "property": { "type": "string", "description": "Relation property name on source page" }
+        },
+        "required": ["source_page", "target_page", "property"]
+    })
+}
+
+pub async fn execute_link(
+    params: &LinkParams,
+    _config: &Arc<LifeOSConfig>,
+    notion: &Arc<NotionClient>,
+    schema_cache: &SchemaCache,
+) -> Result<String, String> {
+    // First, fetch the source page to get current relations
+    let source_page = notion.get_page(&params.source_page).await?;
+
+    // Get existing relation values for this property
+    let existing_ids: Vec<String> = match source_page.properties.get(&params.property) {
+        Some(PropertyValue::Relation { relation, .. }) => {
+            relation.iter().map(|r| r.id.clone()).collect()
+        }
+        _ => Vec::new(),
+    };
+
+    // Add the new target if not already linked
+    let mut new_ids: Vec<serde_json::Value> = existing_ids.iter()
+        .map(|id| serde_json::json!({ "id": id }))
+        .collect();
+
+    if !existing_ids.contains(&params.target_page) {
+        new_ids.push(serde_json::json!({ "id": &params.target_page }));
+    }
+
+    // Update the page
+    let update_body = serde_json::json!({
+        "properties": {
+            &params.property: { "relation": new_ids }
+        }
+    });
+
+    notion.update_page(&params.source_page, &update_body).await?;
+
+    // Resolve titles for the output
+    let source_title = crate::transform::extract_title(&source_page);
+    let target_title = notion.get_page(&params.target_page).await
+        .ok()
+        .map(|p| crate::transform::extract_title(&p))
+        .unwrap_or_else(|| "unknown".to_string());
+
+    let already_existed = existing_ids.contains(&params.target_page);
+
+    let data = serde_json::json!({
+        "link": {
+            "source": { "id": &params.source_page, "title": source_title },
+            "target": { "id": &params.target_page, "title": target_title },
+            "property": params.property,
+            "action": if already_existed { "already_existed" } else { "created" },
+            "total_relations": new_ids.len(),
+        }
+    });
+
+    Ok(crate::toon_format::encode(&data))
+}
+
+// ── graph_metrics ─────────────────────────────────────────────────
+
+pub fn schema_graph_metrics() -> serde_json::Value {
+    serde_json::json!({
+        "type": "object",
+        "properties": {}
+    })
+}
+
+pub async fn execute_graph_metrics(
+    config: &Arc<LifeOSConfig>,
+    notion: &Arc<NotionClient>,
+    schema_cache: &SchemaCache,
+) -> Result<String, String> {
+    let mut db_metrics: Vec<serde_json::Value> = Vec::new();
+    let mut total_entries: usize = 0;
+    let mut total_relation_edges: usize = 0;
+    let mut orphan_entries: Vec<serde_json::Value> = Vec::new();
+
+    for db_key in schema_cache.db_keys() {
+        let ds_id = match crate::config::resolve_db(config, db_key) {
+            Some(crate::config::ResolvedDb::Reservoir(_, db)) => db.ds_id().to_string(),
+            Some(crate::config::ResolvedDb::Satellite(_, _, sat)) => sat.ds_id().to_string(),
+            None => continue,
+        };
+
+        let query = serde_json::json!({ "page_size": 100 });
+        match notion.query_data_source(&ds_id, &query).await {
+            Ok(result) => {
+                let entry_count = result.results.len();
+                total_entries += entry_count;
+
+                let mut relation_count: usize = 0;
+                let mut entries_without_relations: usize = 0;
+
+                for page in &result.results {
+                    let mut has_any_relation = false;
+                    for (_prop_name, prop_value) in &page.properties {
+                        if let PropertyValue::Relation { relation, .. } = prop_value {
+                            if !relation.is_empty() {
+                                relation_count += relation.len();
+                                has_any_relation = true;
+                            }
+                        }
+                    }
+                    if !has_any_relation {
+                        entries_without_relations += 1;
+                        let title = crate::transform::extract_title(page);
+                        if orphan_entries.len() < 20 { // Cap at 20 to avoid huge output
+                            orphan_entries.push(serde_json::json!({
+                                "id": page.id,
+                                "title": title,
+                                "database": db_key,
+                            }));
+                        }
+                    }
+                }
+
+                total_relation_edges += relation_count;
+
+                db_metrics.push(serde_json::json!({
+                    "database": db_key,
+                    "entries": entry_count,
+                    "relations": relation_count,
+                    "entries_without_relations": entries_without_relations,
+                    "relation_density": if entry_count > 0 {
+                        (relation_count as f64 / entry_count as f64 * 100.0).round() / 100.0
+                    } else {
+                        0.0
+                    },
+                }));
+            }
+            Err(_) => {
+                db_metrics.push(serde_json::json!({
+                    "database": db_key,
+                    "error": "query_failed",
+                }));
+            }
+        }
+    }
+
+    let data = serde_json::json!({
+        "graph_metrics": {
+            "total_entries": total_entries,
+            "total_relation_edges": total_relation_edges,
+            "overall_density": if total_entries > 0 {
+                (total_relation_edges as f64 / total_entries as f64 * 100.0).round() / 100.0
+            } else {
+                0.0
+            },
+            "orphan_entries": orphan_entries,
+            "orphan_count_sampled": orphan_entries.len(),
+            "databases": db_metrics,
+        }
+    });
+
+    Ok(crate::toon_format::encode(&data))
+}
+
+// ── ancestors (hierarchy traversal) ──────────────────────────────
+
 /// Hierarchical priority: which DB keys represent "upward" in the hierarchy.
 /// When a relation points to one of these, it's a parent link.
 const HIERARCHY_UP: &[&str] = &[

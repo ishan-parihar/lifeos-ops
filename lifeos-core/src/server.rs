@@ -82,7 +82,7 @@ impl LifeosServer {
                     "capabilities": { "tools": {}, "resources": {} },
                     "serverInfo": { "name": "lifeos-mcp", "version": "0.1.0" },
                     "instructions": format!(
-                        "LifeOS v4 Holonic MCP server with {} reservoir databases (matrix, potentiator, significator, greatway, nexus) + satellites. 16 tools: get_schema, query, query_override, mutate, intelligence_briefing, data_science, review_pipeline, strategic_simulator, sync_note, energy_flow, drive_assessment, health_metrics, get_page, expand, trace, ancestors. Relations are shown as (relation→target_db) in schemas. Call get_schema first.",
+                        "LifeOS v4 Holonic MCP server with {} reservoir databases (matrix, potentiator, significator, greatway, nexus) + satellites. 19 tools: get_schema, query, query_override, mutate, intelligence_briefing, data_science, review_pipeline, strategic_simulator, sync_note, energy_flow, drive_assessment, health_metrics, get_page, expand, trace, ancestors, backlinks, link, graph_metrics. Relations are shown as (relation→target_db) in schemas. Call get_schema first.",
                         db_count
                     )
                 }));
