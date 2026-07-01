@@ -164,15 +164,6 @@ impl SchemaCache {
         &self.db_keys
     }
 
-    pub fn properties_of(&self, db_key: &str) -> Option<&HashMap<String, PropInfo>> {
-        self.dbs.get(db_key)
-    }
-
-    /// Get all satellite keys for a reservoir.
-    pub fn satellites_of(&self, reservoir_key: &str) -> &[String] {
-        self.reservoir_satellites.get(reservoir_key).map(|v| v.as_slice()).unwrap_or(&[])
-    }
-
     /// Get the reservoir key that owns a satellite.
     pub fn reservoir_for(&self, satellite_key: &str) -> Option<&str> {
         self.satellite_to_reservoir.get(satellite_key).map(|s| s.as_str())

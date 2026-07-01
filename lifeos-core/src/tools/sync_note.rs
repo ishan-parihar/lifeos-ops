@@ -75,7 +75,7 @@ pub async fn execute(
                 .map_err(|e| format!("Failed to read file: {}", e))?;
             let db_key = params.database.as_deref()
                 .ok_or("database required for to_notion direction")?;
-            let db = crate::get_db(config, db_key)
+            let db = crate::config::get_db(config, db_key)
                 .ok_or_else(|| format!("Unknown database: {}", db_key))?;
 
             let title = content.lines()
