@@ -762,6 +762,7 @@ dependencies = [
  "clap",
  "dotenvy",
  "lifeos-core",
+ "serde_json",
  "tokio",
  "tracing",
  "tracing-subscriber",

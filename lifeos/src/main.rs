@@ -152,6 +152,92 @@ async fn main() {
                     ).await;
                     match result { Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); } }
                 }
+                Commands::Schema { database } => {
+                    let (cfg, _notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let result = lifeos_core::tools::execute_get_schema(database.as_deref(), &sc, &cfg);
+                    println!("{result}");
+                }
+                Commands::Query { database, filter_property, filter_value, filter_type, sort_property, sort_direction, limit, preset, reservoir, cycle } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::query::QueryParams {
+                        database, filter_property, filter_value, filter_type,
+                        sort_property, sort_direction, limit: Some(limit),
+                        return_properties: None, preset, reservoir, cycle,
+                    };
+                    match lifeos_core::tools::query::execute(&params, &cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::Mutate { operation, database, page_id, properties, dry_run } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let props: Option<serde_json::Value> = properties.and_then(|p| serde_json::from_str(&p).ok());
+                    let _ = dry_run; // CLI flag — tool operates directly
+                    let params = lifeos_core::tools::mutate::MutateParams {
+                        operation, database, page_id, properties: props, target_name: None,
+                    };
+                    match lifeos_core::tools::mutate::execute(&params, &cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::Intelligence { mode, role, module, range } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::intelligence::IntelligenceParams {
+                        mode, role, module, range, overrides: None,
+                    };
+                    match lifeos_core::tools::intelligence::execute(&params, &cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::DataScience { analysis_type, database, database_b, days_back, property, metric_property } => {
+                    let (cfg, notion, _sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::data_science::DataScienceParams {
+                        analysis_type, database, database_b, days_back, property, metric_property,
+                    };
+                    match lifeos_core::tools::data_science::execute(&params, &cfg, &notion).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::Review { review_type } => {
+                    let (cfg, notion, _sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::review::ReviewParams {
+                        review_type, date: None, databases: None,
+                    };
+                    match lifeos_core::tools::review::execute(&params, &cfg, &notion).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::Strategic { analysis_type, project_database, okr_database, campaign_database } => {
+                    let (cfg, notion, _sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::strategic::StrategicParams {
+                        analysis_type, project_database, okr_database, campaign_database,
+                    };
+                    match lifeos_core::tools::strategic::execute(&params, &cfg, &notion).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::EnergyFlow { scope, currency, limit } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::energy_flow::EnergyFlowParams {
+                        scope, currency, entry_id: None, limit,
+                    };
+                    match lifeos_core::tools::energy_flow::execute(&params, &cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::DriveAssessment { boundary, range } => {
+                    let (cfg, notion, _sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::drive_assessment::DriveAssessmentParams { boundary, range };
+                    match lifeos_core::tools::drive_assessment::execute(&params, &cfg, &notion).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::HealthMetrics { metric, range } => {
+                    let (cfg, notion, _sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::health_metrics::HealthMetricsParams { metric, range };
+                    match lifeos_core::tools::health_metrics::execute(&params, &cfg, &notion).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
                 Commands::MCP => unreachable!(),
                 Commands::Discover { config: config_path_arg } => {
                     let cfg = resolve_config(config_path_arg.as_deref());

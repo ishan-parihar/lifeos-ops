@@ -178,7 +178,7 @@ pub async fn call_tool(
 }
 
 /// Execute the get_schema tool — returns hierarchical v4 holonic database schemas
-fn execute_get_schema(database: Option<&str>, schema_cache: &SchemaCache, config: &LifeOSConfig) -> String {
+pub fn execute_get_schema(database: Option<&str>, schema_cache: &SchemaCache, config: &LifeOSConfig) -> String {
     let mut output = String::new();
 
     // Filter to specific reservoir if requested
