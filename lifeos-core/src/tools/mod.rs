@@ -18,6 +18,7 @@ pub mod energy_flow;
 pub mod drive_assessment;
 pub mod health_metrics;
 pub mod shared;
+pub mod relations;
 
 fn enrich_database_param(schema: &mut Value, param_name: &str, schema_cache: &SchemaCache) {
     let db_keys: Vec<Value> = schema_cache.db_keys().iter().map(|k| Value::String(k.clone())).collect();
@@ -61,6 +62,10 @@ pub async fn get_tool_definitions(config: &LifeOSConfig, _notion: &NotionClient,
         tool_def("energy_flow", "Trace currency flow across the holonic spiral.".to_string(), energy_flow::schema()),
         tool_def("drive_assessment", "Assess 4 drives at lesser/greater boundary.".to_string(), drive_schema),
         tool_def("health_metrics", "G_z + P_z holonic health metrics.".to_string(), health_schema),
+        tool_def("get_page", "Fetch entry with all relations resolved to titles.".to_string(), relations::schema_get_page()),
+        tool_def("expand", "Batch resolve relation IDs to titled entries.".to_string(), relations::schema_expand()),
+        tool_def("trace", "Follow relations N levels deep from any entry.".to_string(), relations::schema_trace()),
+        tool_def("ancestors", "Walk up hierarchy from entry to root.".to_string(), relations::schema_ancestors()),
     ]
 }
 
@@ -147,6 +152,26 @@ pub async fn call_tool(
             let params: health_metrics::HealthMetricsParams = serde_json::from_value(args.clone())
                 .map_err(|e| format!("Invalid health_metrics params: {}", e))?;
             health_metrics::execute(&params, config, notion).await
+        }
+        "get_page" => {
+            let params: relations::GetPageParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid get_page params: {}", e))?;
+            relations::execute_get_page(&params, config, notion, schema_cache).await
+        }
+        "expand" => {
+            let params: relations::ExpandParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid expand params: {}", e))?;
+            relations::execute_expand(&params, config, notion, schema_cache).await
+        }
+        "trace" => {
+            let params: relations::TraceParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid trace params: {}", e))?;
+            relations::execute_trace(&params, config, notion, schema_cache).await
+        }
+        "ancestors" => {
+            let params: relations::AncestorsParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid ancestors params: {}", e))?;
+            relations::execute_ancestors(&params, config, notion, schema_cache).await
         }
         _ => Err(format!("Unknown tool: {}", name)),
     }

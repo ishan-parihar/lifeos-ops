@@ -2,7 +2,7 @@
 //!
 //! Provides two layers:
 //! - `SchemaEngine`: per-data-source schema caching (original)
-//! - `SchemaCache`: config-aware caching with reservoir → satellite hierarchy
+//! - `SchemaCache`: config-aware caching with reservoir → satellite hierarchy + relation graph
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -60,7 +60,14 @@ pub struct PropInfo {
     pub enum_options: Vec<String>,
 }
 
-/// Config-key-aware property type cache with reservoir hierarchy.
+/// A relation edge: property name → target database key.
+#[derive(Debug, Clone)]
+pub struct RelationEdge {
+    pub prop_name: String,
+    pub target_db: String,
+}
+
+/// Config-key-aware property type cache with reservoir hierarchy + relation graph.
 pub struct SchemaCache {
     /// db_key → (config_key → PropInfo) — includes both reservoirs and satellites
     dbs: HashMap<String, HashMap<String, PropInfo>>,
@@ -70,6 +77,11 @@ pub struct SchemaCache {
     reservoir_satellites: HashMap<String, Vec<String>>,
     /// satellite_key → reservoir_key (reverse lookup)
     satellite_to_reservoir: HashMap<String, String>,
+    /// db_key → Vec<RelationEdge> — which properties link to which databases
+    relation_graph: HashMap<String, Vec<RelationEdge>>,
+    /// database_id → config_key (reverse map for resolving relation targets)
+    id_to_key: HashMap<String, String>,
+
 }
 
 impl SchemaCache {
@@ -93,17 +105,14 @@ impl SchemaCache {
         let mut tasks: Vec<FetchTask> = Vec::new();
 
         for (db_key, db_cfg) in &config.databases {
-            // Ensure all reservoirs appear in the map, even those with no satellites
             reservoir_satellites.insert(db_key.clone(), Vec::new());
 
-            // Reservoir itself
             tasks.push(FetchTask {
                 key: db_key.clone(),
                 ds_id: db_cfg.ds_id().to_string(),
                 props: db_cfg.properties.clone(),
             });
 
-            // Satellites
             for (sat_key, sat_cfg) in &db_cfg.satellites {
                 tasks.push(FetchTask {
                     key: sat_key.clone(),
@@ -118,31 +127,82 @@ impl SchemaCache {
             }
         }
 
-        // Execute all fetches concurrently
+        // Execute all fetches concurrently — also capture raw schemas for relation extraction
+        struct FetchResult {
+            key: String,
+            ds_id: String,
+            props: Option<HashMap<String, PropInfo>>,
+            raw_schema: Option<NotionDataSource>,
+        }
+
         let mut futures = Vec::new();
         for task in tasks {
             let key = task.key;
-            let ds_id = task.ds_id;
+            let ds_id = task.ds_id.clone();
             let props = task.props;
             let eng = engine.clone();
             let sem = semaphore.clone();
             futures.push(async move {
                 let _permit = sem.acquire().await;
-                let info = eng.get_schema(&ds_id).await.ok().and_then(|schema| {
-                    build_prop_info_map(&props, &schema)
+                let raw = eng.get_schema(&ds_id).await.ok();
+                let prop_info = raw.as_ref().and_then(|schema| {
+                    build_prop_info_map(&props, schema)
                 });
-                (key, info)
+                FetchResult { key, ds_id: task.ds_id, props: prop_info, raw_schema: raw }
             });
         }
 
         let results = futures::future::join_all(futures).await;
 
-        for (key, info_opt) in results {
-            db_keys.push(key.clone());
-            dbs.insert(key, info_opt.unwrap_or_default());
+        // Build reverse map: database_id → config_key
+        let mut id_to_key: HashMap<String, String> = HashMap::new();
+        for (db_key, db_cfg) in &config.databases {
+            id_to_key.insert(db_cfg.database_id.clone(), db_key.clone());
+            for (sat_key, sat_cfg) in &db_cfg.satellites {
+                id_to_key.insert(sat_cfg.database_id.clone(), sat_key.clone());
+            }
         }
 
-        Self { dbs, db_keys, reservoir_satellites, satellite_to_reservoir }
+        // Collect raw schemas and prop info
+        let mut raw_schemas: HashMap<String, NotionDataSource> = HashMap::new();
+        for result in results {
+            db_keys.push(result.key.clone());
+            if let Some(props) = result.props {
+                dbs.insert(result.key.clone(), props);
+            } else {
+                dbs.insert(result.key.clone(), HashMap::new());
+            }
+            if let Some(schema) = result.raw_schema {
+                raw_schemas.insert(result.ds_id, schema);
+            }
+        }
+
+        // Build relation graph from raw schemas
+        let mut relation_graph: HashMap<String, Vec<RelationEdge>> = HashMap::new();
+        for (ds_id, schema) in &raw_schemas {
+            // Find which config key owns this schema
+            let source_config_key = find_key_for_ds_id(ds_id, config);
+
+            if let Some(src_key) = source_config_key {
+                let mut edges = Vec::new();
+                for (prop_name, prop_schema) in &schema.properties {
+                    if prop_schema.prop_type == "relation" {
+                        if let Some(ref rel_config) = prop_schema.relation {
+                            let target_key = id_to_key.get(&rel_config.database_id)
+                                .cloned()
+                                .unwrap_or_else(|| format!("unknown({})", &rel_config.database_id[..8.min(rel_config.database_id.len())]));
+                            edges.push(RelationEdge {
+                                prop_name: prop_name.clone(),
+                                target_db: target_key,
+                            });
+                        }
+                    }
+                }
+                relation_graph.insert(src_key, edges);
+            }
+        }
+
+        Self { dbs, db_keys, reservoir_satellites, satellite_to_reservoir, relation_graph, id_to_key }
     }
 
     pub fn get_prop_type(&self, db_key: &str, config_key: &str) -> Option<&str> {
@@ -174,13 +234,25 @@ impl SchemaCache {
         self.reservoir_satellites.contains_key(key)
     }
 
+    /// Get outgoing relation edges for a database (which properties link to which databases).
+    pub fn get_relation_edges(&self, db_key: &str) -> &[RelationEdge] {
+        self.relation_graph.get(db_key).map(|v| v.as_slice()).unwrap_or(&[])
+    }
 
+    /// Get all relation edges as a flat list for the full graph.
+    pub fn all_relation_edges(&self) -> &HashMap<String, Vec<RelationEdge>> {
+        &self.relation_graph
+    }
+
+    /// Resolve a database_id back to a config key.
+    pub fn resolve_db_key_from_id(&self, database_id: &str) -> Option<&str> {
+        self.id_to_key.get(database_id).map(|s| s.as_str())
+    }
 
     /// Build a hierarchical description for a reservoir showing its satellites.
     pub fn describe_reservoir(&self, reservoir_key: &str, config: &LifeOSConfig) -> String {
         let mut output = String::new();
 
-        // Reservoir header
         if let Some(db_cfg) = config.databases.get(reservoir_key) {
             let archetype = db_cfg.archetype.as_deref().unwrap_or("unknown");
             let scale = db_cfg.scale.as_deref().unwrap_or("unknown");
@@ -192,9 +264,9 @@ impl SchemaCache {
                 db_cfg.name, archetype, scale, dimension, cycle
             ));
 
-            // Reservoir own properties
+            // Reservoir own properties + relations
             if let Some(props) = self.dbs.get(reservoir_key) {
-                let desc = format_properties(props);
+                let desc = format_properties_with_relations(props, self.relation_graph.get(reservoir_key));
                 if !desc.is_empty() {
                     output.push_str(&format!("  Properties: {}\n", desc));
                 }
@@ -210,7 +282,7 @@ impl SchemaCache {
                             .map(|s| s.name.as_str())
                         {
                             let sat_desc = self.dbs.get(sat_key)
-                                .map(|p| format_properties(p))
+                                .map(|p| format_properties_with_relations(p, self.relation_graph.get(sat_key)))
                                 .unwrap_or_default();
                             output.push_str(&format!("    {}: {} {}\n", sat_key, sat_name,
                                 if sat_desc.is_empty() { String::new() } else { format!("({})", sat_desc) }
@@ -229,28 +301,69 @@ impl SchemaCache {
         let Some(props) = self.dbs.get(db_key) else {
             return String::new();
         };
-        format_properties(props)
+        format_properties_with_relations(props, self.relation_graph.get(db_key))
+    }
+
+    /// Describe the full relation graph as human-readable text.
+    pub fn describe_relation_graph(&self) -> String {
+        let mut output = String::from("LifeOS Relational Graph:\n\n");
+        for (db_key, edges) in &self.relation_graph {
+            output.push_str(&format!("{}:\n", db_key));
+            for edge in edges {
+                output.push_str(&format!("  {} → {}\n", edge.prop_name, edge.target_db));
+            }
+        }
+        output
     }
 }
 
-fn format_properties(props: &HashMap<String, PropInfo>) -> String {
+/// Find the config key for a given data_source_id.
+fn find_key_for_ds_id(ds_id: &str, config: &LifeOSConfig) -> Option<String> {
+    for (db_key, db_cfg) in &config.databases {
+        if db_cfg.ds_id() == ds_id {
+            return Some(db_key.clone());
+        }
+        for (sat_key, sat_cfg) in &db_cfg.satellites {
+            if sat_cfg.ds_id() == ds_id {
+                return Some(sat_key.clone());
+            }
+        }
+    }
+    None
+}
+
+
+
+/// Format properties with relation targets annotated.
+fn format_properties_with_relations(props: &HashMap<String, PropInfo>, edges: Option<&Vec<RelationEdge>>) -> String {
+    let edge_map: HashMap<&str, &str> = edges
+        .map(|e| e.iter().map(|e| (e.prop_name.as_str(), e.target_db.as_str())).collect())
+        .unwrap_or_default();
+
     let parts: Vec<String> = props.iter().map(|(key, info)| {
-        let type_hint = match info.prop_type.as_str() {
-            "select" | "status" => {
-                if info.enum_options.is_empty() {
-                    format!("({})", info.prop_type)
-                } else {
-                    format!("({}:{})", info.prop_type, info.enum_options.join("/"))
-                }
+        let type_hint = if info.prop_type == "relation" {
+            match edge_map.get(key.as_str()) {
+                Some(target) => format!("(relation→{})", target),
+                None => "(relation)".to_string(),
             }
-            "multi_select" => {
-                if info.enum_options.is_empty() {
-                    "(multi_select)".to_string()
-                } else {
-                    format!("(multi_select:{})", info.enum_options.join("/"))
+        } else {
+            match info.prop_type.as_str() {
+                "select" | "status" => {
+                    if info.enum_options.is_empty() {
+                        format!("({})", info.prop_type)
+                    } else {
+                        format!("({}:{})", info.prop_type, info.enum_options.join("/"))
+                    }
                 }
+                "multi_select" => {
+                    if info.enum_options.is_empty() {
+                        "(multi_select)".to_string()
+                    } else {
+                        format!("(multi_select:{})", info.enum_options.join("/"))
+                    }
+                }
+                t => format!("({})", t),
             }
-            t => format!("({})", t),
         };
         format!("{}{}", key, type_hint)
     }).collect();
