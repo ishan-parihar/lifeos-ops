@@ -256,14 +256,20 @@ pub async fn push_database(
     index: &HashMap<String, IndexEntry>,
     dry_run: bool,
 ) -> Result<PushReport, String> {
-    let db = config
-        .databases
-        .get(db_key)
-        .ok_or_else(|| format!("Database key '{}' not found in config", db_key))?;
+    // Use resolve_db to support both reservoir and satellite keys
+    let (ds_id, db_name, properties) = match crate::config::resolve_db(config, db_key) {
+        Some(crate::config::ResolvedDb::Reservoir(_key, db)) => {
+            (db.ds_id().to_string(), db.name.clone(), db.properties.clone())
+        }
+        Some(crate::config::ResolvedDb::Satellite(_, _, sat)) => {
+            (sat.ds_id().to_string(), sat.name.clone(), sat.properties.clone())
+        }
+        None => return Err(format!("Database key '{}' not found in config", db_key)),
+    };
 
     tracing::info!(
         "Pushing database: {} ({}){}",
-        db.name,
+        db_name,
         db_key,
         if dry_run { " [DRY RUN]" } else { "" }
     );
@@ -328,7 +334,7 @@ pub async fn push_database(
                         &entry.page_id,
                         frontmatter,
                         body,
-                        &db.properties,
+                        &properties,
                         dry_run,
                     )
                     .await
@@ -353,7 +359,7 @@ pub async fn push_database(
                         &entry.page_id,
                         frontmatter,
                         body,
-                        &db.properties,
+                        &properties,
                         dry_run,
                     )
                     .await
@@ -383,11 +389,11 @@ pub async fn push_database(
 
             match push_created_page(
                 notion,
-                db.ds_id(),
+                &ds_id,
                 &title,
                 frontmatter,
                 body,
-                &db.properties,
+                &properties,
                 dry_run,
             )
             .await

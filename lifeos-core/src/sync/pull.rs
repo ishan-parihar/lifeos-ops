@@ -73,6 +73,7 @@ pub async fn pull_database(
 /// Like `pull_database` but accepts an optional `since` timestamp.
 /// When `since` is `Some(iso_timestamp)`, only pages modified after that
 /// time are fetched from Notion, making repeated pulls much cheaper.
+/// Supports both reservoir and satellite keys via `resolve_db`.
 pub async fn pull_database_since(
     notion: &NotionClient,
     config: &LifeOSConfig,
@@ -81,12 +82,18 @@ pub async fn pull_database_since(
     index: &mut HashMap<String, IndexEntry>,
     since: Option<&str>,
 ) -> Result<PullReport, String> {
-    let db = config
-        .databases
-        .get(db_key)
-        .ok_or_else(|| format!("Database key '{}' not found in config", db_key))?;
+    // Use resolve_db to support both reservoir and satellite keys
+    let (ds_id, db_name, properties) = match crate::config::resolve_db(config, db_key) {
+        Some(crate::config::ResolvedDb::Reservoir(_key, db)) => {
+            (db.ds_id().to_string(), db.name.clone(), db.properties.clone())
+        }
+        Some(crate::config::ResolvedDb::Satellite(_, _, sat)) => {
+            (sat.ds_id().to_string(), sat.name.clone(), sat.properties.clone())
+        }
+        None => return Err(format!("Database key '{}' not found in config", db_key)),
+    };
 
-    tracing::info!("Pulling database: {} ({})", db.name, db_key);
+    tracing::info!("Pulling database: {} ({})", db_name, db_key);
 
     if !vault_dir.exists() {
         fs::create_dir_all(vault_dir)
@@ -94,7 +101,7 @@ pub async fn pull_database_since(
     }
 
     let pages = notion
-        .query_data_source_all_since(db.ds_id(), since)
+        .query_data_source_all_since(&ds_id, since)
         .await?;
     tracing::info!(
         "  Found {} pages in data source{}",
@@ -157,7 +164,7 @@ pub async fn pull_database_since(
             }
         };
 
-        let frontmatter_yaml = match extract_properties_yaml(page, &db.properties, &title_cache) {
+        let frontmatter_yaml = match extract_properties_yaml(page, &properties, &title_cache) {
             Ok(y) => serde_yaml::to_string(&y).unwrap_or_default(),
             Err(e) => {
                 tracing::warn!("  [warn] {} frontmatter: {e}", title);
