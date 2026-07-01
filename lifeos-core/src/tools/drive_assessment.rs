@@ -37,11 +37,11 @@ pub async fn execute(
     let date_filter = crate::util::date_filter::build_date_filter(range, None);
 
     // Query all 4 core reservoirs + nexus
-    let matrix_stats = query_reservoir_stats(config, notion, "matrix", &date_filter).await;
-    let potentiator_stats = query_reservoir_stats(config, notion, "potentiator", &date_filter).await;
-    let significator_stats = query_reservoir_stats(config, notion, "significator", &date_filter).await;
-    let greatway_stats = query_reservoir_stats(config, notion, "greatway", &date_filter).await;
-    let nexus_stats = query_reservoir_stats(config, notion, "nexus", &date_filter).await;
+    let matrix_stats = crate::tools::shared::query_reservoir(config, notion, "matrix", &date_filter, 50).await;
+    let potentiator_stats = crate::tools::shared::query_reservoir(config, notion, "potentiator", &date_filter, 50).await;
+    let significator_stats = crate::tools::shared::query_reservoir(config, notion, "significator", &date_filter, 50).await;
+    let greatway_stats = crate::tools::shared::query_reservoir(config, notion, "greatway", &date_filter, 50).await;
+    let nexus_stats = crate::tools::shared::query_reservoir(config, notion, "nexus", &date_filter, 50).await;
 
     // Calculate health metrics
     let g_z = calculate_g_z(&matrix_stats, &potentiator_stats);
@@ -110,42 +110,6 @@ pub async fn execute(
     Ok(crate::toon_format::encode(&result))
 }
 
-async fn query_reservoir_stats(
-    config: &LifeOSConfig,
-    notion: &NotionClient,
-    reservoir_key: &str,
-    date_filter: &Option<serde_json::Value>,
-) -> serde_json::Value {
-    let db = match crate::config::get_db(config, reservoir_key) {
-        Some(db) => db,
-        None => return serde_json::json!({ "error": "not found" }),
-    };
-
-    let mut query = serde_json::json!({ "page_size": 50 });
-    if let Some(ref filter) = date_filter {
-        if let Some(date_prop) = db.properties.get("date") {
-            let mut f = filter.clone();
-            f["property"] = serde_json::json!(date_prop);
-            query["filter"] = f;
-        }
-    }
-
-    match notion.query_data_source(db.ds_id(), &query).await {
-        Ok(result) => {
-            let mut status_dist: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
-            for page in &result.results {
-                let status = crate::transform::extract_string(page, "Status");
-                *status_dist.entry(status).or_insert(0) += 1;
-            }
-            serde_json::json!({
-                "total": result.results.len(),
-                "has_more": result.has_more,
-                "status_distribution": status_dist
-            })
-        }
-        Err(e) => serde_json::json!({ "error": e }),
-    }
-}
 
 fn calculate_g_z(matrix: &serde_json::Value, potentiator: &serde_json::Value) -> f64 {
     let m_count = matrix.get("total").and_then(|v| v.as_f64()).unwrap_or(0.0);

@@ -17,6 +17,7 @@ pub mod sync_note;
 pub mod energy_flow;
 pub mod drive_assessment;
 pub mod health_metrics;
+pub mod shared;
 
 fn enrich_database_param(schema: &mut Value, param_name: &str, schema_cache: &SchemaCache) {
     let db_keys: Vec<Value> = schema_cache.db_keys().iter().map(|k| Value::String(k.clone())).collect();
