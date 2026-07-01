@@ -58,7 +58,6 @@ fn simple_glob_match(name: &str, pattern: &str) -> bool {
 }
 
 pub struct PushReport {
-    pub db_key: String,
     pub pages_created: usize,
     pub pages_updated: usize,
     pub errors: Vec<String>,
@@ -280,7 +279,6 @@ pub async fn push_database(
             db_dir.display()
         );
         return Ok(PushReport {
-            db_key: db_key.to_string(),
             pages_created: 0,
             pages_updated: 0,
             errors: Vec::new(),
@@ -299,7 +297,6 @@ pub async fn push_database(
     tracing::info!("  Found {} .md files ({} ignored)", files.len(), ignored);
 
     let mut report = PushReport {
-        db_key: db_key.to_string(),
         pages_created: 0,
         pages_updated: 0,
         errors: Vec::new(),

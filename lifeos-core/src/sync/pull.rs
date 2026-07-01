@@ -10,7 +10,6 @@ use crate::vault::{self, vault_path, IndexEntry};
 use crate::sync::merge::store_base_snapshot;
 
 pub struct PullReport {
-    pub db_key: String,
     pub pages_processed: usize,
     pub files_created: usize,
     pub files_updated: usize,
@@ -98,7 +97,6 @@ pub async fn pull_database_since(
     );
 
     let mut report = PullReport {
-        db_key: db_key.to_string(),
         pages_processed: 0,
         files_created: 0,
         files_updated: 0,

@@ -220,7 +220,7 @@ async fn cmd_pull(
         None
     };
     let mut global_report = sync::pull::PullReport {
-        db_key: "ALL".to_string(),
+
         pages_processed: 0,
         files_created: 0,
         files_updated: 0,
@@ -304,7 +304,7 @@ async fn cmd_push(
 
     let index = read_index(vault_dir)?;
     let mut global_report = sync::push::PushReport {
-        db_key: "ALL".to_string(),
+
         pages_created: 0,
         pages_updated: 0,
         errors: vec![],
