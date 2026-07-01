@@ -367,6 +367,7 @@ async fn cmd_discover(mut cfg: LifeOSConfig, token: &str) -> Result<(), String> 
     let mut updated = 0;
     let mut not_found = Vec::new();
 
+    // Discover reservoirs
     for db_config in cfg.databases.values_mut() {
         if let Some((id, _)) = notion_dbs.iter().find(|(_, title)| title == &db_config.name) {
             let old_id = std::mem::replace(&mut db_config.database_id, id.clone());
@@ -377,12 +378,24 @@ async fn cmd_discover(mut cfg: LifeOSConfig, token: &str) -> Result<(), String> 
         } else {
             not_found.push(db_config.name.clone());
         }
+        // Discover satellites
+        for sat in db_config.satellites.values_mut() {
+            if let Some((id, _)) = notion_dbs.iter().find(|(_, title)| title == &sat.name) {
+                let old_id = std::mem::replace(&mut sat.database_id, id.clone());
+                if old_id != sat.database_id {
+                    println!("  [UPDATED] {} (satellite) : {} -> {}", sat.name, &old_id[..8.min(old_id.len())], &sat.database_id[..8.min(sat.database_id.len())]);
+                }
+                updated += 1;
+            } else {
+                not_found.push(sat.name.clone());
+            }
+        }
     }
 
     save_config(&cfg, &path).map_err(|e| e.to_string())?;
 
     println!("\nDiscover complete:");
-    println!("  Updated: {} databases", updated);
+    println!("  Updated: {} databases (reservoirs + satellites)", updated);
     println!("  Not found: {}", not_found.len());
     if !not_found.is_empty() {
         for name in &not_found {

@@ -82,7 +82,7 @@ impl LifeosServer {
                     "capabilities": { "tools": {}, "resources": {} },
                     "serverInfo": { "name": "lifeos-mcp", "version": "0.1.0" },
                     "instructions": format!(
-                        "LifeOS MCP server with {} databases and 9 tools: get_schema, query, query_override, mutate, intelligence_briefing, data_science, review_pipeline, strategic_simulator, sync_note. Call get_schema first to see available databases.",
+                        "LifeOS v4 Holonic MCP server with {} reservoir databases (matrix, potentiator, significator, greatway, nexus) + satellites. 12 tools: get_schema, query, query_override, mutate, intelligence_briefing, data_science, review_pipeline, strategic_simulator, sync_note, energy_flow, drive_assessment, health_metrics. Call get_schema first.",
                         db_count
                     )
                 }));

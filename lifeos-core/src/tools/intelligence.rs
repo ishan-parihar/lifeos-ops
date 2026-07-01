@@ -29,7 +29,7 @@ pub fn schema(_schema_cache: &SchemaCache) -> serde_json::Value {
     let obj = serde_json::json!({
         "type": "object",
         "properties": {
-            "mode": { "type": "string", "enum": ["role", "module"], "description": "Briefing mode" },
+            "mode": { "type": "string", "enum": ["role", "module", "lesser_cycle", "greater_cycle", "nexus", "drive_balance", "reservoir_health"], "description": "Briefing mode: role/module for legacy, lesser_cycle/greater_cycle/nexus/drive_balance/reservoir_health for v4 holonic" },
             "role": { "type": "string", "enum": ["CEO", "COO", "CMO", "CRO", "CFO", "CHO"], "description": "Role key when mode=role" },
             "module": { "type": "string", "enum": ["productivity", "health", "strategic", "financial", "content", "journaling"], "description": "Module key when mode=module" },
             "range": { "type": "string", "description": "Date range: today, this_week, this_month, this_quarter or ISO date" },
@@ -303,6 +303,109 @@ pub async fn execute(
             }
 
             Ok(crate::toon_format::encode(&data))
+        }
+        "lesser_cycle" => {
+            let mut data = serde_json::json!({
+                "briefing_type": "lesser_cycle",
+                "description": "Current-stage energy flow: Matrix (Catalyst→Experience) ⇄ Potentiator (Experience→Catalyst)",
+                "range": range
+            });
+            let mut errors: Vec<String> = Vec::new();
+            for key in &["matrix", "potentiator"] {
+                if let Some(db) = crate::config::get_db(config, key) {
+                    let mut query = serde_json::json!({ "page_size": 20 });
+                    if let Some(date_prop) = db.properties.get("date") {
+                        if let Some(df) = build_date_filter(range, date_prop) {
+                            query["filter"] = df;
+                        }
+                    }
+                    match notion.query_data_source(db.ds_id(), &query).await {
+                        Ok(result) => {
+                            let items: Vec<serde_json::Value> = result.results.iter()
+                                .map(|p| serde_json::json!({
+                                    "title": crate::transform::extract_title(p),
+                                    "id": p.id,
+                                    "archetype": db.archetype.as_deref().unwrap_or("unknown"),
+                                    "currency_in": db.currency_in.as_deref().unwrap_or("?"),
+                                    "currency_out": db.currency_out.as_deref().unwrap_or("?"),
+                                })).collect();
+                            data[key] = serde_json::json!({ "entries": items, "count": items.len() });
+                        }
+                        Err(e) => errors.push(format!("{}: {}", key, e)),
+                    }
+                }
+            }
+            if !errors.is_empty() { data["_errors"] = serde_json::json!(errors); }
+            Ok(crate::toon_format::encode(&data))
+        }
+        "greater_cycle" => {
+            let mut data = serde_json::json!({
+                "briefing_type": "greater_cycle",
+                "description": "All-stage evolutionary tension: Significator (Transformation→Choice) ⇄ GreatWay (Choice→Transformation)",
+                "range": range
+            });
+            let mut errors: Vec<String> = Vec::new();
+            for key in &["significator", "greatway"] {
+                if let Some(db) = crate::config::get_db(config, key) {
+                    let query = serde_json::json!({ "page_size": 20 });
+                    match notion.query_data_source(db.ds_id(), &query).await {
+                        Ok(result) => {
+                            let items: Vec<serde_json::Value> = result.results.iter()
+                                .map(|p| serde_json::json!({
+                                    "title": crate::transform::extract_title(p),
+                                    "id": p.id,
+                                    "archetype": db.archetype.as_deref().unwrap_or("unknown"),
+                                })).collect();
+                            data[key] = serde_json::json!({ "entries": items, "count": items.len() });
+                        }
+                        Err(e) => errors.push(format!("{}: {}", key, e)),
+                    }
+                }
+            }
+            if !errors.is_empty() { data["_errors"] = serde_json::json!(errors); }
+            Ok(crate::toon_format::encode(&data))
+        }
+        "nexus" => {
+            let mut data = serde_json::json!({
+                "briefing_type": "nexus",
+                "description": "Contact-boundary transmutation: all 4 currencies (Catalyst, Experience, Transformation, Choice)",
+                "range": range
+            });
+            if let Some(db) = crate::config::get_db(config, "nexus") {
+                let query = serde_json::json!({ "page_size": 20 });
+                match notion.query_data_source(db.ds_id(), &query).await {
+                    Ok(result) => {
+                        let items: Vec<serde_json::Value> = result.results.iter()
+                            .map(|p| serde_json::json!({
+                                "title": crate::transform::extract_title(p),
+                                "id": p.id,
+                            })).collect();
+                        data["nexus"] = serde_json::json!({ "entries": items, "count": items.len() });
+                    }
+                    Err(e) => { data["_errors"] = serde_json::json!([e]); }
+                }
+            }
+            Ok(crate::toon_format::encode(&data))
+        }
+        "drive_balance" | "reservoir_health" => {
+            // Delegate to the dedicated tools
+            if params.mode == "drive_balance" {
+                crate::tools::drive_assessment::execute(
+                    &crate::tools::drive_assessment::DriveAssessmentParams {
+                        boundary: "both".to_string(),
+                        range: Some(range.to_string()),
+                    },
+                    config, notion,
+                ).await
+            } else {
+                crate::tools::health_metrics::execute(
+                    &crate::tools::health_metrics::HealthMetricsParams {
+                        metric: "both".to_string(),
+                        range: Some(range.to_string()),
+                    },
+                    config, notion,
+                ).await
+            }
         }
         _ => Err(format!("Unknown mode: {}", params.mode)),
     }

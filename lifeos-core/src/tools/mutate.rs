@@ -171,16 +171,24 @@ pub async fn execute(
     notion: &Arc<NotionClient>,
     schema_cache: &SchemaCache,
 ) -> Result<String, String> {
-    let db = crate::get_db(config, &params.database)
-        .ok_or_else(|| format!("Unknown database: {}", params.database))?;
+    // Resolve database — supports both reservoir and satellite keys
+    let (ds_id, _db_name, properties) = match crate::config::resolve_db(config, &params.database) {
+        Some(crate::config::ResolvedDb::Reservoir(_key, db)) => {
+            (db.ds_id().to_string(), db.name.clone(), db.properties.clone())
+        }
+        Some(crate::config::ResolvedDb::Satellite(_, _, sat)) => {
+            (sat.ds_id().to_string(), sat.name.clone(), sat.properties.clone())
+        }
+        None => return Err(format!("Unknown database: {}", params.database)),
+    };
 
     match params.operation.as_str() {
         "create" => {
             let props = params.properties.as_ref()
                 .ok_or("properties required for create")?;
-            let mapped = map_properties(props, &db.properties, &params.database, schema_cache);
+            let mapped = map_properties(props, &properties, &params.database, schema_cache);
             let body = serde_json::json!({
-                "parent": { "data_source_id": db.ds_id() },
+                "parent": { "data_source_id": ds_id },
                 "properties": mapped
             });
             let page = notion.create_page(&body).await?;
@@ -191,7 +199,7 @@ pub async fn execute(
             let page_id = resolve_page_id(params, notion, config).await?;
             let props = params.properties.as_ref()
                 .ok_or("properties required for update")?;
-            let mapped = map_properties(props, &db.properties, &params.database, schema_cache);
+            let mapped = map_properties(props, &properties, &params.database, schema_cache);
             let page = notion.update_page(&page_id, &mapped).await?;
             let title = crate::transform::extract_title(&page);
             Ok(format!("Updated: {} ({})", title, page.id))
@@ -209,7 +217,7 @@ pub async fn execute(
                     .and_then(|v| v.as_str()))
                 .ok_or("target_name or 'Name' property required for upsert")?;
 
-            let title_notion_name = db.properties.get("title").map(|s| s.as_str()).unwrap_or("Name");
+            let title_notion_name = properties.get("title").map(|s| s.as_str()).unwrap_or("Name");
             let query_body = serde_json::json!({
                 "page_size": 10,
                 "filter": {
@@ -217,18 +225,18 @@ pub async fn execute(
                     "title": { "equals": target_name }
                 }
             });
-            let result = notion.query_data_source(db.ds_id(), &query_body).await?;
+            let result = notion.query_data_source(&ds_id, &query_body).await?;
 
             let props = params.properties.as_ref()
                 .ok_or("properties required for upsert")?;
-            let mapped = map_properties(props, &db.properties, &params.database, schema_cache);
+            let mapped = map_properties(props, &properties, &params.database, schema_cache);
 
             if let Some(page) = result.results.first() {
                 notion.update_page(&page.id, &mapped).await?;
                 Ok(format!("Upsert (updated): {}", target_name))
             } else {
                 let body = serde_json::json!({
-                    "parent": { "data_source_id": db.ds_id() },
+                    "parent": { "data_source_id": ds_id },
                     "properties": mapped
                 });
                 notion.create_page(&body).await?;
