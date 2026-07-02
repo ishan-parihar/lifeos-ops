@@ -73,8 +73,10 @@ async fn calculate_g_z(
     notion: &NotionClient,
     date_filter: &Option<serde_json::Value>,
 ) -> serde_json::Value {
-    let matrix = crate::tools::shared::query_reservoir(config, notion, "matrix", date_filter, 100).await;
-    let potentiator = crate::tools::shared::query_reservoir(config, notion, "potentiator", date_filter, 100).await;
+    let matrix_key = config.reservoir_by_archetype("matrix").map(|(k, _)| k.to_string());
+    let potentiator_key = config.reservoir_by_archetype("potentiator").map(|(k, _)| k.to_string());
+    let matrix = match &matrix_key { Some(k) => crate::tools::shared::query_reservoir(config, notion, k, date_filter, 100).await, None => serde_json::json!({"total": 0}) };
+    let potentiator = match &potentiator_key { Some(k) => crate::tools::shared::query_reservoir(config, notion, k, date_filter, 100).await, None => serde_json::json!({"total": 0}) };
 
     let m_total = matrix.get("total").and_then(|v| v.as_f64()).unwrap_or(0.0);
     let p_total = potentiator.get("total").and_then(|v| v.as_f64()).unwrap_or(0.0);
@@ -121,9 +123,12 @@ async fn calculate_p_z(
     notion: &NotionClient,
     date_filter: &Option<serde_json::Value>,
 ) -> serde_json::Value {
-    let significator = crate::tools::shared::query_reservoir(config, notion, "significator", date_filter, 100).await;
-    let greatway = crate::tools::shared::query_reservoir(config, notion, "greatway", date_filter, 100).await;
-    let nexus = crate::tools::shared::query_reservoir(config, notion, "nexus", date_filter, 100).await;
+    let significator_key = config.reservoir_by_archetype("significator").map(|(k, _)| k.to_string());
+    let greatway_key = config.reservoir_by_archetype("greatway").map(|(k, _)| k.to_string());
+    let nexus_key = config.reservoir_by_archetype("nexus").map(|(k, _)| k.to_string());
+    let significator = match &significator_key { Some(k) => crate::tools::shared::query_reservoir(config, notion, k, date_filter, 100).await, None => serde_json::json!({"total": 0}) };
+    let greatway = match &greatway_key { Some(k) => crate::tools::shared::query_reservoir(config, notion, k, date_filter, 100).await, None => serde_json::json!({"total": 0}) };
+    let nexus = match &nexus_key { Some(k) => crate::tools::shared::query_reservoir(config, notion, k, date_filter, 100).await, None => serde_json::json!({"total": 0}) };
 
     let s_total = significator.get("total").and_then(|v| v.as_f64()).unwrap_or(0.0);
     let g_total = greatway.get("total").and_then(|v| v.as_f64()).unwrap_or(0.0);

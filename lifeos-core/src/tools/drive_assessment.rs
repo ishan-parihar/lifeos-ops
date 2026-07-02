@@ -36,12 +36,28 @@ pub async fn execute(
     let range = params.range.as_deref().unwrap_or("this_week");
     let date_filter = crate::util::date_filter::build_date_filter(range, None);
 
-    // Query all 4 core reservoirs + nexus
-    let matrix_stats = crate::tools::shared::query_reservoir(config, notion, "matrix", &date_filter, 50).await;
-    let potentiator_stats = crate::tools::shared::query_reservoir(config, notion, "potentiator", &date_filter, 50).await;
-    let significator_stats = crate::tools::shared::query_reservoir(config, notion, "significator", &date_filter, 50).await;
-    let greatway_stats = crate::tools::shared::query_reservoir(config, notion, "greatway", &date_filter, 50).await;
-    let nexus_stats = crate::tools::shared::query_reservoir(config, notion, "nexus", &date_filter, 50).await;
+    // Query all reservoirs from config (no hardcoded names)
+    let mut reservoir_stats: std::collections::HashMap<String, serde_json::Value> = std::collections::HashMap::new();
+    for key in config.all_reservoir_keys() {
+        reservoir_stats.insert(key.clone(), crate::tools::shared::query_reservoir(config, notion, &key, &date_filter, 50).await);
+    }
+
+    // Extract by archetype for drive calculations
+    let matrix_stats = config.reservoir_by_archetype("matrix")
+        .and_then(|(k, _)| reservoir_stats.get(k))
+        .cloned().unwrap_or(serde_json::json!({"total": 0}));
+    let potentiator_stats = config.reservoir_by_archetype("potentiator")
+        .and_then(|(k, _)| reservoir_stats.get(k))
+        .cloned().unwrap_or(serde_json::json!({"total": 0}));
+    let significator_stats = config.reservoir_by_archetype("significator")
+        .and_then(|(k, _)| reservoir_stats.get(k))
+        .cloned().unwrap_or(serde_json::json!({"total": 0}));
+    let greatway_stats = config.reservoir_by_archetype("greatway")
+        .and_then(|(k, _)| reservoir_stats.get(k))
+        .cloned().unwrap_or(serde_json::json!({"total": 0}));
+    let nexus_stats = config.reservoir_by_archetype("nexus")
+        .and_then(|(k, _)| reservoir_stats.get(k))
+        .cloned().unwrap_or(serde_json::json!({"total": 0}));
 
     // Calculate health metrics
     let g_z = calculate_g_z(&matrix_stats, &potentiator_stats);
@@ -68,8 +84,8 @@ pub async fn execute(
         "boundary": params.boundary,
         "range": range,
         "lesser_boundary": {
-            "matrix": matrix_stats,
-            "potentiator": potentiator_stats,
+            "matrix": matrix_stats.clone(),
+            "potentiator": potentiator_stats.clone(),
             "G_z_coherence": g_z,
             "drives": {
                 "Agency": { "score": lesser_agency, "assessment": format_assessment("Agency", lesser_agency) },
@@ -79,8 +95,8 @@ pub async fn execute(
             }
         },
         "greater_boundary": {
-            "significator": significator_stats,
-            "greatway": greatway_stats,
+            "significator": significator_stats.clone(),
+            "greatway": greatway_stats.clone(),
             "P_z_tension": p_z,
             "drives": {
                 "Agency": { "score": greater_agency, "assessment": format_assessment("Agency", greater_agency) },

@@ -246,7 +246,69 @@ pub fn resolve_db<'a>(config: &'a LifeOSConfig, key: &str) -> Option<ResolvedDb<
     None
 }
 
+/// Resolve a database key to (ds_id, name, properties) — works for both reservoirs and satellites.
+/// This is the primary accessor for tools that need to query any database by key.
+pub fn resolve_db_access<'a>(config: &'a LifeOSConfig, key: &str) -> Option<(&'a str, &'a str, &'a HashMap<String, String>)> {
+    match resolve_db(config, key) {
+        Some(ResolvedDb::Reservoir(_, db)) => Some((db.ds_id(), &db.name, &db.properties)),
+        Some(ResolvedDb::Satellite(_, _, sat)) => Some((sat.ds_id(), &sat.name, &sat.properties)),
+        None => None,
+    }
+}
 
+
+
+impl LifeOSConfig {
+    /// Get reservoir keys for a given cycle ("lesser" or "greater") from holonic config.
+    /// Falls back to iterating databases if holonic config is missing.
+    pub fn cycle_reservoirs(&self, cycle: &str) -> Vec<String> {
+        if let Some(ref holonic) = self.holonic {
+            let cycle_def = match cycle {
+                "lesser" => Some(&holonic.cycles.lesser),
+                "greater" => Some(&holonic.cycles.greater),
+                _ => None,
+            };
+            if let Some(cdef) = cycle_def {
+                return cdef.reservoirs.clone();
+            }
+        }
+        // Fallback: iterate config.databases, filter by cycle attribute
+        self.databases.iter()
+            .filter(|(_, db)| db.cycle.as_deref() == Some(cycle))
+            .map(|(k, _)| k.clone())
+            .collect()
+    }
+
+    /// Get all reservoir keys from config (top-level database keys).
+    pub fn all_reservoir_keys(&self) -> Vec<String> {
+        self.databases.keys().cloned().collect()
+    }
+
+    /// Find a reservoir by archetype.
+    pub fn reservoir_by_archetype(&self, archetype: &str) -> Option<(&str, &DbConfig)> {
+        self.databases.iter()
+            .find(|(_, db)| db.archetype.as_deref() == Some(archetype))
+            .map(|(k, db)| (k.as_str(), db))
+    }
+
+    /// Get all satellite keys under a given reservoir.
+    pub fn satellite_keys(&self, reservoir_key: &str) -> Vec<String> {
+        self.databases.get(reservoir_key)
+            .map(|db| db.satellites.keys().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    /// Get all database keys (reservoirs + satellites) as a flat list.
+    pub fn all_database_keys(&self) -> Vec<String> {
+        let mut keys: Vec<String> = self.databases.keys().cloned().collect();
+        for db in self.databases.values() {
+            for sat_key in db.satellites.keys() {
+                keys.push(sat_key.clone());
+            }
+        }
+        keys
+    }
+}
 
 #[derive(Debug)]
 pub enum ConfigError {

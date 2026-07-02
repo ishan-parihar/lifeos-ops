@@ -19,11 +19,16 @@ pub struct EnergyFlowParams {
     pub limit: Option<u32>,
 }
 
-pub fn schema() -> serde_json::Value {
+pub fn schema(config: &LifeOSConfig) -> serde_json::Value {
+    // Build dynamic scope enum from config: cycle names + all reservoir keys
+    let mut scopes: Vec<String> = vec!["lesser_cycle".into(), "greater_cycle".into(), "full_spiral".into()];
+    for key in config.all_reservoir_keys() {
+        scopes.push(key);
+    }
     serde_json::json!({
         "type": "object",
         "properties": {
-            "scope": { "type": "string", "enum": ["lesser_cycle", "greater_cycle", "full_spiral", "matrix", "potentiator", "significator", "greatway", "nexus"], "description": "Scope of energy flow analysis" },
+            "scope": { "type": "string", "enum": scopes, "description": "Scope: lesser_cycle, greater_cycle, full_spiral, or any reservoir key" },
             "currency": { "type": "string", "enum": ["Catalyst", "Experience", "Transformation", "Choice", "all"], "description": "Currency to trace (default: all)" },
             "entry_id": { "type": "string", "description": "Optional specific entry ID to trace across reservoirs" },
             "limit": { "type": "integer", "minimum": 1, "maximum": 50, "description": "Limit per database (default 10)" }
@@ -68,12 +73,19 @@ pub async fn execute(
         }
     });
 
-    // Determine which reservoirs to query
-    let reservoirs: Vec<&str> = match params.scope.as_str() {
-        "lesser_cycle" => vec!["matrix", "potentiator"],
-        "greater_cycle" => vec!["significator", "greatway"],
-        "full_spiral" => vec!["matrix", "potentiator", "significator", "greatway", "nexus"],
-        other => vec![other],
+    // Determine which reservoirs to query — from config, not hardcoded
+    let reservoir_keys: Vec<String> = match params.scope.as_str() {
+        "lesser_cycle" => config.cycle_reservoirs("lesser"),
+        "greater_cycle" => config.cycle_reservoirs("greater"),
+        "full_spiral" => config.all_reservoir_keys(),
+        other => {
+            // Allow querying a specific reservoir by key
+            if config.databases.contains_key(other) {
+                vec![other.to_string()]
+            } else {
+                return Err(format!("Unknown scope: {}. Use lesser_cycle, greater_cycle, full_spiral, or a reservoir key.", other));
+            }
+        }
     };
 
     let mut result = serde_json::json!({
@@ -84,7 +96,7 @@ pub async fn execute(
         "reservoirs": {}
     });
 
-    for res_key in &reservoirs {
+    for res_key in &reservoir_keys {
         // Use resolve_db to support both reservoir and satellite keys
         let (ds_id, archetype, cycle, currency_in, currency_out, satellites) = match crate::config::resolve_db(config, res_key) {
             Some(crate::config::ResolvedDb::Reservoir(_k, db)) => {
