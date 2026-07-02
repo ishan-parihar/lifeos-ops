@@ -80,13 +80,13 @@ pub async fn execute(
 
     for res_key in &reservoir_keys {
         let (ds_id, archetype, currency_in, currency_out) = match crate::config::resolve_db(config, res_key) {
-            Some(crate::config::ResolvedDb::Reservoir(_k, db)) => {
+            Some(db) => {
                 (db.ds_id().to_string(),
                  db.archetype.as_deref().unwrap_or("unknown").to_string(),
                  db.currency_in.as_deref().unwrap_or("?").to_string(),
                  db.currency_out.as_deref().unwrap_or("?").to_string())
             }
-            _ => continue,
+            None => continue,
         };
 
         let query = serde_json::json!({ "page_size": limit });
@@ -201,8 +201,8 @@ async fn find_flow_paths(
 
             // Query a few entries from the source to find actual relation links
             let ds_id = match crate::config::resolve_db(config, src_key) {
-                Some(crate::config::ResolvedDb::Reservoir(_, db)) => db.ds_id().to_string(),
-                _ => continue,
+                Some(db) => db.ds_id().to_string(),
+                None => continue,
             };
 
             let query = serde_json::json!({ "page_size": limit.min(5) });
@@ -212,8 +212,8 @@ async fn find_flow_paths(
                         for rel in relation {
                             // Check if this related page is in the target reservoir
                             let target_ds_id = match crate::config::resolve_db(config, &edge.target_db) {
-                                Some(crate::config::ResolvedDb::Reservoir(_, db)) => db.ds_id().to_string(),
-                                _ => continue,
+                                Some(db) => db.ds_id().to_string(),
+                                None => continue,
                             };
 
                             // Fetch the target page to confirm it's in the target DB
@@ -347,12 +347,12 @@ fn score_entry_metabolism(page: &crate::notion::types::NotionPage, archetype: &s
             }
         }
         "nexus" => {
-            // Nexus should have category and log type
+            // Nexus should have category and kind
             let cat = crate::transform::extract_string(page, "Category");
-            let lt = crate::transform::extract_string(page, "Log Type");
+            let kind = crate::transform::extract_string(page, "Kind");
             let cat_score = if !cat.is_empty() && cat != "unknown" { 10.0 } else { 0.0 };
-            let lt_score = if !lt.is_empty() && lt != "unknown" { 10.0 } else { 0.0 };
-            cat_score + lt_score
+            let kind_score = if !kind.is_empty() && kind != "unknown" { 10.0 } else { 0.0 };
+            cat_score + kind_score
         }
         _ => 10.0,
     };
@@ -469,20 +469,13 @@ async fn trace_entry(
     let mut currency_out = "?".to_string();
 
     if let Some(ds_id) = parent_ds_id {
-        'outer: for (key, db) in &config.databases {
+        for (key, db) in &config.databases {
             if ds_id == db.ds_id() {
                 owner_reservoir = key.clone();
                 owner_archetype = db.archetype.as_deref().unwrap_or("unknown").to_string();
                 currency_in = db.currency_in.as_deref().unwrap_or("?").to_string();
                 currency_out = db.currency_out.as_deref().unwrap_or("?").to_string();
                 break;
-            }
-            for (sat_key, sat) in &db.satellites {
-                if ds_id == sat.ds_id() {
-                    owner_reservoir = format!("{}→{}", key, sat_key);
-                    owner_archetype = sat.role.as_deref().unwrap_or("satellite").to_string();
-                    break 'outer;
-                }
             }
         }
     }
@@ -508,12 +501,6 @@ async fn trace_entry(
                                 target_reservoir = key.clone();
                                 target_archetype = db.archetype.as_deref().unwrap_or("unknown").to_string();
                                 break;
-                            }
-                            for (sat_key, sat) in &db.satellites {
-                                if tds == sat.ds_id() {
-                                    target_reservoir = format!("{}→{}", key, sat_key);
-                                    break;
-                                }
                             }
                         }
                     }
@@ -552,12 +539,11 @@ async fn trace_entry(
     }
 
     // Find backlinks — entries that reference this page
-    // (Search a few key reservoirs for efficiency)
-    let search_keys: Vec<String> = config.all_reservoir_keys().into_iter().take(5).collect();
+    let search_keys: Vec<String> = config.all_reservoir_keys();
     for db_key in &search_keys {
         let ds_id = match crate::config::resolve_db(config, db_key) {
-            Some(crate::config::ResolvedDb::Reservoir(_, db)) => db.ds_id().to_string(),
-            _ => continue,
+            Some(db) => db.ds_id().to_string(),
+            None => continue,
         };
         let query = serde_json::json!({ "page_size": 20 });
         if let Ok(result) = notion.query_data_source(&ds_id, &query).await {

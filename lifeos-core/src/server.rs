@@ -76,26 +76,27 @@ impl LifeosServer {
             "initialize" => {
                 tracing::info!("Client initialized (protocol: {})",
                     req["params"]["protocolVersion"].as_str().unwrap_or("unknown"));
-                let db_count = self.config.databases.len();
                 self.ok(&id, json!({
                     "protocolVersion": "2024-11-05",
                     "capabilities": { "tools": {}, "resources": {} },
                     "serverInfo": { "name": "lifeos-mcp", "version": "0.1.0" },
-                    "instructions": format!(
-                        concat!(
-                            "LifeOS v4 Holonic MCP server with {} reservoir databases + satellites. ",
-                            "All database keys and structures are defined in lifeos.config.json -- never hardcode database names. ",
-                            "19 tools: get_schema (call first), query, query_override, mutate, intelligence_briefing, ",
-                            "data_science, review_pipeline, strategic_simulator, sync_note, energy_flow, ",
-                            "drive_assessment, health_metrics, get_page, expand, trace, ancestors, ",
-                            "backlinks, link, graph_metrics. ",
-                            "Spiral: Matrix->Potentiator (lesser cycle) -> Nexus (transmutation) -> Significator->GreatWay (greater cycle). ",
-                            "4 currencies: Catalyst, Experience, Transformation, Choice. ",
-                            "4 drives: Agency, Communion, Eros, Agape. ",
-                            "Use cycle_reservoirs from holonic config for cycle queries. Relations shown as (relation->target_db) in schemas."
-                        ),
-                        db_count
-                    )
+                    "instructions": "LifeOS v5 — 5 unified databases with entry-type discrimination. \
+\
+5 DBs: matrix (Experience), potentiator (Catalyst), significator (Choice), greatway (Transformation), nexus (All 4 currencies). \
+\
+Each DB stores multiple entry types via select/multi_select (e.g., Potentiator: Activity, Diet, Financial). \
+\
+Tools: get_schema (call first), query (use entry_type to filter by type), query_override, mutate, \
+\
+intelligence_briefing, data_science, review_pipeline, strategic_simulator, sync_note, \
+\
+energy_flow, drive_assessment, health_metrics, get_page, expand, trace, ancestors, \
+\
+backlinks, link, graph_metrics, transmute, process_currency, trigger_nexus, apply_drive. \
+\
+Spiral: Matrix<->Potentiator (lesser cycle) -> Nexus -> Significator<->GreatWay (greater cycle). \
+\
+Currencies: Catalyst, Experience, Transformation, Choice. Drives: Agency, Communion, Eros, Agape."
                 }));
             }
 

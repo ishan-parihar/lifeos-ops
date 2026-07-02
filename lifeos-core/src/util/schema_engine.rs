@@ -2,7 +2,7 @@
 //!
 //! Provides two layers:
 //! - `SchemaEngine`: per-data-source schema caching (original)
-//! - `SchemaCache`: config-aware caching with reservoir → satellite hierarchy + relation graph
+//! - `SchemaCache`: config-aware caching for the 5 unified databases + relation graph
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -67,35 +67,28 @@ pub struct RelationEdge {
     pub target_db: String,
 }
 
-/// Config-key-aware property type cache with reservoir hierarchy + relation graph.
+/// Config-key-aware property type cache with relation graph.
 pub struct SchemaCache {
-    /// db_key → (config_key → PropInfo) — includes both reservoirs and satellites
+    /// db_key → (config_key → PropInfo) — the 5 unified databases
     dbs: HashMap<String, HashMap<String, PropInfo>>,
-    /// All database keys in insertion order (reservoirs first, then satellites)
+    /// All database keys in insertion order
     db_keys: Vec<String>,
-    /// reservoir_key → Vec<satellite_key>
-    reservoir_satellites: HashMap<String, Vec<String>>,
-    /// satellite_key → reservoir_key (reverse lookup)
-    satellite_to_reservoir: HashMap<String, String>,
     /// db_key → Vec<RelationEdge> — which properties link to which databases
     relation_graph: HashMap<String, Vec<RelationEdge>>,
     /// database_id → config_key (reverse map for resolving relation targets)
     id_to_key: HashMap<String, String>,
-
 }
 
 impl SchemaCache {
-    /// Pre-warm the cache by fetching ALL database schemas (reservoirs + satellites).
+    /// Pre-warm the cache by fetching ALL 5 unified database schemas.
     pub async fn init(config: &Arc<LifeOSConfig>, notion: &Arc<NotionClient>) -> Self {
         let mut dbs: HashMap<String, HashMap<String, PropInfo>> = HashMap::new();
         let mut db_keys: Vec<String> = Vec::new();
-        let mut reservoir_satellites: HashMap<String, Vec<String>> = HashMap::new();
-        let mut satellite_to_reservoir: HashMap<String, String> = HashMap::new();
 
         let engine = Arc::new(SchemaEngine::new(notion.clone()));
         let semaphore = Arc::new(tokio::sync::Semaphore::new(4));
 
-        // Collect all fetch tasks: reservoirs + satellites
+        // Collect all fetch tasks: the 5 unified databases
         struct FetchTask {
             key: String,
             ds_id: String,
@@ -105,26 +98,11 @@ impl SchemaCache {
         let mut tasks: Vec<FetchTask> = Vec::new();
 
         for (db_key, db_cfg) in &config.databases {
-            reservoir_satellites.insert(db_key.clone(), Vec::new());
-
             tasks.push(FetchTask {
                 key: db_key.clone(),
                 ds_id: db_cfg.ds_id().to_string(),
                 props: db_cfg.properties.clone(),
             });
-
-            for (sat_key, sat_cfg) in &db_cfg.satellites {
-                tasks.push(FetchTask {
-                    key: sat_key.clone(),
-                    ds_id: sat_cfg.ds_id().to_string(),
-                    props: sat_cfg.properties.clone(),
-                });
-                reservoir_satellites
-                    .entry(db_key.clone())
-                    .or_default()
-                    .push(sat_key.clone());
-                satellite_to_reservoir.insert(sat_key.clone(), db_key.clone());
-            }
         }
 
         // Execute all fetches concurrently — also capture raw schemas for relation extraction
@@ -158,9 +136,6 @@ impl SchemaCache {
         let mut id_to_key: HashMap<String, String> = HashMap::new();
         for (db_key, db_cfg) in &config.databases {
             id_to_key.insert(db_cfg.database_id.clone(), db_key.clone());
-            for (sat_key, sat_cfg) in &db_cfg.satellites {
-                id_to_key.insert(sat_cfg.database_id.clone(), sat_key.clone());
-            }
         }
 
         // Collect raw schemas and prop info
@@ -202,7 +177,7 @@ impl SchemaCache {
             }
         }
 
-        Self { dbs, db_keys, reservoir_satellites, satellite_to_reservoir, relation_graph, id_to_key }
+        Self { dbs, db_keys, relation_graph, id_to_key }
     }
 
     pub fn get_prop_type(&self, db_key: &str, config_key: &str) -> Option<&str> {
@@ -224,16 +199,6 @@ impl SchemaCache {
         &self.db_keys
     }
 
-    /// Get the reservoir key that owns a satellite.
-    pub fn reservoir_for(&self, satellite_key: &str) -> Option<&str> {
-        self.satellite_to_reservoir.get(satellite_key).map(|s| s.as_str())
-    }
-
-    /// Check if a key is a reservoir (not a satellite).
-    pub fn is_reservoir(&self, key: &str) -> bool {
-        self.reservoir_satellites.contains_key(key)
-    }
-
     /// Get outgoing relation edges for a database (which properties link to which databases).
     pub fn get_relation_edges(&self, db_key: &str) -> &[RelationEdge] {
         self.relation_graph.get(db_key).map(|v| v.as_slice()).unwrap_or(&[])
@@ -249,7 +214,7 @@ impl SchemaCache {
         self.id_to_key.get(database_id).map(|s| s.as_str())
     }
 
-    /// Build a hierarchical description for a reservoir showing its satellites.
+    /// Build a description for a database showing its properties, entry types, and holonic role.
     pub fn describe_reservoir(&self, reservoir_key: &str, config: &LifeOSConfig) -> String {
         let mut output = String::new();
 
@@ -264,31 +229,29 @@ impl SchemaCache {
                 db_cfg.name, archetype, scale, dimension, cycle
             ));
 
-            // Reservoir own properties + relations
+            // Description
+            if let Some(ref desc) = db_cfg.description {
+                output.push_str(&format!("  Role: {}\n", desc));
+            }
+
+            // Entry type property name (which Notion property to filter on)
+            if let Some(ref et_prop) = db_cfg.entry_type_property {
+                output.push_str(&format!("  Entry Type Property: {}\n", et_prop));
+            }
+
+            // Entry types (from config descriptions)
+            if let Some(entry_types) = config.entry_type_descriptions(reservoir_key) {
+                output.push_str(&format!("  Entry Types ({}):\n", entry_types.len()));
+                for (et_name, et_desc) in entry_types {
+                    output.push_str(&format!("    {}: {}\n", et_name, et_desc));
+                }
+            }
+
+            // Properties + relations
             if let Some(props) = self.dbs.get(reservoir_key) {
                 let desc = format_properties_with_relations(props, self.relation_graph.get(reservoir_key));
                 if !desc.is_empty() {
                     output.push_str(&format!("  Properties: {}\n", desc));
-                }
-            }
-
-            // Satellites
-            if let Some(satellites) = self.reservoir_satellites.get(reservoir_key) {
-                if !satellites.is_empty() {
-                    output.push_str(&format!("  Satellites ({}):\n", satellites.len()));
-                    for sat_key in satellites {
-                        if let Some(sat_name) = config.databases.get(reservoir_key)
-                            .and_then(|db| db.satellites.get(sat_key))
-                            .map(|s| s.name.as_str())
-                        {
-                            let sat_desc = self.dbs.get(sat_key)
-                                .map(|p| format_properties_with_relations(p, self.relation_graph.get(sat_key)))
-                                .unwrap_or_default();
-                            output.push_str(&format!("    {}: {} {}\n", sat_key, sat_name,
-                                if sat_desc.is_empty() { String::new() } else { format!("({})", sat_desc) }
-                            ));
-                        }
-                    }
                 }
             }
         }
@@ -296,7 +259,7 @@ impl SchemaCache {
         output
     }
 
-    /// Describe all properties for a single database (reservoir or satellite).
+    /// Describe all properties for a single database.
     pub fn describe_db_properties(&self, db_key: &str) -> String {
         let Some(props) = self.dbs.get(db_key) else {
             return String::new();
@@ -322,11 +285,6 @@ fn find_key_for_ds_id(ds_id: &str, config: &LifeOSConfig) -> Option<String> {
     for (db_key, db_cfg) in &config.databases {
         if db_cfg.ds_id() == ds_id {
             return Some(db_key.clone());
-        }
-        for (sat_key, sat_cfg) in &db_cfg.satellites {
-            if sat_cfg.ds_id() == ds_id {
-                return Some(sat_key.clone());
-            }
         }
     }
     None

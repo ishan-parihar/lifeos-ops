@@ -60,7 +60,7 @@ fn extract_page_date(properties: &HashMap<String, PropertyValue>) -> Option<chro
 /// Pull pages from Notion, optionally filtering by `since` timestamp.
 /// When `since` is `Some(iso_timestamp)`, only pages modified after that
 /// time are fetched from Notion, making repeated pulls much cheaper.
-/// Supports both reservoir and satellite keys via `resolve_db`.
+/// Supports all 5 unified database keys via `resolve_db`.
 pub async fn pull_database_since(
     notion: &NotionClient,
     config: &LifeOSConfig,
@@ -69,16 +69,13 @@ pub async fn pull_database_since(
     index: &mut HashMap<String, IndexEntry>,
     since: Option<&str>,
 ) -> Result<PullReport, String> {
-    // Use resolve_db to support both reservoir and satellite keys
-    let (ds_id, db_name, properties) = match crate::config::resolve_db(config, db_key) {
-        Some(crate::config::ResolvedDb::Reservoir(_key, db)) => {
-            (db.ds_id().to_string(), db.name.clone(), db.properties.clone())
-        }
-        Some(crate::config::ResolvedDb::Satellite(_, _, sat)) => {
-            (sat.ds_id().to_string(), sat.name.clone(), sat.properties.clone())
-        }
+    let db = match crate::config::resolve_db(config, db_key) {
+        Some(db) => db,
         None => return Err(format!("Database key '{}' not found in config", db_key)),
     };
+    let ds_id = db.ds_id();
+    let db_name = &db.name;
+    let properties = &db.properties;
 
     tracing::info!("Pulling database: {} ({})", db_name, db_key);
 

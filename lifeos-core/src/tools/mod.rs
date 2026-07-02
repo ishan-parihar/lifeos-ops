@@ -51,8 +51,8 @@ pub async fn get_tool_definitions(config: &LifeOSConfig, _notion: &NotionClient,
     let drive_schema = drive_assessment::schema();
 
     vec![
-        tool_def("get_schema", "Database schemas by reservoir \u{2192} satellite. Call first.".to_string(), get_schema_schema(config)),
-        tool_def("query", "Query any DB with filters, sort, reservoir, or cycle.".to_string(), query_schema),
+        tool_def("get_schema", "Database schemas with entry types and holonic roles. Call first to understand the 5-DB architecture.".to_string(), get_schema_schema(config)),
+        tool_def("query", "Query any of the 5 databases with filters, sort, entry_type, or cycle.".to_string(), query_schema),
         tool_def("query_override", "Schema-validated query with AI filter override.".to_string(), query::schema_override(config, schema_cache)),
         tool_def("mutate", "Create/update/delete entries across all databases.".to_string(), mutate_schema),
         tool_def("intelligence_briefing", "Role or cycle briefing (CEO-CFO, lesser/greater/nexus).".to_string(), intelligence::schema(schema_cache)),
@@ -220,20 +220,17 @@ pub async fn call_tool(
     }
 }
 
-/// Execute the get_schema tool — returns hierarchical v4 holonic database schemas
+/// Execute the get_schema tool — returns the 5 unified databases with entry types and holonic roles
 pub fn execute_get_schema(database: Option<&str>, schema_cache: &SchemaCache, config: &LifeOSConfig) -> String {
     let mut output = String::new();
 
-    // Filter to specific reservoir if requested
-    let reservoirs: Vec<&String> = if let Some(req_db) = database {
+    // Filter to specific database if requested
+    let databases: Vec<&String> = if let Some(req_db) = database {
         if config.databases.contains_key(req_db) {
             vec![config.databases.keys().find(|k| *k == req_db).unwrap()]
-        } else if let Some(res_key) = schema_cache.reservoir_for(req_db) {
-            // Requested a satellite — show its parent reservoir
-            vec![config.databases.keys().find(|k| k.as_str() == res_key).unwrap()]
         } else {
             return format!(
-                "No reservoir found for '{}'. Available reservoirs: {}",
+                "No database found for '{}'. Available databases: {}",
                 req_db,
                 config.databases.keys().cloned().collect::<Vec<_>>().join(", ")
             );
@@ -242,7 +239,7 @@ pub fn execute_get_schema(database: Option<&str>, schema_cache: &SchemaCache, co
         config.databases.keys().collect()
     };
 
-    for key in reservoirs {
+    for key in databases {
         let desc = schema_cache.describe_reservoir(key, config);
         output.push_str(&desc);
         output.push('\n');
@@ -251,6 +248,6 @@ pub fn execute_get_schema(database: Option<&str>, schema_cache: &SchemaCache, co
     if output.is_empty() {
         "No database schemas available.".to_string()
     } else {
-        format!("LifeOS v4 Holonic Database Schemas:\n{}", output)
+        format!("LifeOS v5 — The 5-DB Holonic Architecture:\n\nEach database stores a specific currency in the energy-flow spiral. Entries are discriminated by Entry Type / Item Type / Category properties within each DB.\n\n{}", output)
     }
 }

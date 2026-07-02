@@ -11,11 +11,11 @@ use crate::notion::client::NotionClient;
 pub struct StrategicParams {
     /// Analysis type: alignment, project_health, okr_progress, campaign_metrics, overview
     pub analysis_type: String,
-    /// Project database key (for project_health) — accepts reservoir or satellite keys
+    /// Project database key (for project_health) — accepts database key (e.g., "greatway")
     pub project_database: Option<String>,
-    /// OKR database key (for okr_progress) — accepts reservoir or satellite keys
+    /// OKR database key (for okr_progress) — accepts database key
     pub okr_database: Option<String>,
-    /// Campaign database key (for campaign_metrics) — accepts reservoir or satellite keys
+    /// Campaign database key (for campaign_metrics) — accepts database key
     pub campaign_database: Option<String>,
 }
 
@@ -25,7 +25,7 @@ pub fn schema() -> serde_json::Value {
         "type": "object",
         "properties": {
             "analysis_type": { "type": "string", "enum": ["overview", "alignment", "project_health", "okr_progress", "campaign_metrics"], "description": "Analysis type" },
-            "project_database": { "type": "string", "description": "Project database key for project_health (reservoir or satellite key, auto-discovered if omitted)" },
+            "project_database": { "type": "string", "description": "Project database key for project_health (e.g., 'greatway', auto-discovered if omitted)" },
             "okr_database": { "type": "string", "description": "OKR/quarterly goals database key for okr_progress (auto-discovered if omitted)" },
             "campaign_database": { "type": "string", "description": "Campaign database key for campaign_metrics (auto-discovered if omitted)" }
         },
@@ -33,44 +33,25 @@ pub fn schema() -> serde_json::Value {
     })
 }
 
-/// Auto-discover a satellite by searching all reservoirs for a satellite whose name
-/// contains the given substring (case-insensitive).
-/// Returns (satellite_key, reservoir_key).
-fn discover_satellite<'a>(config: &'a LifeOSConfig, name_substring: &str) -> Option<(&'a str, &'a str)> {
-    let lower = name_substring.to_lowercase();
-    for (rk, rdb) in &config.databases {
-        for (sk, sat) in &rdb.satellites {
-            if sat.name.to_lowercase().contains(&lower) {
-                return Some((sk.as_str(), rk.as_str()));
-            }
-        }
-    }
-    None
-}
+/// Auto-discover entries by entry type within a database.
+/// In v5, entries are filtered by their Entry Type / Item Type property.
 
 /// Resolve a database key for strategic analysis.
-/// Accepts any key (reservoir or satellite) and returns (ds_id, properties, name).
+/// Accepts a reservoir key and returns (ds_id, properties, name).
 fn resolve_for_analysis<'a>(
     config: &'a LifeOSConfig,
     key: Option<&str>,
-    auto_discover_name: &str,
     fallback_archetype: &str,
 ) -> Result<(&'a str, &'a std::collections::HashMap<String, String>, &'a str), String> {
     if let Some(k) = key {
-        // Explicit key — use resolve_db_access which handles both reservoir and satellite keys
-        crate::config::resolve_db_access(config, k)
-            .map(|(ds, name, props)| (ds, props, name))
-            .ok_or_else(|| format!("Unknown database: {}", k))
-    } else if let Some((sat_key, _rk)) = discover_satellite(config, auto_discover_name) {
-        // Auto-discover by name substring
-        crate::config::resolve_db_access(config, sat_key)
-            .map(|(ds, name, props)| (ds, props, name))
-            .ok_or_else(|| format!("Discovered satellite '{}' but could not resolve", sat_key))
+        let db = crate::config::resolve_db(config, k)
+            .ok_or_else(|| format!("Unknown database: {}", k))?;
+        Ok((db.ds_id(), &db.properties, db.name.as_str()))
     } else {
         // Fallback to archetype (e.g. "greatway" for projects)
         config.reservoir_by_archetype(fallback_archetype)
             .map(|(_, db)| (db.ds_id(), &db.properties, db.name.as_str()))
-            .ok_or_else(|| format!("No database found for '{}' (auto-discover failed, archetype '{}' not found)", auto_discover_name, fallback_archetype))
+            .ok_or_else(|| format!("No database found for archetype '{}'", fallback_archetype))
     }
 }
 
@@ -114,7 +95,6 @@ pub async fn execute(
             let (ds_id, properties, _name) = resolve_for_analysis(
                 config,
                 params.project_database.as_deref(),
-                "project",
                 "greatway",
             )?;
 
@@ -150,7 +130,6 @@ pub async fn execute(
             let (ds_id, properties, _name) = resolve_for_analysis(
                 config,
                 params.okr_database.as_deref(),
-                "quarterly",
                 "greatway",
             )?;
 
@@ -195,10 +174,12 @@ pub async fn execute(
             }
 
             for key in &check_keys {
-                let (ds_id, _, name) = match crate::config::resolve_db_access(config, key) {
-                    Some(v) => v,
+                let db = match crate::config::resolve_db(config, key) {
+                    Some(db) => db,
                     None => continue,
                 };
+                let ds_id = db.ds_id();
+                let name = db.name.as_str();
                 let query = serde_json::json!({ "page_size": 20 });
                 if let Ok(result) = notion.query_data_source(ds_id, &query).await {
                     let items: Vec<serde_json::Value> = result.results.iter().map(|p| {
@@ -219,7 +200,6 @@ pub async fn execute(
             let (ds_id, properties, _name) = resolve_for_analysis(
                 config,
                 params.campaign_database.as_deref(),
-                "campaign",
                 "greatway",
             )?;
 
