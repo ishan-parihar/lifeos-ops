@@ -240,7 +240,7 @@ async fn main() {
                 }
                 Commands::EnergyFlow { scope, currency, limit } => {
                     let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
-                    let params = lifeos_core::tools::energy_flow::EnergyFlowParams {
+                    let params = lifeos_core::tools::energy_flow::EnergyFlowParams { show_metabolism: None,
                         scope, currency, entry_id: None, limit,
                     };
                     match lifeos_core::tools::energy_flow::execute(&params, &cfg, &notion, &sc).await {
@@ -255,9 +255,9 @@ async fn main() {
                     }
                 }
                 Commands::HealthMetrics { metric, range } => {
-                    let (cfg, notion, _sc) = resolve_with_schema(None, &notion_token).await;
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
                     let params = lifeos_core::tools::health_metrics::HealthMetricsParams { metric, range };
-                    match lifeos_core::tools::health_metrics::execute(&params, &cfg, &notion).await {
+                    match lifeos_core::tools::health_metrics::execute(&params, &cfg, &notion, &sc).await {
                         Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
                     }
                 }
