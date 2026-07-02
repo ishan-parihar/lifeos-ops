@@ -50,7 +50,7 @@ pub async fn get_tool_definitions(config: &LifeOSConfig, _notion: &NotionClient,
     let drive_schema = drive_assessment::schema();
 
     vec![
-        tool_def("get_schema", "Database schemas by reservoir → satellite. Call first.".to_string(), get_schema_schema()),
+        tool_def("get_schema", "Database schemas by reservoir \u{2192} satellite. Call first.".to_string(), get_schema_schema(config)),
         tool_def("query", "Query any DB with filters, sort, reservoir, or cycle.".to_string(), query_schema),
         tool_def("query_override", "Schema-validated query with AI filter override.".to_string(), query::schema_override(config, schema_cache)),
         tool_def("mutate", "Create/update/delete entries across all databases.".to_string(), mutate_schema),
@@ -59,7 +59,7 @@ pub async fn get_tool_definitions(config: &LifeOSConfig, _notion: &NotionClient,
         tool_def("review_pipeline", "Daily/weekly/monthly/quarterly reviews.".to_string(), review::schema()),
         tool_def("strategic_simulator", "Cross-DB strategic analysis: OKRs, projects, campaigns.".to_string(), strategic_schema),
         tool_def("sync_note", "Bidirectional Notion ↔ markdown sync.".to_string(), sync_note::schema()),
-        tool_def("energy_flow", "Trace currency flow across the holonic spiral.".to_string(), energy_flow::schema()),
+        tool_def("energy_flow", "Trace currency flow across the holonic spiral.".to_string(), energy_flow::schema(config)),
         tool_def("drive_assessment", "Assess 4 drives at lesser/greater boundary.".to_string(), drive_schema),
         tool_def("health_metrics", "G_z + P_z holonic health metrics.".to_string(), health_schema),
         tool_def("get_page", "Fetch entry with all relations resolved to titles.".to_string(), relations::schema_get_page()),
@@ -72,13 +72,15 @@ pub async fn get_tool_definitions(config: &LifeOSConfig, _notion: &NotionClient,
     ]
 }
 
-fn get_schema_schema() -> Value {
+fn get_schema_schema(config: &LifeOSConfig) -> Value {
+    let reservoir_keys: Vec<Value> = config.databases.keys().map(|k| Value::String(k.clone())).collect();
     serde_json::json!({
         "type": "object",
         "properties": {
             "database": {
                 "type": "string",
-                "description": "Optional reservoir name to filter (matrix, potentiator, significator, greatway, nexus). Omit to return all database schemas."
+                "enum": reservoir_keys,
+                "description": "Optional reservoir key to filter. Omit to return all database schemas."
             }
         }
     })

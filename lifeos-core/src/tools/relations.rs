@@ -387,14 +387,14 @@ pub async fn execute_backlinks(
     params: &BacklinksParams,
     config: &Arc<LifeOSConfig>,
     notion: &Arc<NotionClient>,
-    schema_cache: &SchemaCache,
+    _schema_cache: &SchemaCache,
 ) -> Result<String, String> {
     // Determine which databases to search
     let db_keys: Vec<String> = if let Some(ref db) = params.database {
         vec![db.clone()]
     } else {
-        // Search all databases (reservoirs + satellites)
-        schema_cache.db_keys().iter().cloned().collect()
+        // Search all databases — use config.all_database_keys() to avoid needing schema_cache
+        config.all_database_keys()
     };
 
     let mut backlinks: Vec<serde_json::Value> = Vec::new();
@@ -468,7 +468,7 @@ pub async fn execute_link(
     params: &LinkParams,
     _config: &Arc<LifeOSConfig>,
     notion: &Arc<NotionClient>,
-    schema_cache: &SchemaCache,
+    _schema_cache: &SchemaCache,
 ) -> Result<String, String> {
     // First, fetch the source page to get current relations
     let source_page = notion.get_page(&params.source_page).await?;
@@ -533,15 +533,15 @@ pub fn schema_graph_metrics() -> serde_json::Value {
 pub async fn execute_graph_metrics(
     config: &Arc<LifeOSConfig>,
     notion: &Arc<NotionClient>,
-    schema_cache: &SchemaCache,
+    _schema_cache: &SchemaCache,
 ) -> Result<String, String> {
     let mut db_metrics: Vec<serde_json::Value> = Vec::new();
     let mut total_entries: usize = 0;
     let mut total_relation_edges: usize = 0;
     let mut orphan_entries: Vec<serde_json::Value> = Vec::new();
 
-    for db_key in schema_cache.db_keys() {
-        let ds_id = match crate::config::resolve_db(config, db_key) {
+    for db_key in config.all_database_keys() {
+        let ds_id = match crate::config::resolve_db(config, &db_key) {
             Some(crate::config::ResolvedDb::Reservoir(_, db)) => db.ds_id().to_string(),
             Some(crate::config::ResolvedDb::Satellite(_, _, sat)) => sat.ds_id().to_string(),
             None => continue,

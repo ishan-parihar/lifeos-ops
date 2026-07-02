@@ -366,11 +366,10 @@ async fn execute_cycle_query(
     notion: &Arc<NotionClient>,
     _schema_cache: &SchemaCache,
 ) -> Result<String, String> {
-    let reservoir_keys: Vec<String> = match cycle {
-        "lesser" => vec!["matrix".to_string(), "potentiator".to_string()],
-        "greater" => vec!["significator".to_string(), "greatway".to_string()],
-        _ => return Err(format!("Unknown cycle: {}. Use 'lesser' or 'greater'.", cycle)),
-    };
+    let reservoir_keys = config.cycle_reservoirs(cycle);
+    if reservoir_keys.is_empty() {
+        return Err(format!("Unknown cycle: {}. Use 'lesser' or 'greater'.", cycle));
+    }
 
     let mut all_items: Vec<serde_json::Value> = Vec::new();
     let mut errors: Vec<String> = Vec::new();

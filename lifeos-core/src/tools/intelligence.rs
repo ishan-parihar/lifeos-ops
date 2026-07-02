@@ -22,14 +22,12 @@ pub struct IntelligenceParams {
     pub overrides: Option<std::collections::HashMap<String, serde_json::Value>>,
 }
 
-/// Execute intelligence briefing
-
 /// Generate JSON Schema for this tool
 pub fn schema(_schema_cache: &SchemaCache) -> serde_json::Value {
     let obj = serde_json::json!({
         "type": "object",
         "properties": {
-            "mode": { "type": "string", "enum": ["role", "module", "lesser_cycle", "greater_cycle", "nexus", "drive_balance", "reservoir_health"], "description": "Briefing mode: role/module for legacy, lesser_cycle/greater_cycle/nexus/drive_balance/reservoir_health for v4 holonic" },
+            "mode": { "type": "string", "enum": ["role", "module", "lesser_cycle", "greater_cycle", "nexus", "drive_balance", "reservoir_health"], "description": "Briefing mode: role/module for config-driven briefings, lesser_cycle/greater_cycle/nexus/drive_balance/reservoir_health for holonic analysis" },
             "role": { "type": "string", "enum": ["CEO", "COO", "CMO", "CRO", "CFO", "CHO"], "description": "Role key when mode=role" },
             "module": { "type": "string", "enum": ["productivity", "health", "strategic", "financial", "content", "journaling"], "description": "Module key when mode=module" },
             "range": { "type": "string", "description": "Date range: today, this_week, this_month, this_quarter or ISO date" },
@@ -59,10 +57,6 @@ const NON_FILTERABLE_TYPES: &[&str] = &[
 
 /// Walk a filter tree and correct type keys (`"status"` ↔ `"select"`)
 /// based on the actual Notion property type from SchemaCache.
-///
-/// - Returns `Value::Null` for filter conditions on non-filterable properties (formula, rollup, …)
-/// - Uses case-insensitive matching for property name reverse-lookup
-/// - Filters out null conditions from compound filters (`or`/`and`)
 fn correct_filter_type(
     filter: &serde_json::Value,
     db_key: &str,
@@ -96,7 +90,6 @@ fn correct_filter_type(
 
             // Simple filter with "property" key
             if let Some(prop_name) = map.get("property").and_then(|v| v.as_str()) {
-                // Case-insensitive reverse lookup: find config-key whose Notion prop name matches
                 let prop_lower = prop_name.to_lowercase();
                 let config_key = property_mapping.iter()
                     .find(|(_, v)| v.to_lowercase() == prop_lower)
@@ -105,12 +98,9 @@ fn correct_filter_type(
                 if let Some(cfg_key) = config_key {
                     let actual_type = schema_cache.get_prop_type(db_key, cfg_key);
                     if let Some(actual) = actual_type {
-                        // Non-filterable type → remove this condition entirely
                         if NON_FILTERABLE_TYPES.contains(&actual) {
                             return Value::Null;
                         }
-
-                        // Remap wrong type key (status↔select etc.)
                         let filterable = ["select", "status", "rich_text", "title", "date", "checkbox", "url", "email", "phone_number", "number", "multi_select"];
                         for type_key in &filterable {
                             if map.contains_key(*type_key) && *type_key != actual {
@@ -157,7 +147,6 @@ fn build_target_query(
 ) -> (serde_json::Value, serde_json::Value) {
     let mut query = serde_json::json!({ "page_size": target.limit.unwrap_or(10) });
 
-    // Priority: override_filter > filters.static > filter
     let static_filter = target.effective_filter();
     let final_filter = override_filter.or(static_filter);
 
@@ -182,7 +171,6 @@ fn build_target_query(
         }
     }
 
-    // Priority: override_sort > target.sort
     if let Some(sort) = override_sort.or(target.sort.as_ref()) {
         query["sorts"] = sort.clone();
     }
@@ -199,6 +187,62 @@ fn build_target_query(
     });
 
     (query, meta)
+}
+
+/// Execute a briefing for a list of targets. Uses resolve_db to support both reservoir and satellite keys.
+async fn execute_briefing_targets(
+    targets: &[crate::config::BriefingTarget],
+    config: &Arc<LifeOSConfig>,
+    notion: &Arc<NotionClient>,
+    schema_cache: &SchemaCache,
+    range: &str,
+    overrides: &Option<std::collections::HashMap<String, serde_json::Value>>,
+) -> (serde_json::Value, Vec<String>) {
+    let mut data = serde_json::json!({});
+    let mut all_meta: Vec<serde_json::Value> = Vec::new();
+    let mut errors: Vec<String> = Vec::new();
+
+    for target in targets {
+        // Use resolve_db to support both reservoir and satellite keys
+        let db = match crate::config::resolve_db(config, &target.db) {
+            Some(crate::config::ResolvedDb::Reservoir(_, db)) => db,
+            Some(crate::config::ResolvedDb::Satellite(_, _, _)) => {
+                errors.push(format!("Satellite briefing targets not yet supported: {}", target.db));
+                continue;
+            }
+            None => {
+                errors.push(format!("Unknown database in briefing: {}", target.db));
+                continue;
+            }
+        };
+        let target_override = overrides.as_ref().and_then(|o| o.get(&target.db));
+        let ov_filter = target_override.and_then(|o| o.get("filter"));
+        let ov_sort = target_override.and_then(|o| o.get("sort"));
+        let (query, meta) = build_target_query(target, db, &target.db, range, schema_cache, ov_filter, ov_sort);
+        all_meta.push(meta);
+        match notion.query_data_source(db.ds_id(), &query).await {
+            Ok(result) => {
+                let items: Vec<serde_json::Value> = result.results.iter()
+                    .map(|p| {
+                        let title = crate::transform::extract_title(p);
+                        serde_json::json!({ "title": title, "id": p.id })
+                    }).collect();
+                data[&target.db] = serde_json::json!(items);
+            }
+            Err(e) => {
+                errors.push(format!("{}: {}", target.db, e));
+            }
+        }
+    }
+
+    if !errors.is_empty() {
+        data["_errors"] = serde_json::json!(errors.clone());
+    }
+    if !all_meta.is_empty() {
+        data["_meta"] = serde_json::json!({ "per_database": all_meta });
+    }
+
+    (data, errors)
 }
 
 pub async fn execute(
@@ -223,36 +267,12 @@ pub async fn execute(
                 "range": range
             });
 
-            let mut all_meta: Vec<serde_json::Value> = Vec::new();
-            let mut errors: Vec<String> = Vec::new();
-            for target in targets {
-                if let Some(db) = crate::config::get_db(config, &target.db) {
-                    let target_override = params.overrides.as_ref()
-                        .and_then(|o| o.get(&target.db));
-                    let ov_filter = target_override.and_then(|o| o.get("filter"));
-                    let ov_sort = target_override.and_then(|o| o.get("sort"));
-                    let (query, meta) = build_target_query(target, db, &target.db, range, schema_cache, ov_filter, ov_sort);
-                    all_meta.push(meta);
-                    match notion.query_data_source(db.ds_id(), &query).await {
-                        Ok(result) => {
-                            let items: Vec<serde_json::Value> = result.results.iter()
-                                .map(|p| {
-                                    let title = crate::transform::extract_title(p);
-                                    serde_json::json!({ "title": title, "id": p.id })
-                                }).collect();
-                            data[&target.db] = serde_json::json!(items);
-                        }
-                        Err(e) => {
-                            errors.push(format!("{}: {}", target.db, e));
-                        }
-                    }
+            let (briefing_data, _errors) = execute_briefing_targets(targets, config, notion, schema_cache, range, &params.overrides).await;
+            // Merge briefing data into the output
+            if let Some(obj) = briefing_data.as_object() {
+                for (k, v) in obj {
+                    data[k] = v.clone();
                 }
-            }
-            if !errors.is_empty() {
-                data["_errors"] = serde_json::json!(errors);
-            }
-            if !all_meta.is_empty() {
-                data["_meta"] = serde_json::json!({ "per_database": all_meta });
             }
 
             Ok(crate::toon_format::encode(&data))
@@ -270,36 +290,11 @@ pub async fn execute(
                 "range": range
             });
 
-            let mut all_meta: Vec<serde_json::Value> = Vec::new();
-            let mut errors: Vec<String> = Vec::new();
-            for target in targets {
-                if let Some(db) = crate::config::get_db(config, &target.db) {
-                    let target_override = params.overrides.as_ref()
-                        .and_then(|o| o.get(&target.db));
-                    let ov_filter = target_override.and_then(|o| o.get("filter"));
-                    let ov_sort = target_override.and_then(|o| o.get("sort"));
-                    let (query, meta) = build_target_query(target, db, &target.db, range, schema_cache, ov_filter, ov_sort);
-                    all_meta.push(meta);
-                    match notion.query_data_source(db.ds_id(), &query).await {
-                        Ok(result) => {
-                            let items: Vec<serde_json::Value> = result.results.iter()
-                                .map(|p| {
-                                    let title = crate::transform::extract_title(p);
-                                    serde_json::json!({ "title": title, "id": p.id })
-                                }).collect();
-                            data[&target.db] = serde_json::json!(items);
-                        }
-                        Err(e) => {
-                            errors.push(format!("{}: {}", target.db, e));
-                        }
-                    }
+            let (briefing_data, _errors) = execute_briefing_targets(targets, config, notion, schema_cache, range, &params.overrides).await;
+            if let Some(obj) = briefing_data.as_object() {
+                for (k, v) in obj {
+                    data[k] = v.clone();
                 }
-            }
-            if !errors.is_empty() {
-                data["_errors"] = serde_json::json!(errors);
-            }
-            if !all_meta.is_empty() {
-                data["_meta"] = serde_json::json!({ "per_database": all_meta });
             }
 
             Ok(crate::toon_format::encode(&data))
@@ -307,11 +302,13 @@ pub async fn execute(
         "lesser_cycle" => {
             let mut data = serde_json::json!({
                 "briefing_type": "lesser_cycle",
-                "description": "Current-stage energy flow: Matrix (Catalyst→Experience) ⇄ Potentiator (Experience→Catalyst)",
+                "description": "Current-stage energy flow — cycle reservoirs from holonic config",
                 "range": range
             });
             let mut errors: Vec<String> = Vec::new();
-            for key in &["matrix", "potentiator"] {
+            // Derive cycle reservoirs from config instead of hardcoding
+            let lesser_keys = config.cycle_reservoirs("lesser");
+            for key in &lesser_keys {
                 if let Some(db) = crate::config::get_db(config, key) {
                     let mut query = serde_json::json!({ "page_size": 20 });
                     if let Some(date_prop) = db.properties.get("date") {
@@ -341,11 +338,13 @@ pub async fn execute(
         "greater_cycle" => {
             let mut data = serde_json::json!({
                 "briefing_type": "greater_cycle",
-                "description": "All-stage evolutionary tension: Significator (Transformation→Choice) ⇄ GreatWay (Choice→Transformation)",
+                "description": "All-stage evolutionary tension — cycle reservoirs from holonic config",
                 "range": range
             });
             let mut errors: Vec<String> = Vec::new();
-            for key in &["significator", "greatway"] {
+            // Derive cycle reservoirs from config instead of hardcoding
+            let greater_keys = config.cycle_reservoirs("greater");
+            for key in &greater_keys {
                 if let Some(db) = crate::config::get_db(config, key) {
                     let query = serde_json::json!({ "page_size": 20 });
                     match notion.query_data_source(db.ds_id(), &query).await {
@@ -368,70 +367,76 @@ pub async fn execute(
         "nexus" => {
             let mut data = serde_json::json!({
                 "briefing_type": "nexus",
-                "description": "Contact-boundary transmutation: all 4 currencies (Catalyst, Experience, Transformation, Choice)",
+                "description": "Contact-boundary transmutation: all currencies",
                 "range": range
             });
             let mut errors: Vec<String> = Vec::new();
 
-            // Query Nexus reservoir
-            if let Some(db) = crate::config::get_db(config, "nexus") {
-                let mut query = serde_json::json!({ "page_size": 20 });
-                if let Some(date_prop) = db.properties.get("date") {
-                    if let Some(df) = crate::util::date_filter::build_date_filter(range, Some(date_prop)) {
-                        query["filter"] = df;
-                    }
-                }
-                match notion.query_data_source(db.ds_id(), &query).await {
-                    Ok(result) => {
-                        let items: Vec<serde_json::Value> = result.results.iter()
-                            .map(|p| {
-                                let title = crate::transform::extract_title(p);
-                                let category = crate::transform::extract_string(p, "Category");
-                                let log_type = crate::transform::extract_string(p, "Log Type");
-                                serde_json::json!({
-                                    "title": title,
-                                    "id": p.id,
-                                    "category": category,
-                                    "log_type": log_type
-                                })
-                            }).collect();
-
-                        // Analyze transmutation patterns
-                        let mut category_dist: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
-                        let mut log_type_dist: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
-                        for item in &items {
-                            let cat = item["category"].as_str().unwrap_or("unknown");
-                            let lt = item["log_type"].as_str().unwrap_or("unknown");
-                            *category_dist.entry(cat.to_string()).or_insert(0) += 1;
-                            *log_type_dist.entry(lt.to_string()).or_insert(0) += 1;
+            // Discover nexus by archetype from config — no hardcoded name
+            let nexus_key = config.reservoir_by_archetype("nexus").map(|(k, _)| k.to_string());
+            if let Some(ref nexus_k) = nexus_key {
+                if let Some(db) = crate::config::get_db(config, nexus_k) {
+                    let mut query = serde_json::json!({ "page_size": 20 });
+                    if let Some(date_prop) = db.properties.get("date") {
+                        if let Some(df) = crate::util::date_filter::build_date_filter(range, Some(date_prop)) {
+                            query["filter"] = df;
                         }
-
-                        data["nexus"] = serde_json::json!({
-                            "entries": items,
-                            "count": items.len(),
-                            "transmutation_analysis": {
-                                "category_distribution": category_dist,
-                                "log_type_distribution": log_type_dist,
-                                "currencies_active": ["Catalyst", "Experience", "Transformation", "Choice"],
-                                "interpretation": nexus_interpretation(items.len(), &category_dist)
-                            }
-                        });
                     }
-                    Err(e) => { errors.push(format!("nexus: {}", e)); }
+                    match notion.query_data_source(db.ds_id(), &query).await {
+                        Ok(result) => {
+                            let items: Vec<serde_json::Value> = result.results.iter()
+                                .map(|p| {
+                                    let title = crate::transform::extract_title(p);
+                                    let category = crate::transform::extract_string(p, "Category");
+                                    let log_type = crate::transform::extract_string(p, "Log Type");
+                                    serde_json::json!({
+                                        "title": title,
+                                        "id": p.id,
+                                        "category": category,
+                                        "log_type": log_type
+                                    })
+                                }).collect();
+
+                            let mut category_dist: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+                            let mut log_type_dist: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+                            for item in &items {
+                                let cat = item["category"].as_str().unwrap_or("unknown");
+                                let lt = item["log_type"].as_str().unwrap_or("unknown");
+                                *category_dist.entry(cat.to_string()).or_insert(0) += 1;
+                                *log_type_dist.entry(lt.to_string()).or_insert(0) += 1;
+                            }
+
+                            data["nexus"] = serde_json::json!({
+                                "entries": items,
+                                "count": items.len(),
+                                "transmutation_analysis": {
+                                    "category_distribution": category_dist,
+                                    "log_type_distribution": log_type_dist,
+                                    "currencies_active": config.holonic.as_ref()
+                                        .map(|h| serde_json::json!(h.currencies))
+                                        .unwrap_or(serde_json::json!(["Catalyst", "Experience", "Transformation", "Choice"])),
+                                    "interpretation": nexus_interpretation(items.len(), &category_dist)
+                                }
+                            });
+                        }
+                        Err(e) => { errors.push(format!("nexus: {}", e)); }
+                    }
                 }
             }
 
             // Also query nexus satellites for completeness
-            if let Some(db) = crate::config::get_db(config, "nexus") {
-                for (sat_key, sat_cfg) in &db.satellites {
-                    let query = serde_json::json!({ "page_size": 10 });
-                    if let Ok(result) = notion.query_data_source(sat_cfg.ds_id(), &query).await {
-                        let count = result.results.len();
-                        data["satellites"][sat_key] = serde_json::json!({
-                            "name": sat_cfg.name,
-                            "role": sat_cfg.role,
-                            "entry_count": count
-                        });
+            if let Some(ref nexus_k) = nexus_key {
+                if let Some(db) = crate::config::get_db(config, nexus_k) {
+                    for (sat_key, sat_cfg) in &db.satellites {
+                        let query = serde_json::json!({ "page_size": 10 });
+                        if let Ok(result) = notion.query_data_source(sat_cfg.ds_id(), &query).await {
+                            let count = result.results.len();
+                            data["satellites"][sat_key] = serde_json::json!({
+                                "name": sat_cfg.name,
+                                "role": sat_cfg.role,
+                                "entry_count": count
+                            });
+                        }
                     }
                 }
             }
@@ -440,7 +445,6 @@ pub async fn execute(
             Ok(crate::toon_format::encode(&data))
         }
         "drive_balance" | "reservoir_health" => {
-            // Delegate to the dedicated tools
             if params.mode == "drive_balance" {
                 crate::tools::drive_assessment::execute(
                     &crate::tools::drive_assessment::DriveAssessmentParams {
@@ -467,7 +471,7 @@ fn nexus_interpretation(count: usize, categories: &std::collections::HashMap<Str
     if count == 0 {
         "No nexus entries in range — contact-boundary is dormant".to_string()
     } else if count > 20 {
-        format!("High nexus activity ({count} entries) — active transmutation across all 4 currencies")
+        format!("High nexus activity ({count} entries) — active transmutation across all currencies")
     } else {
         let dominant = categories.iter()
             .max_by_key(|(_, v)| *v)
@@ -476,5 +480,3 @@ fn nexus_interpretation(count: usize, categories: &std::collections::HashMap<Str
         format!("Moderate nexus activity ({count} entries) — dominant category: {}", dominant)
     }
 }
-
-
