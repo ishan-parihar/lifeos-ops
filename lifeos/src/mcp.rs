@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use lifeos_core::{LifeosServer, load_config, NotionClient, resolve_all_data_sources, SchemaCache};
+use lifeos_core::{LifeosServer, load_config, config_path, save_config, NotionClient, resolve_all_data_sources, SchemaCache};
 
 pub async fn run_server() {
     let mut config = match load_config() {
@@ -32,11 +32,21 @@ pub async fn run_server() {
         }
         tracing::warn!(
             "MCP server starting with {}/{} databases unresolved — tools targeting these databases will fail",
-            failures.len(),
-            config.databases.len()
+            failures.len(), config.databases.len()
         );
     } else {
         tracing::info!("All {} databases resolved successfully", config.databases.len());
+    }
+
+    // Persist auto-discovered config so subsequent runs are instant.
+    // Only saves when the embedded fallback was used (no file on disk).
+    if config_path().is_none() {
+        let save_path = std::path::PathBuf::from("lifeos.config.json");
+        if let Err(e) = save_config(&config, &save_path) {
+            tracing::warn!("Could not save auto-discovered config: {e}");
+        } else {
+            tracing::info!("Saved auto-discovered config to {}", save_path.display());
+        }
     }
 
     // Create the actual client with resolved config

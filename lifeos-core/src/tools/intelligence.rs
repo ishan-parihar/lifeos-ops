@@ -55,117 +55,29 @@ const NON_FILTERABLE_TYPES: &[&str] = &[
     "created_time", "last_edited_time", "button", "unique_id",
 ];
 
-/// Module-specific satellite targets: when a module targets a reservoir,
-/// we should query its satellites for richer data.
-fn module_satellite_targets(module_key: &str, config: &LifeOSConfig) -> Vec<(String, String)> {
-    // Returns (satellite_key, satellite_name) for the module
+/// Module-specific entry type filters: when a module targets a reservoir,
+/// we query by entry type within that unified database.
+fn module_entry_type_filters(module_key: &str) -> Vec<(&'static str, Vec<&'static str>)> {
+    // Returns (db_key, entry_type_values) for the module
     match module_key {
-        "health" => {
-            // Health data lives in potentiator satellites: diet_log, activity_log, subjective_journal
-            let pot_key = config.reservoir_by_archetype("potentiator")
-                .map(|(k, _)| k.to_string())
-                .unwrap_or_else(|| "potentiator".to_string());
-            config.satellite_keys(&pot_key).iter()
-                .filter(|sk| {
-                    let name = config.databases.get(&pot_key)
-                        .and_then(|db| db.satellites.get(sk.as_str()))
-                        .map(|s| s.name.to_lowercase())
-                        .unwrap_or_default();
-                    name.contains("diet") || name.contains("activity") || name.contains("subjective") || name.contains("day")
-                })
-                .map(|sk| {
-                    let name = config.databases.get(&pot_key)
-                        .and_then(|db| db.satellites.get(sk.as_str()))
-                        .map(|s| s.name.clone())
-                        .unwrap_or_else(|| sk.clone());
-                    (sk.clone(), name)
-                })
-                .collect()
-        }
-        "financial" => {
-            let pot_key = config.reservoir_by_archetype("potentiator")
-                .map(|(k, _)| k.to_string())
-                .unwrap_or_else(|| "potentiator".to_string());
-            config.satellite_keys(&pot_key).iter()
-                .filter(|sk| {
-                    let name = config.databases.get(&pot_key)
-                        .and_then(|db| db.satellites.get(sk.as_str()))
-                        .map(|s| s.name.to_lowercase())
-                        .unwrap_or_default();
-                    name.contains("financial")
-                })
-                .map(|sk| {
-                    let name = config.databases.get(&pot_key)
-                        .and_then(|db| db.satellites.get(sk.as_str()))
-                        .map(|s| s.name.clone())
-                        .unwrap_or_else(|| sk.clone());
-                    (sk.clone(), name)
-                })
-                .collect()
-        }
-        "journaling" => {
-            let pot_key = config.reservoir_by_archetype("potentiator")
-                .map(|(k, _)| k.to_string())
-                .unwrap_or_else(|| "potentiator".to_string());
-            config.satellite_keys(&pot_key).iter()
-                .filter(|sk| {
-                    let name = config.databases.get(&pot_key)
-                        .and_then(|db| db.satellites.get(sk.as_str()))
-                        .map(|s| s.name.to_lowercase())
-                        .unwrap_or_default();
-                    name.contains("journal") || name.contains("relational") || name.contains("systemic")
-                })
-                .map(|sk| {
-                    let name = config.databases.get(&pot_key)
-                        .and_then(|db| db.satellites.get(sk.as_str()))
-                        .map(|s| s.name.clone())
-                        .unwrap_or_else(|| sk.clone());
-                    (sk.clone(), name)
-                })
-                .collect()
-        }
-        "content" => {
-            let gw_key = config.reservoir_by_archetype("greatway")
-                .map(|(k, _)| k.to_string())
-                .unwrap_or_else(|| "greatway".to_string());
-            config.satellite_keys(&gw_key).iter()
-                .filter(|sk| {
-                    let name = config.databases.get(&gw_key)
-                        .and_then(|db| db.satellites.get(sk.as_str()))
-                        .map(|s| s.name.to_lowercase())
-                        .unwrap_or_default();
-                    name.contains("content") || name.contains("campaign")
-                })
-                .map(|sk| {
-                    let name = config.databases.get(&gw_key)
-                        .and_then(|db| db.satellites.get(sk.as_str()))
-                        .map(|s| s.name.clone())
-                        .unwrap_or_else(|| sk.clone());
-                    (sk.clone(), name)
-                })
-                .collect()
-        }
-        "productivity" => {
-            let gw_key = config.reservoir_by_archetype("greatway")
-                .map(|(k, _)| k.to_string())
-                .unwrap_or_else(|| "greatway".to_string());
-            config.satellite_keys(&gw_key).iter()
-                .filter(|sk| {
-                    let name = config.databases.get(&gw_key)
-                        .and_then(|db| db.satellites.get(sk.as_str()))
-                        .map(|s| s.name.to_lowercase())
-                        .unwrap_or_default();
-                    name.contains("task") || name.contains("project")
-                })
-                .map(|sk| {
-                    let name = config.databases.get(&gw_key)
-                        .and_then(|db| db.satellites.get(sk.as_str()))
-                        .map(|s| s.name.clone())
-                        .unwrap_or_else(|| sk.clone());
-                    (sk.clone(), name)
-                })
-                .collect()
-        }
+        "health" => vec![
+            ("potentiator", vec!["Activity", "Diet", "Subjective"]),
+        ],
+        "financial" => vec![
+            ("potentiator", vec!["Financial"]),
+        ],
+        "journaling" => vec![
+            ("potentiator", vec!["Subjective", "Relational", "Systemic"]),
+        ],
+        "content" => vec![
+            ("greatway", vec!["Content", "Campaign"]),
+        ],
+        "productivity" => vec![
+            ("greatway", vec!["Task", "Project"]),
+        ],
+        "strategic" => vec![
+            ("greatway", vec!["Project", "Annual Goal", "Quarterly Goal"]),
+        ],
         _ => Vec::new(),
     }
 }
@@ -304,7 +216,7 @@ fn build_target_query(
     (query, meta)
 }
 
-/// Execute a briefing for a list of targets. Uses resolve_db to support both reservoir and satellite keys.
+/// Execute a briefing for a list of targets using resolve_db.
 async fn execute_briefing_targets(
     targets: &[crate::config::BriefingTarget],
     config: &Arc<LifeOSConfig>,
@@ -318,13 +230,8 @@ async fn execute_briefing_targets(
     let mut errors: Vec<String> = Vec::new();
 
     for target in targets {
-        // Use resolve_db to support both reservoir and satellite keys
         let db = match crate::config::resolve_db(config, &target.db) {
-            Some(crate::config::ResolvedDb::Reservoir(_, db)) => db,
-            Some(crate::config::ResolvedDb::Satellite(_, _, _)) => {
-                errors.push(format!("Satellite briefing targets not yet supported: {}", target.db));
-                continue;
-            }
+            Some(db) => db,
             None => {
                 errors.push(format!("Unknown database in briefing: {}", target.db));
                 continue;
@@ -413,56 +320,53 @@ pub async fn execute(
                 }
             }
 
-            // Additionally, query module-specific satellites for richer data
-            // (e.g., health module should query diet_log, activity_log satellites)
-            let satellite_targets = module_satellite_targets(&module_key, config);
-            if !satellite_targets.is_empty() {
-                let mut satellite_data = serde_json::json!({});
-                let mut sat_errors: Vec<String> = Vec::new();
-                for (sat_key, sat_name) in &satellite_targets {
-                    let ds_id = match crate::config::resolve_db(config, sat_key) {
-                        Some(crate::config::ResolvedDb::Satellite(_, _, sat)) => sat.ds_id().to_string(),
-                        Some(crate::config::ResolvedDb::Reservoir(_, db)) => db.ds_id().to_string(),
-                        None => continue,
-                    };
-                    let mut query = serde_json::json!({ "page_size": 20 });
-                    if let Some(date_prop) = {
-                        // Find date property from satellite config
-                        crate::config::resolve_db(config, sat_key)
-                            .and_then(|r| match r {
-                                crate::config::ResolvedDb::Satellite(_, _, sat) => sat.properties.get("date").cloned(),
-                                _ => None,
-                            })
-                    } {
-                        if let Some(df) = crate::util::date_filter::build_date_filter(range, Some(&date_prop)) {
-                            query["filter"] = df;
+            // Query module-specific entry types for richer data
+            // (e.g., health module filters Potentiator by Activity, Diet, Subjective entry types)
+            let entry_type_filters = module_entry_type_filters(&module_key);
+            if !entry_type_filters.is_empty() {
+                let mut entry_type_data = serde_json::json!({});
+                let mut et_errors: Vec<String> = Vec::new();
+                for (db_key, entry_types) in &entry_type_filters {
+                    if let Some(db) = crate::config::resolve_db(config, db_key) {
+                        let mut db_entries = serde_json::json!({});
+                        for entry_type in entry_types {
+                            let mut query = serde_json::json!({ "page_size": 20 });
+                            // Filter by entry type using the DB's entry_type_property
+                            if let Some(et_prop) = db.properties.get("entry_type") {
+                                let prop_type = schema_cache.get_prop_type(db_key, "entry_type")
+                                    .unwrap_or("select");
+                                query["filter"] = serde_json::json!({
+                                    "property": et_prop,
+                                    prop_type: { "equals": entry_type }
+                                });
+                            }
+                            match notion.query_data_source(db.ds_id(), &query).await {
+                                Ok(result) => {
+                                    let items: Vec<serde_json::Value> = result.results.iter()
+                                        .map(|p| serde_json::json!({
+                                            "title": crate::transform::extract_title(p),
+                                            "id": p.id,
+                                        })).collect();
+                                    db_entries[entry_type] = serde_json::json!({
+                                        "entries": items,
+                                        "count": items.len(),
+                                    });
+                                }
+                                Err(e) => et_errors.push(format!("{}.{}: {}", db_key, entry_type, e)),
+                            }
                         }
-                    }
-                    match notion.query_data_source(&ds_id, &query).await {
-                        Ok(result) => {
-                            let items: Vec<serde_json::Value> = result.results.iter()
-                                .map(|p| serde_json::json!({
-                                    "title": crate::transform::extract_title(p),
-                                    "id": p.id,
-                                })).collect();
-                            satellite_data[sat_key] = serde_json::json!({
-                                "name": sat_name,
-                                "entries": items,
-                                "count": items.len(),
-                            });
-                        }
-                        Err(e) => sat_errors.push(format!("{}: {}", sat_key, e)),
+                        entry_type_data[db_key] = db_entries;
                     }
                 }
-                if !satellite_data.as_object().unwrap_or(&serde_json::Map::new()).is_empty() {
-                    data["satellites"] = satellite_data;
+                if !entry_type_data.as_object().unwrap_or(&serde_json::Map::new()).is_empty() {
+                    data["entry_types"] = entry_type_data;
                 }
-                if !sat_errors.is_empty() {
+                if !et_errors.is_empty() {
                     let existing_errors = data.get("_errors")
                         .and_then(|e| e.as_array().cloned())
                         .unwrap_or_default();
                     let mut all_errors: Vec<serde_json::Value> = existing_errors;
-                    for e in sat_errors {
+                    for e in et_errors {
                         all_errors.push(serde_json::json!(e));
                     }
                     data["_errors"] = serde_json::json!(all_errors);
@@ -560,22 +464,22 @@ pub async fn execute(
                                 .map(|p| {
                                     let title = crate::transform::extract_title(p);
                                     let category = crate::transform::extract_string(p, "Category");
-                                    let log_type = crate::transform::extract_string(p, "Log Type");
+                                    let kind = crate::transform::extract_string(p, "Kind");
                                     serde_json::json!({
                                         "title": title,
                                         "id": p.id,
                                         "category": category,
-                                        "log_type": log_type
+                                        "kind": kind
                                     })
                                 }).collect();
 
                             let mut category_dist: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
-                            let mut log_type_dist: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
+                            let mut kind_dist: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
                             for item in &items {
                                 let cat = item["category"].as_str().unwrap_or("unknown");
-                                let lt = item["log_type"].as_str().unwrap_or("unknown");
+                                let kind = item["kind"].as_str().unwrap_or("unknown");
                                 *category_dist.entry(cat.to_string()).or_insert(0) += 1;
-                                *log_type_dist.entry(lt.to_string()).or_insert(0) += 1;
+                                *kind_dist.entry(kind.to_string()).or_insert(0) += 1;
                             }
 
                             data["nexus"] = serde_json::json!({
@@ -583,7 +487,7 @@ pub async fn execute(
                                 "count": items.len(),
                                 "transmutation_analysis": {
                                     "category_distribution": category_dist,
-                                    "log_type_distribution": log_type_dist,
+                                    "kind_distribution": kind_dist,
                                     "currencies_active": config.holonic.as_ref()
                                         .map(|h| serde_json::json!(h.currencies))
                                         .unwrap_or(serde_json::json!(["Catalyst", "Experience", "Transformation", "Choice"])),
@@ -592,23 +496,6 @@ pub async fn execute(
                             });
                         }
                         Err(e) => { errors.push(format!("nexus: {}", e)); }
-                    }
-                }
-            }
-
-            // Also query nexus satellites for completeness
-            if let Some(ref nexus_k) = nexus_key {
-                if let Some(db) = crate::config::get_db(config, nexus_k) {
-                    for (sat_key, sat_cfg) in &db.satellites {
-                        let query = serde_json::json!({ "page_size": 10 });
-                        if let Ok(result) = notion.query_data_source(sat_cfg.ds_id(), &query).await {
-                            let count = result.results.len();
-                            data["satellites"][sat_key] = serde_json::json!({
-                                "name": sat_cfg.name,
-                                "role": sat_cfg.role,
-                                "entry_count": count
-                            });
-                        }
                     }
                 }
             }

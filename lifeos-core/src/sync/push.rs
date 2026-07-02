@@ -254,16 +254,14 @@ pub async fn push_database(
     index: &HashMap<String, IndexEntry>,
     dry_run: bool,
 ) -> Result<PushReport, String> {
-    // Use resolve_db to support both reservoir and satellite keys
-    let (ds_id, db_name, properties) = match crate::config::resolve_db(config, db_key) {
-        Some(crate::config::ResolvedDb::Reservoir(_key, db)) => {
-            (db.ds_id().to_string(), db.name.clone(), db.properties.clone())
-        }
-        Some(crate::config::ResolvedDb::Satellite(_, _, sat)) => {
-            (sat.ds_id().to_string(), sat.name.clone(), sat.properties.clone())
-        }
+    // Use resolve_db to get database config
+    let db = match crate::config::resolve_db(config, db_key) {
+        Some(db) => db,
         None => return Err(format!("Database key '{}' not found in config", db_key)),
     };
+    let ds_id = db.ds_id();
+    let db_name = &db.name;
+    let properties = &db.properties;
 
     tracing::info!(
         "Pushing database: {} ({}){}",

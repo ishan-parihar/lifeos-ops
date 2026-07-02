@@ -157,9 +157,9 @@ pub enum Commands {
         /// Preset: active, this_week, this_month, needs_review
         #[arg(short, long)]
         preset: Option<String>,
-        /// Query a reservoir + all its satellites
+        /// Filter by entry type within a database (e.g., "Activity" for potentiator, "Project" for greatway)
         #[arg(short, long)]
-        reservoir: Option<String>,
+        entry_type: Option<String>,
         /// Query all reservoirs in a cycle (lesser/greater)
         #[arg(short, long)]
         cycle: Option<String>,
@@ -200,26 +200,41 @@ pub enum Commands {
         range: Option<String>,
     },
 
-    /// Run data science analysis (temporal, trajectories, correlations)
+    /// Data science analysis: aggregate, profile, trend, compare, correlate, summarize
     DataScience {
-        /// Analysis type: temporal, trajectories, weekday_profile, correlations, patterns
-        #[arg(short, long)]
+        /// Analysis type: aggregate, profile, trend, compare, correlate, summarize
+        #[arg(short = 't', long)]
         analysis_type: String,
-        /// Primary database key
+        /// Primary database key (matrix, potentiator, significator, greatway, nexus)
         #[arg(short, long)]
         database: String,
-        /// Secondary database (for correlations)
-        #[arg(short, long)]
+        /// Secondary database (for correlate)
+        #[arg(short = 'B', long)]
         database_b: Option<String>,
         /// Days to look back (default: 30)
-        #[arg(short, long)]
+        #[arg(short = 'd', long)]
         days_back: Option<i64>,
+        /// Filter by entry type within the database
+        #[arg(short = 'e', long)]
+        entry_type: Option<String>,
         /// Property to analyze
         #[arg(short, long)]
         property: Option<String>,
-        /// Metric property for numerical analysis
-        #[arg(short, long)]
+        /// Metric property for trend analysis
+        #[arg(long)]
         metric_property: Option<String>,
+        /// Group results by: status, date, entry_type, week, month
+        #[arg(short = 'g', long)]
+        group_by: Option<String>,
+        /// Period for trend/compare: week, month, quarter
+        #[arg(short = 'p', long)]
+        period: Option<String>,
+        /// Analyze across a cycle: lesser, greater
+        #[arg(short = 'c', long)]
+        cycle: Option<String>,
+        /// Correlation metric: count, timing
+        #[arg(long)]
+        correlation_metric: Option<String>,
     },
 
     /// Run daily/weekly/monthly/quarterly review pipeline

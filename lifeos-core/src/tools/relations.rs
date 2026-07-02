@@ -400,8 +400,7 @@ pub async fn execute_backlinks(
 
     for db_key in &db_keys {
         let ds_id = match crate::config::resolve_db(config, db_key) {
-            Some(crate::config::ResolvedDb::Reservoir(_, db)) => db.ds_id().to_string(),
-            Some(crate::config::ResolvedDb::Satellite(_, _, sat)) => sat.ds_id().to_string(),
+            Some(db) => db.ds_id().to_string(),
             None => continue,
         };
 
@@ -533,8 +532,7 @@ pub async fn execute_graph_metrics(
 
     for db_key in config.all_database_keys() {
         let ds_id = match crate::config::resolve_db(config, &db_key) {
-            Some(crate::config::ResolvedDb::Reservoir(_, db)) => db.ds_id().to_string(),
-            Some(crate::config::ResolvedDb::Satellite(_, _, sat)) => sat.ds_id().to_string(),
+            Some(db) => db.ds_id().to_string(),
             None => continue,
         };
 
@@ -635,24 +633,10 @@ fn derive_hierarchy_up(config: &crate::config::LifeOSConfig, schema_cache: &Sche
     for (key, db) in &config.databases {
         if db.scale.as_deref() == Some("all-stage") && db.dimension.as_deref() == Some("intra-holonic") {
             upward_keys.insert(key.clone());
-            for sat_key in db.satellites.keys() {
-                upward_keys.insert(sat_key.clone());
-            }
         }
     }
 
-    // Strategy 3: Scaffold satellite roles indicate hierarchy
-    for (_key, db) in &config.databases {
-        for (sat_key, sat) in &db.satellites {
-            if let Some(ref role) = sat.role {
-                if role.contains("scaffold") {
-                    upward_keys.insert(sat_key.clone());
-                }
-            }
-        }
-    }
-
-    // Strategy 4: Property names that indicate "parent" direction
+    // Strategy 3: Property names that indicate "parent" direction
     for (key, db) in &config.databases {
         for prop_name in db.properties.keys() {
             let lower = prop_name.to_lowercase();
@@ -661,19 +645,6 @@ fn derive_hierarchy_up(config: &crate::config::LifeOSConfig, schema_cache: &Sche
                 if let Some(edges) = schema_cache.all_relation_edges().get(key) {
                     for edge in edges {
                         upward_keys.insert(edge.target_db.clone());
-                    }
-                }
-            }
-        }
-        for (sat_key, sat) in &db.satellites {
-            for prop_name in sat.properties.keys() {
-                let lower = prop_name.to_lowercase();
-                if lower.contains("parent") || lower.contains("annual") || lower.contains("quarter")
-                    || lower.contains("vision") || lower.contains("value") || lower.contains("pillar") {
-                    if let Some(edges) = schema_cache.all_relation_edges().get(sat_key) {
-                        for edge in edges {
-                            upward_keys.insert(edge.target_db.clone());
-                        }
                     }
                 }
             }

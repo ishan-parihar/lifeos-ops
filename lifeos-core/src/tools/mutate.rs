@@ -171,16 +171,13 @@ pub async fn execute(
     notion: &Arc<NotionClient>,
     schema_cache: &SchemaCache,
 ) -> Result<String, String> {
-    // Resolve database — supports both reservoir and satellite keys
-    let (ds_id, _db_name, properties) = match crate::config::resolve_db(config, &params.database) {
-        Some(crate::config::ResolvedDb::Reservoir(_key, db)) => {
-            (db.ds_id().to_string(), db.name.clone(), db.properties.clone())
-        }
-        Some(crate::config::ResolvedDb::Satellite(_, _, sat)) => {
-            (sat.ds_id().to_string(), sat.name.clone(), sat.properties.clone())
-        }
+    // Resolve database
+    let db = match crate::config::resolve_db(config, &params.database) {
+        Some(db) => db,
         None => return Err(format!("Unknown database: {}", params.database)),
     };
+    let ds_id = db.ds_id();
+    let properties = &db.properties;
 
     match params.operation.as_str() {
         "create" => {

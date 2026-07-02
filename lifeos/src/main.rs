@@ -180,12 +180,12 @@ async fn main() {
                     let result = lifeos_core::tools::execute_get_schema(database.as_deref(), &sc, &cfg);
                     println!("{result}");
                 }
-                Commands::Query { database, filter_property, filter_value, filter_type, sort_property, sort_direction, limit, preset, reservoir, cycle } => {
+                Commands::Query { database, filter_property, filter_value, filter_type, sort_property, sort_direction, limit, preset, entry_type, cycle } => {
                     let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
                     let params = lifeos_core::tools::query::QueryParams {
                         database, filter_property, filter_value, filter_type,
                         sort_property, sort_direction, limit: Some(limit),
-                        return_properties: None, preset, reservoir, cycle,
+                        return_properties: None, preset, entry_type, cycle,
                     };
                     match lifeos_core::tools::query::execute(&params, &cfg, &notion, &sc).await {
                         Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
@@ -211,10 +211,11 @@ async fn main() {
                         Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
                     }
                 }
-                Commands::DataScience { analysis_type, database, database_b, days_back, property, metric_property } => {
+                Commands::DataScience { analysis_type, database, database_b, days_back, property, metric_property, entry_type, group_by, period, cycle, correlation_metric } => {
                     let (cfg, notion, _sc) = resolve_with_schema(None, &notion_token).await;
                     let params = lifeos_core::tools::data_science::DataScienceParams {
                         analysis_type, database, database_b, days_back, property, metric_property,
+                        entry_type, group_by, period, cycle, correlation_metric,
                     };
                     match lifeos_core::tools::data_science::execute(&params, &cfg, &notion).await {
                         Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
@@ -287,14 +288,24 @@ fn resolve_config(config_path: Option<&str>) -> LifeOSConfig {
     }
 }
 
-async fn resolve_config_with_ds(config_path: Option<&str>, token: &str) -> (LifeOSConfig, NotionClient) {
-    let mut cfg = resolve_config(config_path);
+async fn resolve_config_with_ds(config_path_arg: Option<&str>, token: &str) -> (LifeOSConfig, NotionClient) {
+    let mut cfg = resolve_config(config_path_arg);
     let notion = NotionClient::new(cfg.clone(), token.to_string());
     let failures = resolve_all_data_sources(&mut cfg, &notion).await;
     if !failures.is_empty() {
         tracing::warn!("{}/{} databases unresolved", failures.len(), cfg.databases.len());
         for (db_key, _) in &failures {
             tracing::warn!("  unresolved database: {db_key}");
+        }
+    }
+    // Persist auto-discovered config so subsequent runs are instant.
+    // Only saves when the embedded fallback was used (no file on disk).
+    if config_path().is_none() {
+        let save_path = std::path::PathBuf::from("lifeos.config.json");
+        if let Err(e) = save_config(&cfg, &save_path) {
+            tracing::warn!("Could not save auto-discovered config: {e}");
+        } else {
+            tracing::info!("Saved auto-discovered config to {}", save_path.display());
         }
     }
     let notion = NotionClient::new(cfg.clone(), token.to_string());
@@ -343,21 +354,14 @@ async fn cmd_pull(
         .map(|s| s.split(',').map(|k| k.trim().to_string()).collect())
         .unwrap_or_default();
 
-    // Expand to include satellites alongside reservoirs
+    // In v5, all_db_keys = just the 5 reservoir keys (no satellites)
     let all_db_keys: Vec<String> = if let Some(filter) = db_filter {
         filter
             .split(',')
             .map(|s| s.trim().to_string())
             .collect()
     } else {
-        let mut keys = Vec::new();
-        for (key, db) in &config.databases {
-            keys.push(key.clone());
-            for sat_key in db.satellites.keys() {
-                keys.push(sat_key.clone());
-            }
-        }
-        keys
+        config.databases.keys().cloned().collect()
     };
 
     let db_keys: Vec<&String> = all_db_keys
@@ -436,21 +440,14 @@ async fn cmd_push(
     db_filter: Option<&str>,
     dry_run: bool,
 ) -> Result<(), String> {
-    // Expand to include satellites alongside reservoirs
+    // In v5, all_db_keys = just the 5 reservoir keys (no satellites)
     let all_db_keys: Vec<String> = if let Some(filter) = db_filter {
         filter
             .split(',')
             .map(|s| s.trim().to_string())
             .collect()
     } else {
-        let mut keys = Vec::new();
-        for (key, db) in &config.databases {
-            keys.push(key.clone());
-            for sat_key in db.satellites.keys() {
-                keys.push(sat_key.clone());
-            }
-        }
-        keys
+        config.databases.keys().cloned().collect()
     };
 
     let db_keys: Vec<&String> = all_db_keys.iter().collect();
@@ -518,7 +515,7 @@ async fn cmd_discover(mut cfg: LifeOSConfig, token: &str) -> Result<(), String> 
     let mut updated = 0;
     let mut not_found = Vec::new();
 
-    // Discover reservoirs
+    // Discover the 5 unified databases
     for db_config in cfg.databases.values_mut() {
         if let Some((id, _)) = notion_dbs.iter().find(|(_, title)| title == &db_config.name) {
             let old_id = std::mem::replace(&mut db_config.database_id, id.clone());
@@ -529,24 +526,12 @@ async fn cmd_discover(mut cfg: LifeOSConfig, token: &str) -> Result<(), String> 
         } else {
             not_found.push(db_config.name.clone());
         }
-        // Discover satellites
-        for sat in db_config.satellites.values_mut() {
-            if let Some((id, _)) = notion_dbs.iter().find(|(_, title)| title == &sat.name) {
-                let old_id = std::mem::replace(&mut sat.database_id, id.clone());
-                if old_id != sat.database_id {
-                    println!("  [UPDATED] {} (satellite) : {} -> {}", sat.name, &old_id[..8.min(old_id.len())], &sat.database_id[..8.min(sat.database_id.len())]);
-                }
-                updated += 1;
-            } else {
-                not_found.push(sat.name.clone());
-            }
-        }
     }
 
     save_config(&cfg, &path).map_err(|e| e.to_string())?;
 
     println!("\nDiscover complete:");
-    println!("  Updated: {} databases (reservoirs + satellites)", updated);
+    println!("  Updated: {} databases", updated);
     println!("  Not found: {}", not_found.len());
     if !not_found.is_empty() {
         for name in &not_found {

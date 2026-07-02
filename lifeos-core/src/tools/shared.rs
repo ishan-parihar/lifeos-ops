@@ -7,7 +7,6 @@ use crate::notion::types::NotionPage;
 
 /// Query a single reservoir database, applying date filter if available.
 /// Returns total count, has_more, status_distribution, and digestion_distribution.
-/// Accepts both reservoir and satellite keys via resolve_db.
 pub async fn query_reservoir(
     config: &LifeOSConfig,
     notion: &NotionClient,
@@ -16,10 +15,7 @@ pub async fn query_reservoir(
     page_size: u32,
 ) -> serde_json::Value {
     let db = match crate::config::resolve_db(config, key) {
-        Some(crate::config::ResolvedDb::Reservoir(_k, db)) => db,
-        Some(crate::config::ResolvedDb::Satellite(_rk, _sk, sat)) => {
-            return query_ds(notion, sat.ds_id(), &sat.properties, date_filter, page_size).await;
-        }
+        Some(db) => db,
         None => return serde_json::json!({ "total": 0 }),
     };
     query_ds(notion, db.ds_id(), &db.properties, date_filter, page_size).await
@@ -66,22 +62,15 @@ async fn query_ds(
 
 // ── Energetic Utility Functions ──────────────────────────────────────
 
-/// Determine which reservoir (or satellite) owns a Notion page.
-/// Returns the reservoir key (or satellite key if it's a satellite).
+/// Determine which reservoir owns a Notion page.
+/// Returns the reservoir key.
 pub fn get_entry_reservoir(page: &NotionPage, config: &LifeOSConfig) -> Option<String> {
     let parent_ds_id = page.parent.as_ref().and_then(|p| p.data_source_id.as_deref())?;
     let ds_id = parent_ds_id;
 
     for (res_key, db) in &config.databases {
-        // Check if it's the reservoir itself
         if ds_id == db.ds_id() {
             return Some(res_key.clone());
-        }
-        // Check satellites
-        for (sat_key, sat) in &db.satellites {
-            if ds_id == sat.ds_id() {
-                return Some(sat_key.clone());
-            }
         }
     }
     None
@@ -89,37 +78,8 @@ pub fn get_entry_reservoir(page: &NotionPage, config: &LifeOSConfig) -> Option<S
 
 /// Get the archetype for a reservoir key.
 pub fn get_reservoir_archetype(reservoir_key: &str, config: &LifeOSConfig) -> Option<String> {
-    // Direct reservoir match
-    if let Some(db) = config.databases.get(reservoir_key) {
-        return db.archetype.clone();
-    }
-    // Satellite — look up parent reservoir's archetype
-    for (_res_key, db) in &config.databases {
-        if db.satellites.contains_key(reservoir_key) {
-            return db.archetype.clone();
-        }
-    }
-    None
-}
-
-/// Get the parent reservoir key for a satellite key.
-pub fn parent_reservoir(satellite_key: &str, config: &LifeOSConfig) -> Option<String> {
-    for (res_key, db) in &config.databases {
-        if db.satellites.contains_key(satellite_key) {
-            return Some(res_key.clone());
-        }
-    }
-    None
-}
-
-/// Determine which "effective" reservoir an entry belongs to for energetic purposes.
-/// Satellites inherit their parent reservoir's archetype.
-pub fn effective_reservoir(key: &str, config: &LifeOSConfig) -> Option<String> {
-    if config.databases.contains_key(key) {
-        Some(key.to_string())
-    } else {
-        parent_reservoir(key, config)
-    }
+    config.databases.get(reservoir_key)
+        .and_then(|db| db.archetype.clone())
 }
 
 /// Get the status of an entry from its Status property.
@@ -176,7 +136,6 @@ pub fn get_transmutation_type(
 
 /// Determine the automatic transmutation target for a reservoir at its final stage.
 pub fn auto_transmute_target(reservoir_key: &str, config: &LifeOSConfig) -> Option<String> {
-    // Get the archetype to determine the flow direction
     let archetype = get_reservoir_archetype(reservoir_key, config)?;
     match archetype.as_str() {
         "matrix" => Some("potentiator".into()),  // Matrix generates Experience → Potentiator
@@ -199,39 +158,38 @@ pub async fn create_nexus_event(
         .map(|(k, _)| k.to_string())
         .unwrap_or_else(|| "nexus".into());
 
-    let (nexus_ds_id, _, nexus_props) = match crate::config::resolve_db(config, &nexus_key) {
-        Some(crate::config::ResolvedDb::Reservoir(_, db)) => {
-            (db.ds_id().to_string(), db.name.clone(), db.properties.clone())
-        }
-        _ => return Err("Nexus database not found".into()),
+    let nexus_db = match crate::config::resolve_db(config, &nexus_key) {
+        Some(db) => db,
+        None => return Err("Nexus database not found".into()),
     };
 
     let title = format!("{}: {}", event_type, details);
     let mut properties = serde_json::Map::new();
 
-    if let Some(title_prop) = nexus_props.get("title") {
+    if let Some(title_prop) = nexus_db.properties.get("title") {
         properties.insert(title_prop.clone(), serde_json::json!({
             "title": [{ "text": { "content": title } }]
         }));
     }
-    if let Some(cat_prop) = nexus_props.get("category") {
+    if let Some(cat_prop) = nexus_db.properties.get("category") {
         properties.insert(cat_prop.clone(), serde_json::json!({
             "select": { "name": category }
         }));
     }
-    if let Some(lt_prop) = nexus_props.get("log_type") {
-        properties.insert(lt_prop.clone(), serde_json::json!({
+    // Use 'kind' property instead of 'log_type' (v5 architecture)
+    if let Some(kind_prop) = nexus_db.properties.get("kind") {
+        properties.insert(kind_prop.clone(), serde_json::json!({
             "select": { "name": event_type }
         }));
     }
-    if let Some(status_prop) = nexus_props.get("status") {
+    if let Some(status_prop) = nexus_db.properties.get("status") {
         properties.insert(status_prop.clone(), serde_json::json!({
-            "status": { "name": "Processed" }
+            "status": { "name": "✅ Activated" }
         }));
     }
 
     let create_body = serde_json::json!({
-        "parent": { "data_source_id": nexus_ds_id },
+        "parent": { "data_source_id": nexus_db.ds_id() },
         "properties": properties,
     });
 
@@ -260,11 +218,9 @@ pub async fn create_nexus_log(
         .map(|(k, _)| k.to_string())
         .unwrap_or_else(|| "nexus".into());
 
-    let (nexus_ds_id, _, nexus_props) = match crate::config::resolve_db(config, &nexus_key) {
-        Some(crate::config::ResolvedDb::Reservoir(_, db)) => {
-            (db.ds_id().to_string(), db.name.clone(), db.properties.clone())
-        }
-        _ => return Err("Nexus database not found".into()),
+    let nexus_db = match crate::config::resolve_db(config, &nexus_key) {
+        Some(db) => db,
+        None => return Err("Nexus database not found".into()),
     };
 
     // Build the title
@@ -274,36 +230,36 @@ pub async fn create_nexus_log(
     let mut properties = serde_json::Map::new();
 
     // Title
-    if let Some(title_prop) = nexus_props.get("title") {
+    if let Some(title_prop) = nexus_db.properties.get("title") {
         properties.insert(title_prop.clone(), serde_json::json!({
             "title": [{ "text": { "content": title } }]
         }));
     }
 
-    // Category: "Transmutation"
-    if let Some(cat_prop) = nexus_props.get("category") {
+    // Category: "Transformation" (v5 architecture uses Kind instead of Log Type)
+    if let Some(cat_prop) = nexus_db.properties.get("category") {
         properties.insert(cat_prop.clone(), serde_json::json!({
-            "select": { "name": "Transmutation" }
+            "select": { "name": "Integration" }
         }));
     }
 
-    // Log Type: the transmutation type
-    if let Some(lt_prop) = nexus_props.get("log_type") {
-        properties.insert(lt_prop.clone(), serde_json::json!({
+    // Kind: the transmutation type
+    if let Some(kind_prop) = nexus_db.properties.get("kind") {
+        properties.insert(kind_prop.clone(), serde_json::json!({
             "select": { "name": transmutation_type }
         }));
     }
 
-    // Status: "Processed"
-    if let Some(status_prop) = nexus_props.get("status") {
+    // Status: "✅ Activated"
+    if let Some(status_prop) = nexus_db.properties.get("status") {
         properties.insert(status_prop.clone(), serde_json::json!({
-            "status": { "name": "Processed" }
+            "status": { "name": "✅ Activated" }
         }));
     }
 
     // Create the Nexus page
     let create_body = serde_json::json!({
-        "parent": { "data_source_id": nexus_ds_id },
+        "parent": { "data_source_id": nexus_db.ds_id() },
         "properties": properties,
     });
 

@@ -285,30 +285,29 @@ impl NotionClient {
 }
 
 /// Resolve all database_ids in config to their data_source_ids.
-/// Resolves both reservoirs and their nested satellites.
 /// Mutates config in place. Returns list of (db_key, error) for each failure.
+///
+/// When a database_id fails to resolve (e.g. wrong workspace), auto-discovers
+/// the database by name via the Notion Search API and updates the config.
 pub async fn resolve_all_data_sources(config: &mut LifeOSConfig, notion: &NotionClient) -> Vec<(String, String)> {
     let mut failures = Vec::new();
     let semaphore = Arc::new(tokio::sync::Semaphore::new(4));
 
-    // Collect all (key, db_id) pairs to resolve
-    let mut work_items: Vec<(String, String)> = Vec::new();
+    // Collect all (key, db_id, name) triples to resolve — just the 5 unified databases
+    let mut work_items: Vec<(String, String, String)> = Vec::new();
     for (key, db) in config.databases.iter() {
-        work_items.push((key.clone(), db.database_id.clone()));
-        for (sat_key, sat) in &db.satellites {
-            work_items.push((sat_key.clone(), sat.database_id.clone()));
-        }
+        work_items.push((key.clone(), db.database_id.clone(), db.name.clone()));
     }
 
     // Resolve all concurrently using a helper
     let mut handles = Vec::new();
-    for (key, db_id) in work_items {
+    for (key, db_id, name) in work_items {
         let notion_clone = notion.clone();
         let sem = semaphore.clone();
         handles.push(tokio::task::spawn(async move {
             let _permit = sem.acquire().await;
             let res = notion_clone.resolve_data_source_id(&db_id).await;
-            (key, db_id, res)
+            (key, db_id, name, res)
         }));
     }
 
@@ -320,28 +319,72 @@ pub async fn resolve_all_data_sources(config: &mut LifeOSConfig, notion: &Notion
         }
     }
 
-    for (key, db_id, res) in results {
+    // First pass: resolve what we can directly
+    let mut unresolved: Vec<(String, String)> = Vec::new(); // (key, name)
+    for (key, db_id, name, res) in results {
         match res {
             Ok(ds_id) => {
                 tracing::info!("Resolved {key}: {db_id} → {ds_id}");
-                // Try reservoir first
                 if let Some(db) = config.databases.get_mut(&key) {
                     db.resolved_data_source_id = Some(ds_id.clone());
                 }
-                // Try satellites
-                for db in config.databases.values_mut() {
-                    if let Some(sat) = db.satellites.get_mut(&key) {
-                        sat.resolved_data_source_id = Some(ds_id.clone());
+            }
+            Err(e) => {
+                // Both 404 (wrong workspace/deleted) and other errors trigger auto-discover.
+                // A 404 could mean the embedded ID doesn't exist in this workspace.
+                tracing::warn!("{key}: Could not resolve {db_id}: {e} — will attempt name-based discovery");
+                unresolved.push((key, name));
+            }
+        }
+    }
+
+    // Second pass: auto-discover unresolved databases by name.
+    // search_databases() returns database container IDs (same type as database_id
+    // in config — confirmed by the existing discover command in main.rs).
+    // We set database_id to the found container ID, then resolve it to a
+    // data_source_id via the Notion API.
+    if !unresolved.is_empty() {
+        tracing::info!("Auto-discovering {} unresolved databases by name...", unresolved.len());
+        match notion.search_databases().await {
+            Ok(notion_dbs) => {
+                // Build name → (container_id, title) lookup for exact matching
+                let name_map: std::collections::HashMap<String, (String, String)> = notion_dbs
+                    .into_iter()
+                    .map(|(id, title)| (title.to_lowercase(), (id, title)))
+                    .collect();
+
+                for (key, expected_name) in &unresolved {
+                    let lookup_key = expected_name.to_lowercase();
+                    if let Some((found_db_id, found_title)) = name_map.get(&lookup_key) {
+                        tracing::info!("Auto-discovered {key}: \"{expected_name}\" → {found_db_id} (matched \"{found_title}\")");
+                        // Update database_id (container ID) in config
+                        if let Some(db) = config.databases.get_mut(key) {
+                            db.database_id = found_db_id.clone();
+                        }
+                        // Resolve container ID → data_source_id
+                        match notion.resolve_data_source_id(found_db_id).await {
+                            Ok(ds_id) => {
+                                tracing::info!("  Resolved {key} data_source: {found_db_id} → {ds_id}");
+                                if let Some(db) = config.databases.get_mut(key) {
+                                    db.resolved_data_source_id = Some(ds_id.clone());
+                                }
+                            }
+                            Err(e) => {
+                                tracing::warn!("Auto-discovered {key} ({found_db_id}) but could not resolve data_source: {e}");
+                                failures.push((key.clone(), e));
+                            }
+                        }
+                    } else {
+                        tracing::warn!("Auto-discover: no Notion database found matching \"{expected_name}\" for {key}");
+                        failures.push((key.clone(), format!("No database named \"{expected_name}\" found in Notion workspace")));
                     }
                 }
             }
-            Err(e) if e.contains("404") => {
-                tracing::debug!("{key}: ID {db_id} is already a data_source_id, skipping resolution");
-            }
             Err(e) => {
-                let msg = format!("Could not resolve data_source_id for {key} ({db_id}): {e}");
-                tracing::warn!("{msg}");
-                failures.push((key, e));
+                tracing::error!("Auto-discover: failed to search Notion databases: {e}");
+                for (key, name) in unresolved {
+                    failures.push((key, format!("Search failed: {e} (looking for \"{name}\")")));
+                }
             }
         }
     }

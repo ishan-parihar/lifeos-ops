@@ -2,28 +2,22 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
-// ── v4 Holonic Architecture ─────────────────────────────────────────
+// ── Embedded Default Config ─────────────────────────────────────────
+/// The canonical v5 holonic config, compiled into the binary.
+/// Used as fallback when no lifeos.config.json is found on disk,
+/// enabling zero-config startup for any Notion workspace with the
+/// same LifeOS architecture (database names match, IDs are auto-discovered).
+const EMBEDDED_CONFIG_JSON: &str = include_str!("../../lifeos.config.json");
 
-/// A satellite database nested under a core reservoir.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SatelliteDbConfig {
-    pub name: String,
-    #[serde(rename = "data_source_id")]
-    pub database_id: String,
-    /// Role within the reservoir, e.g. "potentiator_logs", "greatway_commitments"
-    #[serde(default)]
-    pub role: Option<String>,
-    pub properties: HashMap<String, String>,
-    /// Resolved at runtime via GET /v1/databases/{database_id} → data_sources[0].id
-    #[serde(skip)]
-    pub resolved_data_source_id: Option<String>,
+/// Parse the embedded default config. Panics if the embedded JSON is invalid
+/// (this is a compile-time guarantee — if lifeos.config.json is malformed,
+/// the build will fail).
+pub(crate) fn embedded_config() -> LifeOSConfig {
+    serde_json::from_str(EMBEDDED_CONFIG_JSON)
+        .expect("Embedded lifeos.config.json is invalid — this is a compile-time error")
 }
 
-impl SatelliteDbConfig {
-    pub fn ds_id(&self) -> &str {
-        self.resolved_data_source_id.as_deref().unwrap_or(&self.database_id)
-    }
-}
+// ── v5 Holonic Architecture ─────────────────────────────────────────
 
 /// Top-level holonic architecture configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,6 +38,9 @@ pub struct HolonicConfig {
     /// Drive effects per boundary
     #[serde(default)]
     pub drive_effects: HashMap<String, DriveEffectDef>,
+    /// Entry type descriptions per DB: db_key → { entry_type_name → description }
+    #[serde(default)]
+    pub entry_type_descriptions: HashMap<String, HashMap<String, String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -94,7 +91,7 @@ pub struct DbConfig {
     pub database_id: String,
     pub properties: HashMap<String, String>,
 
-    // ── v4 Holonic Metadata ──
+    // ── v5 Holonic Metadata ──
     /// Archetype role: "matrix", "potentiator", "significator", "greatway", "nexus"
     #[serde(default)]
     pub archetype: Option<String>,
@@ -113,9 +110,17 @@ pub struct DbConfig {
     /// Which cycle: "lesser", "greater", or "both"
     #[serde(default)]
     pub cycle: Option<String>,
-    /// Nested satellite databases (only for core reservoirs)
+    /// Human-readable description of this DB's holonic role
     #[serde(default)]
-    pub satellites: HashMap<String, SatelliteDbConfig>,
+    pub description: Option<String>,
+    /// The Notion property name that holds entry type discrimination
+    /// (e.g., "Entry Type" for Potentiator, "Item Type" for GreatWay)
+    #[serde(default)]
+    pub entry_type_property: Option<String>,
+    /// Notion property type for entry_type_property: "select" or "multi_select".
+    /// Defaults to "select" if omitted.
+    #[serde(default = "default_entry_type_property_type")]
+    pub entry_type_property_type: String,
 
     /// Resolved at runtime via GET /v1/databases/{database_id} → data_sources[0].id
     #[serde(skip)]
@@ -194,7 +199,8 @@ pub struct LifeOSConfig {
     pub api_version: String,
     #[serde(default = "default_rate_limit")]
     pub rate_limit: RateLimitConfig,
-    /// Only the 5 core reservoirs. Satellites are nested inside each.
+    /// The 5 core reservoirs — the unified LifeOS databases.
+    /// Entry types are discriminated by select/multi_select properties within each DB.
     pub databases: HashMap<String, DbConfig>,
     #[serde(default)]
     pub holonic: Option<HolonicConfig>,
@@ -202,6 +208,10 @@ pub struct LifeOSConfig {
     pub briefings: Option<BriefingConfig>,
     #[serde(default)]
     pub notion: Option<NotionConfig>,
+}
+
+fn default_entry_type_property_type() -> String {
+    "select".to_string()
 }
 
 fn default_api_version() -> String {
@@ -249,7 +259,11 @@ pub fn load_config() -> Result<LifeOSConfig, ConfigError> {
             return Ok(config);
         }
     }
-    Err(ConfigError::NotFound)
+    // Fallback: use the compiled-in default config.
+    // Database IDs in this config may not match the user's Notion workspace,
+    // but resolve_all_data_sources will auto-discover them by name.
+    tracing::info!("No lifeos.config.json found on disk — using embedded default config");
+    Ok(embedded_config())
 }
 
 // ── Resolution Helpers ──────────────────────────────────────────────
@@ -259,39 +273,10 @@ pub fn get_db<'a>(config: &'a LifeOSConfig, key: &str) -> Option<&'a DbConfig> {
     config.databases.get(key)
 }
 
-/// Resolve a database key — checks reservoirs first, then satellites.
-/// Returns (reservoir_key, DbConfig or SatelliteDbConfig).
-pub enum ResolvedDb<'a> {
-    Reservoir(&'a str, &'a DbConfig),
-    Satellite(&'a str, &'a str, &'a SatelliteDbConfig), // (reservoir_key, sat_key, sat_config)
-}
-
-pub fn resolve_db<'a>(config: &'a LifeOSConfig, key: &str) -> Option<ResolvedDb<'a>> {
-    // Direct reservoir match — use iterator key for correct lifetime
-    for (k, db) in &config.databases {
-        if k == key {
-            return Some(ResolvedDb::Reservoir(k, db));
-        }
-    }
-    // Search satellites — iterate to get correct lifetime on sat_key
-    for (res_key, res_db) in &config.databases {
-        for (sat_key, sat) in &res_db.satellites {
-            if sat_key == key {
-                return Some(ResolvedDb::Satellite(res_key, sat_key, sat));
-            }
-        }
-    }
-    None
-}
-
-/// Resolve a database key to (ds_id, name, properties) — works for both reservoirs and satellites.
-/// This is the primary accessor for tools that need to query any database by key.
-pub fn resolve_db_access<'a>(config: &'a LifeOSConfig, key: &str) -> Option<(&'a str, &'a str, &'a HashMap<String, String>)> {
-    match resolve_db(config, key) {
-        Some(ResolvedDb::Reservoir(_, db)) => Some((db.ds_id(), &db.name, &db.properties)),
-        Some(ResolvedDb::Satellite(_, _, sat)) => Some((sat.ds_id(), &sat.name, &sat.properties)),
-        None => None,
-    }
+/// Resolve a database key to its DbConfig.
+/// In v5, there are only 5 databases — no satellites.
+pub fn resolve_db<'a>(config: &'a LifeOSConfig, key: &str) -> Option<&'a DbConfig> {
+    config.databases.get(key)
 }
 
 
@@ -329,22 +314,9 @@ impl LifeOSConfig {
             .map(|(k, db)| (k.as_str(), db))
     }
 
-    /// Get all satellite keys under a given reservoir.
-    pub fn satellite_keys(&self, reservoir_key: &str) -> Vec<String> {
-        self.databases.get(reservoir_key)
-            .map(|db| db.satellites.keys().cloned().collect())
-            .unwrap_or_default()
-    }
-
-    /// Get all database keys (reservoirs + satellites) as a flat list.
+    /// Get all database keys (just the 5 reservoirs in v5).
     pub fn all_database_keys(&self) -> Vec<String> {
-        let mut keys: Vec<String> = self.databases.keys().cloned().collect();
-        for db in self.databases.values() {
-            for sat_key in db.satellites.keys() {
-                keys.push(sat_key.clone());
-            }
-        }
-        keys
+        self.databases.keys().cloned().collect()
     }
 
     /// Get the status progression for a reservoir from holonic config.
@@ -357,13 +329,18 @@ impl LifeOSConfig {
         }
         // Default progressions per archetype
         match reservoir_key {
-            "matrix" => vec!["Raw".into(), "Processing".into(), "Crystallized".into(), "Integrated".into()],
-            "potentiator" => vec!["Raw".into(), "Processing".into(), "Crystallized".into(), "Catalytic".into()],
-            "significator" => vec!["Latent".into(), "Emerging".into(), "Established".into(), "Directional".into()],
-            "greatway" => vec!["Proposed".into(), "Committed".into(), "Active".into(), "Actualized".into()],
-            "nexus" => vec!["Observed".into(), "Processed".into(), "Integrated".into()],
+            "matrix" => vec!["Active".into(), "Evolving".into(), "Archived".into()],
+            "potentiator" => vec!["Raw".into(), "Digesting".into(), "Crystallized".into()],
+            "significator" => vec!["Draft".into(), "Active".into(), "Evolving".into(), "Archived".into()],
+            "greatway" => vec!["Future".into(), "Ideation".into(), "Paused".into(), "Active".into(), "Done".into(), "Cancelled".into()],
+            "nexus" => vec!["💡 Identified".into(), "✅ Activated".into(), "🏆 Capitalized".into(), "🧊 Archived".into()],
             _ => vec![],
         }
+    }
+
+    /// Get the entry type descriptions for a database.
+    pub fn entry_type_descriptions(&self, db_key: &str) -> Option<&HashMap<String, String>> {
+        self.holonic.as_ref()?.entry_type_descriptions.get(db_key)
     }
 
     /// Get the transmutation source/target pair for a transmutation type.

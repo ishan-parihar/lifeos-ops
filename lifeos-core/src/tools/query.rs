@@ -22,8 +22,8 @@ pub struct QueryParams {
     pub limit: Option<u32>,
     pub return_properties: Option<Vec<String>>,
     pub preset: Option<String>,
-    /// Query all satellites under a reservoir (e.g., "potentiator")
-    pub reservoir: Option<String>,
+    /// Filter by entry type within a database (e.g., "Activity" for Potentiator, "Project" for GreatWay)
+    pub entry_type: Option<String>,
     /// Query all reservoirs in a cycle ("lesser" or "greater")
     pub cycle: Option<String>,
 }
@@ -33,7 +33,7 @@ pub fn schema(_config: &LifeOSConfig, _schema_cache: &SchemaCache) -> serde_json
     let obj = serde_json::json!({
         "type": "object",
         "properties": {
-            "database": { "type": "string", "description": "Database key (activity_log, tasks, projects, etc.)" },
+            "database": { "type": "string", "description": "Database key (matrix, potentiator, significator, greatway, nexus)" },
             "filter_property": { "type": "string", "description": "Config-key of the property to filter on. Check database schema below for valid keys." },
             "filter_value": { "type": "string", "description": "Value to filter for" },
             "filter_type": { "type": "string", "enum": ["select", "status", "rich_text", "title", "date", "checkbox", "url", "email", "phone_number", "number", "multi_select"], "description": "Property type for filter — use the actual Notion column type, not 'select' for status fields or vice versa" },
@@ -41,7 +41,9 @@ pub fn schema(_config: &LifeOSConfig, _schema_cache: &SchemaCache) -> serde_json
             "sort_direction": { "type": "string", "enum": ["ascending", "descending"] },
             "limit": { "type": "integer", "minimum": 1, "maximum": 100, "description": "Max results (default: 50)" },
             "return_properties": { "type": "array", "items": { "type": "string" }, "description": "Specific config-keys to return" },
-            "preset": { "type": "string", "enum": ["active", "this_week", "this_month", "needs_review"], "description": "Intelligent preset query" }
+            "preset": { "type": "string", "enum": ["active", "this_week", "this_month", "needs_review"], "description": "Intelligent preset query" },
+            "entry_type": { "type": "string", "description": "Filter by entry type within a database. Use get_schema to discover valid entry types per DB. E.g., 'Activity' for potentiator, 'Project' for greatway, 'Person' for significator." },
+            "cycle": { "type": "string", "enum": ["lesser", "greater"], "description": "Query all reservoirs in a cycle at once. lesser = matrix+potentiator (current-stage), greater = significator+greatway (all-stage)" }
         },
         "required": ["database"]
     });
@@ -60,63 +62,76 @@ pub async fn execute(
     if let Some(ref cycle) = params.cycle {
         return execute_cycle_query(cycle, params, config, notion, schema_cache).await;
     }
-    // If reservoir is specified, query the reservoir + all its satellites
-    if let Some(ref reservoir) = params.reservoir {
-        return execute_reservoir_query(reservoir, params, config, notion, schema_cache).await;
-    }
 
-    // Resolve database — supports both reservoir and satellite keys
-    let (ds_id, name, properties) = match crate::config::resolve_db(config, &params.database) {
-        Some(crate::config::ResolvedDb::Reservoir(_key, db)) => {
-            (db.ds_id().to_string(), db.name.clone(), db.properties.clone())
-        }
-        Some(crate::config::ResolvedDb::Satellite(_, _, sat)) => {
-            (sat.ds_id().to_string(), sat.name.clone(), sat.properties.clone())
-        }
+    // Resolve database
+    let db = match crate::config::resolve_db(config, &params.database) {
+        Some(db) => db,
         None => return Err(format!("Unknown database: {}", params.database)),
     };
-    let db_name = name;
+    let ds_id = db.ds_id();
+    let name = &db.name;
+    let properties = &db.properties;
+
 
     let limit = params.limit.unwrap_or(50).min(100) as u64;
     let mut body = serde_json::json!({ "page_size": limit });
 
+    // Handle entry_type filter — filter by the DB's entry type property
+    if let Some(ref entry_type) = params.entry_type {
+        if let Some(et_prop) = properties.get("entry_type") {
+            // Get the actual Notion property type from schema cache
+            let actual_type = schema_cache.get_prop_type(&params.database, "entry_type")
+                .unwrap_or("select");
+            body["filter"] = build_filter(et_prop, actual_type, entry_type);
+        } else {
+            return Err(format!(
+                "Database '{}' does not define an entry_type property. \
+Valid entry type properties for this DB are not configured. \
+Use get_schema to check which databases support entry_type filtering.",
+                params.database
+            ));
+        }
+    }
+
     // Handle preset filters — schema-aware: detect actual prop_type + use valid enum values
-    if let Some(ref preset) = params.preset {
-        let now = chrono::Utc::now();
-        match preset.as_str() {
-            "active" => {
-                if let Some(prop) = properties.get("status") {
-                    let actual_type = schema_cache.get_prop_type(&params.database, "status").unwrap_or("select");
-                    if !NON_FILTERABLE.contains(&actual_type) {
-                        body["filter"] = build_filter_with_prop(prop, actual_type, "Active");
+    if params.entry_type.is_none() {
+        if let Some(ref preset) = params.preset {
+            let now = chrono::Utc::now();
+            match preset.as_str() {
+                "active" => {
+                    if let Some(prop) = properties.get("status") {
+                        let actual_type = schema_cache.get_prop_type(&params.database, "status").unwrap_or("select");
+                        if !NON_FILTERABLE.contains(&actual_type) {
+                            body["filter"] = build_filter_with_prop(prop, actual_type, "Active");
+                        }
                     }
                 }
-            }
-            "this_week" => {
-                if let Some(prop) = properties.get("date") {
-                    let start = (now - chrono::Duration::days(7)).format("%Y-%m-%d").to_string();
-                    body["filter"] = serde_json::json!({
-                        "property": prop, "date": { "on_or_after": start }
-                    });
-                }
-            }
-            "this_month" => {
-                if let Some(prop) = properties.get("date") {
-                    let start = (now - chrono::Duration::days(30)).format("%Y-%m-%d").to_string();
-                    body["filter"] = serde_json::json!({
-                        "property": prop, "date": { "on_or_after": start }
-                    });
-                }
-            }
-            "needs_review" => {
-                if let Some(prop) = properties.get("status") {
-                    let actual_type = schema_cache.get_prop_type(&params.database, "status").unwrap_or("select");
-                    if !NON_FILTERABLE.contains(&actual_type) {
-                        body["filter"] = build_filter_with_prop(prop, actual_type, "Needs Review");
+                "this_week" => {
+                    if let Some(prop) = properties.get("date") {
+                        let start = (now - chrono::Duration::days(7)).format("%Y-%m-%d").to_string();
+                        body["filter"] = serde_json::json!({
+                            "property": prop, "date": { "on_or_after": start }
+                        });
                     }
                 }
+                "this_month" => {
+                    if let Some(prop) = properties.get("date") {
+                        let start = (now - chrono::Duration::days(30)).format("%Y-%m-%d").to_string();
+                        body["filter"] = serde_json::json!({
+                            "property": prop, "date": { "on_or_after": start }
+                        });
+                    }
+                }
+                "needs_review" => {
+                    if let Some(prop) = properties.get("status") {
+                        let actual_type = schema_cache.get_prop_type(&params.database, "status").unwrap_or("select");
+                        if !NON_FILTERABLE.contains(&actual_type) {
+                            body["filter"] = build_filter_with_prop(prop, actual_type, "Needs Review");
+                        }
+                    }
+                }
+                _ => {}
             }
-            _ => {}
         }
     }
 
@@ -161,7 +176,7 @@ pub async fn execute(
     // Build result with TOON encoding
     let mut data = serde_json::Map::new();
     data.insert("__schema".into(), serde_json::json!({
-        "database": &params.database, "name": db_name
+        "database": &params.database, "name": name
     }));
     data.insert(params.database.clone(), serde_json::json!(items));
     data.insert("meta".into(), serde_json::json!({
@@ -212,6 +227,9 @@ pub struct QueryOverrideParams {
     pub sort: Option<serde_json::Value>,
     pub limit: Option<u32>,
     pub return_properties: Option<Vec<String>>,
+    /// Filter by entry type within a database
+    #[serde(default)]
+    pub entry_type: Option<String>,
 }
 
 /// MCP schema for query_override tool
@@ -219,7 +237,8 @@ pub fn schema_override(_config: &LifeOSConfig, _schema_cache: &SchemaCache) -> s
     let obj = serde_json::json!({
         "type": "object",
         "properties": {
-            "database": { "type": "string", "description": "Database key (activity_log, tasks, projects, etc.)" },
+            "database": { "type": "string", "description": "Database key (matrix, potentiator, significator, greatway, nexus)" },
+            "entry_type": { "type": "string", "description": "Filter by entry type within a database. Use get_schema to discover valid entry types. E.g., 'Activity' for potentiator, 'Project' for greatway." },
             "filter": {
                 "type": "object",
                 "description": "Notion filter object. Validate property names and types against the database schema before passing.",
@@ -253,18 +272,30 @@ pub async fn execute_override(
     notion: &Arc<NotionClient>,
     schema_cache: &SchemaCache,
 ) -> Result<String, String> {
-    let (ds_id, db_name, properties) = match crate::config::resolve_db(config, &params.database) {
-        Some(crate::config::ResolvedDb::Reservoir(_key, db)) => {
-            (db.ds_id().to_string(), db.name.clone(), db.properties.clone())
-        }
-        Some(crate::config::ResolvedDb::Satellite(_, _, sat)) => {
-            (sat.ds_id().to_string(), sat.name.clone(), sat.properties.clone())
-        }
+    let db = match crate::config::resolve_db(config, &params.database) {
+        Some(db) => db,
         None => return Err(format!("Unknown database: {}", params.database)),
     };
+    let ds_id = db.ds_id();
+    let db_name = &db.name;
+    let properties = &db.properties;
 
     let limit = params.limit.unwrap_or(50).min(100) as u64;
     let mut body = serde_json::json!({ "page_size": limit });
+
+    // Handle entry_type filter — same as query tool
+    if let Some(ref entry_type) = params.entry_type {
+        if let Some(et_prop) = properties.get("entry_type") {
+            let actual_type = schema_cache.get_prop_type(&params.database, "entry_type")
+                .unwrap_or("select");
+            body["filter"] = build_filter(et_prop, actual_type, entry_type);
+        } else {
+            return Err(format!(
+                "Database '{}' does not define an entry_type property. Use get_schema to check.",
+                params.database
+            ));
+        }
+    }
 
     if let Some(ref filter_obj) = params.filter {
         let prop_key = filter_obj.get("property")
@@ -342,7 +373,7 @@ pub async fn execute_override(
 
     let mut data = serde_json::Map::new();
     data.insert("__schema".into(), serde_json::json!({
-        "database": &params.database, "name": &db_name
+        "database": &params.database, "name": db_name
     }));
     data.insert(params.database.clone(), serde_json::json!(items));
     data.insert("meta".into(), serde_json::json!({
@@ -356,6 +387,7 @@ pub async fn execute_override(
     Ok(crate::toon_format::encode(&toon_data))
 }
 
+
 // ─── Cycle & Reservoir Query Helpers ────────────────────────────────
 
 /// Query across all reservoirs in a cycle (lesser or greater)
@@ -364,7 +396,7 @@ async fn execute_cycle_query(
     params: &QueryParams,
     config: &Arc<LifeOSConfig>,
     notion: &Arc<NotionClient>,
-    _schema_cache: &SchemaCache,
+    schema_cache: &SchemaCache,
 ) -> Result<String, String> {
     let reservoir_keys = config.cycle_reservoirs(cycle);
     if reservoir_keys.is_empty() {
@@ -376,30 +408,41 @@ async fn execute_cycle_query(
     let limit = params.limit.unwrap_or(20).min(100);
 
     for res_key in &reservoir_keys {
-        let db = match crate::config::get_db(config, res_key) {
+        let db = match crate::config::resolve_db(config, res_key) {
             Some(db) => db,
             None => continue,
         };
 
         let mut body = serde_json::json!({ "page_size": limit });
 
-        // Apply preset if specified
-        if let Some(ref preset) = params.preset {
-            let now = chrono::Utc::now();
-            match preset.as_str() {
-                "this_week" => {
-                    if let Some(prop) = db.properties.get("date") {
-                        let start = (now - chrono::Duration::days(7)).format("%Y-%m-%d").to_string();
-                        body["filter"] = serde_json::json!({ "property": prop, "date": { "on_or_after": start } });
+        // Apply entry_type filter within each reservoir (if specified)
+        if let Some(ref entry_type) = params.entry_type {
+            if let Some(et_prop) = db.properties.get("entry_type") {
+                let actual_type = schema_cache.get_prop_type(res_key, "entry_type")
+                    .unwrap_or("select");
+                body["filter"] = build_filter(et_prop, actual_type, entry_type);
+            }
+        }
+
+        // Apply preset if specified (only if entry_type not set)
+        if params.entry_type.is_none() {
+            if let Some(ref preset) = params.preset {
+                let now = chrono::Utc::now();
+                match preset.as_str() {
+                    "this_week" => {
+                        if let Some(prop) = db.properties.get("date") {
+                            let start = (now - chrono::Duration::days(7)).format("%Y-%m-%d").to_string();
+                            body["filter"] = serde_json::json!({ "property": prop, "date": { "on_or_after": start } });
+                        }
                     }
-                }
-                "this_month" => {
-                    if let Some(prop) = db.properties.get("date") {
-                        let start = (now - chrono::Duration::days(30)).format("%Y-%m-%d").to_string();
-                        body["filter"] = serde_json::json!({ "property": prop, "date": { "on_or_after": start } });
+                    "this_month" => {
+                        if let Some(prop) = db.properties.get("date") {
+                            let start = (now - chrono::Duration::days(30)).format("%Y-%m-%d").to_string();
+                            body["filter"] = serde_json::json!({ "property": prop, "date": { "on_or_after": start } });
+                        }
                     }
+                    _ => {}
                 }
-                _ => {}
             }
         }
 
@@ -436,110 +479,4 @@ async fn execute_cycle_query(
     Ok(crate::toon_format::encode(&serde_json::Value::Object(data)))
 }
 
-/// Query a reservoir + all its satellites
-async fn execute_reservoir_query(
-    reservoir_key: &str,
-    params: &QueryParams,
-    config: &Arc<LifeOSConfig>,
-    notion: &Arc<NotionClient>,
-    _schema_cache: &SchemaCache,
-) -> Result<String, String> {
-    let db = crate::config::get_db(config, reservoir_key)
-        .ok_or_else(|| format!("Unknown reservoir: {}", reservoir_key))?;
 
-    let limit = params.limit.unwrap_or(10).min(50);
-    let mut all_items: Vec<serde_json::Value> = Vec::new();
-    let mut errors: Vec<String> = Vec::new();
-
-    // Query the reservoir itself
-    let mut body = serde_json::json!({ "page_size": limit });
-    if let Some(ref preset) = params.preset {
-        let now = chrono::Utc::now();
-        match preset.as_str() {
-            "this_week" => {
-                if let Some(prop) = db.properties.get("date") {
-                    let start = (now - chrono::Duration::days(7)).format("%Y-%m-%d").to_string();
-                    body["filter"] = serde_json::json!({ "property": prop, "date": { "on_or_after": start } });
-                }
-            }
-            "this_month" => {
-                if let Some(prop) = db.properties.get("date") {
-                    let start = (now - chrono::Duration::days(30)).format("%Y-%m-%d").to_string();
-                    body["filter"] = serde_json::json!({ "property": prop, "date": { "on_or_after": start } });
-                }
-            }
-            _ => {}
-        }
-    }
-
-    match notion.query_data_source(db.ds_id(), &body).await {
-        Ok(result) => {
-            for page in &result.results {
-                let title = crate::transform::extract_title(page);
-                all_items.push(serde_json::json!({
-                    "title": title,
-                    "id": page.id,
-                    "source": reservoir_key,
-                    "type": "reservoir"
-                }));
-            }
-        }
-        Err(e) => errors.push(format!("{}: {}", reservoir_key, e)),
-    }
-
-    // Query each satellite
-    for (sat_key, sat_cfg) in &db.satellites {
-        let mut sat_body = serde_json::json!({ "page_size": limit });
-        if let Some(ref preset) = params.preset {
-            let now = chrono::Utc::now();
-            match preset.as_str() {
-                "this_week" => {
-                    if let Some(prop) = sat_cfg.properties.get("date") {
-                        let start = (now - chrono::Duration::days(7)).format("%Y-%m-%d").to_string();
-                        sat_body["filter"] = serde_json::json!({ "property": prop, "date": { "on_or_after": start } });
-                    }
-                }
-                "this_month" => {
-                    if let Some(prop) = sat_cfg.properties.get("date") {
-                        let start = (now - chrono::Duration::days(30)).format("%Y-%m-%d").to_string();
-                        sat_body["filter"] = serde_json::json!({ "property": prop, "date": { "on_or_after": start } });
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        match notion.query_data_source(sat_cfg.ds_id(), &sat_body).await {
-            Ok(result) => {
-                for page in &result.results {
-                    let title = crate::transform::extract_title(page);
-                    all_items.push(serde_json::json!({
-                        "title": title,
-                        "id": page.id,
-                        "source": sat_key,
-                        "source_name": sat_cfg.name,
-                        "role": sat_cfg.role.as_deref().unwrap_or("unknown"),
-                        "type": "satellite"
-                    }));
-                }
-            }
-            Err(e) => errors.push(format!("{}: {}", sat_key, e)),
-        }
-    }
-
-    let mut data = serde_json::Map::new();
-    data.insert("__schema".into(), serde_json::json!({
-        "reservoir": reservoir_key,
-        "name": db.name,
-        "archetype": db.archetype,
-        "satellites": db.satellites.keys().cloned().collect::<Vec<_>>()
-    }));
-    data.insert("results".into(), serde_json::json!(all_items));
-    data.insert("meta".into(), serde_json::json!({
-        "count": all_items.len(),
-        "reservoir": reservoir_key,
-        "errors": errors
-    }));
-
-    Ok(crate::toon_format::encode(&serde_json::Value::Object(data)))
-}

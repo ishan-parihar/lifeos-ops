@@ -88,8 +88,7 @@ pub async fn execute_transmute(
         .ok_or_else(|| "Could not determine source reservoir".to_string())?;
 
     // 3. Validate transmutation type matches source/target pair
-    let effective_source = crate::tools::shared::effective_reservoir(&source_reservoir, config)
-        .unwrap_or_else(|| source_reservoir.clone());
+    let effective_source = source_reservoir.clone();
 
     // Check config map first, fall back to archetype-based inference
     let valid_source = if let Some(tt_def) = config.transmutation_def(&params.transmutation_type) {
@@ -184,8 +183,7 @@ pub async fn execute_transmute(
     let target_page = notion.create_page(&create_body).await?;
 
     // 7. Update source entry status to final stage
-    let effective_source_key = crate::tools::shared::effective_reservoir(&source_reservoir, config)
-        .unwrap_or_else(|| source_reservoir.clone());
+    let effective_source_key = source_reservoir.clone();
     let source_db = config.databases.get(&effective_source_key);
     if let Some(db) = source_db {
         let progression = config.status_progression(&effective_source_key);
@@ -344,8 +342,7 @@ async fn process_single_entry(
     let reservoir_key = crate::tools::shared::get_entry_reservoir(&page, config)
         .ok_or_else(|| "Could not determine entry's reservoir".to_string())?;
 
-    let effective_key = crate::tools::shared::effective_reservoir(&reservoir_key, config)
-        .unwrap_or_else(|| reservoir_key.clone());
+    let effective_key = reservoir_key.clone();
 
     // 3. Get current status
     let current_status = crate::tools::shared::get_entry_status(&page);
@@ -373,16 +370,7 @@ async fn process_single_entry(
     // 5. Apply enrichment if provided
     if let Some(ref enrichment) = params.enrichment {
         if let Some(obj) = enrichment.as_object() {
-            let db = config.databases.get(&effective_key)
-                .or_else(|| {
-                    // It's a satellite — find parent
-                    for (_rk, db) in &config.databases {
-                        if db.satellites.contains_key(&reservoir_key) {
-                            return Some(db);
-                        }
-                    }
-                    None
-                });
+            let db = config.databases.get(&effective_key);
             if let Some(db) = db {
                 let mut update_props = serde_json::Map::new();
                 for (key, val) in obj {
