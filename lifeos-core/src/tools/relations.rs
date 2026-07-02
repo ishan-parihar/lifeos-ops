@@ -311,7 +311,7 @@ pub fn schema_ancestors() -> serde_json::Value {
 
 pub async fn execute_ancestors(
     params: &AncestorsParams,
-    _config: &Arc<LifeOSConfig>,
+    config: &Arc<LifeOSConfig>,
     notion: &Arc<NotionClient>,
     schema_cache: &SchemaCache,
 ) -> Result<String, String> {
@@ -345,7 +345,7 @@ pub async fn execute_ancestors(
         }));
 
         // Find the best "parent" relation to walk up
-        match find_parent_relation(&page, schema_cache) {
+        match find_parent_relation(&page, config, schema_cache) {
             Some(id) => current_id = id,
             None => break,
         }
@@ -393,22 +393,18 @@ pub async fn execute_backlinks(
     let db_keys: Vec<String> = if let Some(ref db) = params.database {
         vec![db.clone()]
     } else {
-        // Search all databases — use config.all_database_keys() to avoid needing schema_cache
         config.all_database_keys()
     };
 
     let mut backlinks: Vec<serde_json::Value> = Vec::new();
 
     for db_key in &db_keys {
-        // Get the data source ID for this database
         let ds_id = match crate::config::resolve_db(config, db_key) {
             Some(crate::config::ResolvedDb::Reservoir(_, db)) => db.ds_id().to_string(),
             Some(crate::config::ResolvedDb::Satellite(_, _, sat)) => sat.ds_id().to_string(),
             None => continue,
         };
 
-        // Query all pages in this database and check for relation properties
-        // that reference our target page_id
         let query = serde_json::json!({ "page_size": 100 });
         if let Ok(result) = notion.query_data_source(&ds_id, &query).await {
             for page in &result.results {
@@ -470,10 +466,8 @@ pub async fn execute_link(
     notion: &Arc<NotionClient>,
     _schema_cache: &SchemaCache,
 ) -> Result<String, String> {
-    // First, fetch the source page to get current relations
     let source_page = notion.get_page(&params.source_page).await?;
 
-    // Get existing relation values for this property
     let existing_ids: Vec<String> = match source_page.properties.get(&params.property) {
         Some(PropertyValue::Relation { relation, .. }) => {
             relation.iter().map(|r| r.id.clone()).collect()
@@ -481,7 +475,6 @@ pub async fn execute_link(
         _ => Vec::new(),
     };
 
-    // Add the new target if not already linked
     let mut new_ids: Vec<serde_json::Value> = existing_ids.iter()
         .map(|id| serde_json::json!({ "id": id }))
         .collect();
@@ -490,7 +483,6 @@ pub async fn execute_link(
         new_ids.push(serde_json::json!({ "id": &params.target_page }));
     }
 
-    // Update the page
     let update_body = serde_json::json!({
         "properties": {
             &params.property: { "relation": new_ids }
@@ -499,7 +491,6 @@ pub async fn execute_link(
 
     notion.update_page(&params.source_page, &update_body).await?;
 
-    // Resolve titles for the output
     let source_title = crate::transform::extract_title(&source_page);
     let target_title = notion.get_page(&params.target_page).await
         .ok()
@@ -569,7 +560,7 @@ pub async fn execute_graph_metrics(
                     if !has_any_relation {
                         entries_without_relations += 1;
                         let title = crate::transform::extract_title(page);
-                        if orphan_entries.len() < 20 { // Cap at 20 to avoid huge output
+                        if orphan_entries.len() < 20 {
                             orphan_entries.push(serde_json::json!({
                                 "id": page.id,
                                 "title": title,
@@ -622,35 +613,94 @@ pub async fn execute_graph_metrics(
 
 // ── ancestors (hierarchy traversal) ──────────────────────────────
 
-/// Hierarchical priority: which DB keys represent "upward" in the hierarchy.
-/// When a relation points to one of these, it's a parent link.
-const HIERARCHY_UP: &[&str] = &[
-    "annual_goals", "years",
-    "quarterly_goals", "quarters",
-    "projects", "months", "weeks",
-    "parent_task",
-    "vision", "values",
-];
+/// Derive the set of "upward" database keys from config + relation graph.
+fn derive_hierarchy_up(config: &crate::config::LifeOSConfig, schema_cache: &SchemaCache) -> Vec<String> {
+    let mut upward_keys: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    // Strategy 1: Find databases that are targets but never sources in the relation graph
+    let mut all_targets: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut all_sources: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for (db_key, edges) in schema_cache.all_relation_edges() {
+        all_sources.insert(db_key.clone());
+        for edge in edges {
+            all_targets.insert(edge.target_db.clone());
+        }
+    }
+    let leaf_targets: Vec<String> = all_targets.difference(&all_sources).cloned().collect();
+    for key in &leaf_targets {
+        upward_keys.insert(key.clone());
+    }
+
+    // Strategy 2: Databases with scale "all-stage" and dimension "intra-holonic"
+    for (key, db) in &config.databases {
+        if db.scale.as_deref() == Some("all-stage") && db.dimension.as_deref() == Some("intra-holonic") {
+            upward_keys.insert(key.clone());
+            for sat_key in db.satellites.keys() {
+                upward_keys.insert(sat_key.clone());
+            }
+        }
+    }
+
+    // Strategy 3: Scaffold satellite roles indicate hierarchy
+    for (_key, db) in &config.databases {
+        for (sat_key, sat) in &db.satellites {
+            if let Some(ref role) = sat.role {
+                if role.contains("scaffold") {
+                    upward_keys.insert(sat_key.clone());
+                }
+            }
+        }
+    }
+
+    // Strategy 4: Property names that indicate "parent" direction
+    for (key, db) in &config.databases {
+        for prop_name in db.properties.keys() {
+            let lower = prop_name.to_lowercase();
+            if lower.contains("parent") || lower.contains("annual") || lower.contains("quarter")
+                || lower.contains("vision") || lower.contains("value") || lower.contains("pillar") {
+                if let Some(edges) = schema_cache.all_relation_edges().get(key) {
+                    for edge in edges {
+                        upward_keys.insert(edge.target_db.clone());
+                    }
+                }
+            }
+        }
+        for (sat_key, sat) in &db.satellites {
+            for prop_name in sat.properties.keys() {
+                let lower = prop_name.to_lowercase();
+                if lower.contains("parent") || lower.contains("annual") || lower.contains("quarter")
+                    || lower.contains("vision") || lower.contains("value") || lower.contains("pillar") {
+                    if let Some(edges) = schema_cache.all_relation_edges().get(sat_key) {
+                        for edge in edges {
+                            upward_keys.insert(edge.target_db.clone());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    upward_keys.into_iter().collect()
+}
 
 /// Find a "parent" relation for hierarchical navigation.
-/// Uses the schema relation graph to determine which relations point upward.
 fn find_parent_relation(
     page: &crate::notion::types::NotionPage,
+    config: &crate::config::LifeOSConfig,
     schema_cache: &SchemaCache,
 ) -> Option<String> {
-    // First: check if we know the source database and can use the relation graph
+    let hierarchy_up = derive_hierarchy_up(config, schema_cache);
+
     let parent_ds_id = page.parent.as_ref().and_then(|p| p.data_source_id.as_deref());
 
     if let Some(ds_id) = parent_ds_id {
         if let Some(db_key) = schema_cache.resolve_db_key_from_id(ds_id) {
             let edges = schema_cache.get_relation_edges(db_key);
-            // Find which relation properties point to "upward" databases
             let upward_targets: Vec<&str> = edges.iter()
-                .filter(|e| HIERARCHY_UP.contains(&e.target_db.as_str()))
+                .filter(|e| hierarchy_up.contains(&e.target_db))
                 .map(|e| e.prop_name.as_str())
                 .collect();
 
-            // Now find the first matching relation in the page
             for prop_name in &upward_targets {
                 if let Some(PropertyValue::Relation { relation, .. }) = page.properties.get(*prop_name) {
                     if let Some(first) = relation.first() {
@@ -666,10 +716,11 @@ fn find_parent_relation(
         if let PropertyValue::Relation { relation, .. } = prop_value {
             if let Some(first) = relation.first() {
                 let lower = prop_name.to_lowercase();
-                for target in HIERARCHY_UP {
-                    if lower.contains(target) || lower == *target {
-                        return Some(first.id.clone());
-                    }
+                if lower.contains("parent") || lower.contains("annual") || lower.contains("quarter")
+                    || lower.contains("vision") || lower.contains("value") || lower.contains("pillar")
+                    || lower.contains("year") || lower.contains("month") || lower.contains("week")
+                    || lower.contains("strategic") {
+                    return Some(first.id.clone());
                 }
             }
         }

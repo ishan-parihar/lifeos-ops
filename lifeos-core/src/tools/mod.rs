@@ -61,7 +61,7 @@ pub async fn get_tool_definitions(config: &LifeOSConfig, _notion: &NotionClient,
         tool_def("sync_note", "Bidirectional Notion ↔ markdown sync.".to_string(), sync_note::schema()),
         tool_def("energy_flow", "Trace currency flow across the holonic spiral.".to_string(), energy_flow::schema(config)),
         tool_def("drive_assessment", "Assess 4 drives at lesser/greater boundary.".to_string(), drive_schema),
-        tool_def("health_metrics", "G_z + P_z holonic health metrics.".to_string(), health_schema),
+        tool_def("health_metrics", "G_z, P_z, A_z, C_z holonic health metrics — complete metabolic health picture.".to_string(), health_schema),
         tool_def("get_page", "Fetch entry with all relations resolved to titles.".to_string(), relations::schema_get_page()),
         tool_def("expand", "Batch resolve relation IDs to titled entries.".to_string(), relations::schema_expand()),
         tool_def("trace", "Follow relations N levels deep from any entry.".to_string(), relations::schema_trace()),
@@ -156,7 +156,7 @@ pub async fn call_tool(
         "health_metrics" => {
             let params: health_metrics::HealthMetricsParams = serde_json::from_value(args.clone())
                 .map_err(|e| format!("Invalid health_metrics params: {}", e))?;
-            health_metrics::execute(&params, config, notion).await
+            health_metrics::execute(&params, config, notion, schema_cache).await
         }
         "get_page" => {
             let params: relations::GetPageParams = serde_json::from_value(args.clone())

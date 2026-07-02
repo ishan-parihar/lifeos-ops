@@ -55,6 +55,121 @@ const NON_FILTERABLE_TYPES: &[&str] = &[
     "created_time", "last_edited_time", "button", "unique_id",
 ];
 
+/// Module-specific satellite targets: when a module targets a reservoir,
+/// we should query its satellites for richer data.
+fn module_satellite_targets(module_key: &str, config: &LifeOSConfig) -> Vec<(String, String)> {
+    // Returns (satellite_key, satellite_name) for the module
+    match module_key {
+        "health" => {
+            // Health data lives in potentiator satellites: diet_log, activity_log, subjective_journal
+            let pot_key = config.reservoir_by_archetype("potentiator")
+                .map(|(k, _)| k.to_string())
+                .unwrap_or_else(|| "potentiator".to_string());
+            config.satellite_keys(&pot_key).iter()
+                .filter(|sk| {
+                    let name = config.databases.get(&pot_key)
+                        .and_then(|db| db.satellites.get(sk.as_str()))
+                        .map(|s| s.name.to_lowercase())
+                        .unwrap_or_default();
+                    name.contains("diet") || name.contains("activity") || name.contains("subjective") || name.contains("day")
+                })
+                .map(|sk| {
+                    let name = config.databases.get(&pot_key)
+                        .and_then(|db| db.satellites.get(sk.as_str()))
+                        .map(|s| s.name.clone())
+                        .unwrap_or_else(|| sk.clone());
+                    (sk.clone(), name)
+                })
+                .collect()
+        }
+        "financial" => {
+            let pot_key = config.reservoir_by_archetype("potentiator")
+                .map(|(k, _)| k.to_string())
+                .unwrap_or_else(|| "potentiator".to_string());
+            config.satellite_keys(&pot_key).iter()
+                .filter(|sk| {
+                    let name = config.databases.get(&pot_key)
+                        .and_then(|db| db.satellites.get(sk.as_str()))
+                        .map(|s| s.name.to_lowercase())
+                        .unwrap_or_default();
+                    name.contains("financial")
+                })
+                .map(|sk| {
+                    let name = config.databases.get(&pot_key)
+                        .and_then(|db| db.satellites.get(sk.as_str()))
+                        .map(|s| s.name.clone())
+                        .unwrap_or_else(|| sk.clone());
+                    (sk.clone(), name)
+                })
+                .collect()
+        }
+        "journaling" => {
+            let pot_key = config.reservoir_by_archetype("potentiator")
+                .map(|(k, _)| k.to_string())
+                .unwrap_or_else(|| "potentiator".to_string());
+            config.satellite_keys(&pot_key).iter()
+                .filter(|sk| {
+                    let name = config.databases.get(&pot_key)
+                        .and_then(|db| db.satellites.get(sk.as_str()))
+                        .map(|s| s.name.to_lowercase())
+                        .unwrap_or_default();
+                    name.contains("journal") || name.contains("relational") || name.contains("systemic")
+                })
+                .map(|sk| {
+                    let name = config.databases.get(&pot_key)
+                        .and_then(|db| db.satellites.get(sk.as_str()))
+                        .map(|s| s.name.clone())
+                        .unwrap_or_else(|| sk.clone());
+                    (sk.clone(), name)
+                })
+                .collect()
+        }
+        "content" => {
+            let gw_key = config.reservoir_by_archetype("greatway")
+                .map(|(k, _)| k.to_string())
+                .unwrap_or_else(|| "greatway".to_string());
+            config.satellite_keys(&gw_key).iter()
+                .filter(|sk| {
+                    let name = config.databases.get(&gw_key)
+                        .and_then(|db| db.satellites.get(sk.as_str()))
+                        .map(|s| s.name.to_lowercase())
+                        .unwrap_or_default();
+                    name.contains("content") || name.contains("campaign")
+                })
+                .map(|sk| {
+                    let name = config.databases.get(&gw_key)
+                        .and_then(|db| db.satellites.get(sk.as_str()))
+                        .map(|s| s.name.clone())
+                        .unwrap_or_else(|| sk.clone());
+                    (sk.clone(), name)
+                })
+                .collect()
+        }
+        "productivity" => {
+            let gw_key = config.reservoir_by_archetype("greatway")
+                .map(|(k, _)| k.to_string())
+                .unwrap_or_else(|| "greatway".to_string());
+            config.satellite_keys(&gw_key).iter()
+                .filter(|sk| {
+                    let name = config.databases.get(&gw_key)
+                        .and_then(|db| db.satellites.get(sk.as_str()))
+                        .map(|s| s.name.to_lowercase())
+                        .unwrap_or_default();
+                    name.contains("task") || name.contains("project")
+                })
+                .map(|sk| {
+                    let name = config.databases.get(&gw_key)
+                        .and_then(|db| db.satellites.get(sk.as_str()))
+                        .map(|s| s.name.clone())
+                        .unwrap_or_else(|| sk.clone());
+                    (sk.clone(), name)
+                })
+                .collect()
+        }
+        _ => Vec::new(),
+    }
+}
+
 /// Walk a filter tree and correct type keys (`"status"` ↔ `"select"`)
 /// based on the actual Notion property type from SchemaCache.
 fn correct_filter_type(
@@ -290,10 +405,67 @@ pub async fn execute(
                 "range": range
             });
 
+            // Execute config-driven targets from briefings config
             let (briefing_data, _errors) = execute_briefing_targets(targets, config, notion, schema_cache, range, &params.overrides).await;
             if let Some(obj) = briefing_data.as_object() {
                 for (k, v) in obj {
                     data[k] = v.clone();
+                }
+            }
+
+            // Additionally, query module-specific satellites for richer data
+            // (e.g., health module should query diet_log, activity_log satellites)
+            let satellite_targets = module_satellite_targets(&module_key, config);
+            if !satellite_targets.is_empty() {
+                let mut satellite_data = serde_json::json!({});
+                let mut sat_errors: Vec<String> = Vec::new();
+                for (sat_key, sat_name) in &satellite_targets {
+                    let ds_id = match crate::config::resolve_db(config, sat_key) {
+                        Some(crate::config::ResolvedDb::Satellite(_, _, sat)) => sat.ds_id().to_string(),
+                        Some(crate::config::ResolvedDb::Reservoir(_, db)) => db.ds_id().to_string(),
+                        None => continue,
+                    };
+                    let mut query = serde_json::json!({ "page_size": 20 });
+                    if let Some(date_prop) = {
+                        // Find date property from satellite config
+                        crate::config::resolve_db(config, sat_key)
+                            .and_then(|r| match r {
+                                crate::config::ResolvedDb::Satellite(_, _, sat) => sat.properties.get("date").cloned(),
+                                _ => None,
+                            })
+                    } {
+                        if let Some(df) = crate::util::date_filter::build_date_filter(range, Some(&date_prop)) {
+                            query["filter"] = df;
+                        }
+                    }
+                    match notion.query_data_source(&ds_id, &query).await {
+                        Ok(result) => {
+                            let items: Vec<serde_json::Value> = result.results.iter()
+                                .map(|p| serde_json::json!({
+                                    "title": crate::transform::extract_title(p),
+                                    "id": p.id,
+                                })).collect();
+                            satellite_data[sat_key] = serde_json::json!({
+                                "name": sat_name,
+                                "entries": items,
+                                "count": items.len(),
+                            });
+                        }
+                        Err(e) => sat_errors.push(format!("{}: {}", sat_key, e)),
+                    }
+                }
+                if !satellite_data.as_object().unwrap_or(&serde_json::Map::new()).is_empty() {
+                    data["satellites"] = satellite_data;
+                }
+                if !sat_errors.is_empty() {
+                    let existing_errors = data.get("_errors")
+                        .and_then(|e| e.as_array().cloned())
+                        .unwrap_or_default();
+                    let mut all_errors: Vec<serde_json::Value> = existing_errors;
+                    for e in sat_errors {
+                        all_errors.push(serde_json::json!(e));
+                    }
+                    data["_errors"] = serde_json::json!(all_errors);
                 }
             }
 
@@ -444,24 +616,23 @@ pub async fn execute(
             if !errors.is_empty() { data["_errors"] = serde_json::json!(errors); }
             Ok(crate::toon_format::encode(&data))
         }
-        "drive_balance" | "reservoir_health" => {
-            if params.mode == "drive_balance" {
-                crate::tools::drive_assessment::execute(
-                    &crate::tools::drive_assessment::DriveAssessmentParams {
-                        boundary: "both".to_string(),
-                        range: Some(range.to_string()),
-                    },
-                    config, notion,
-                ).await
-            } else {
-                crate::tools::health_metrics::execute(
-                    &crate::tools::health_metrics::HealthMetricsParams {
-                        metric: "both".to_string(),
-                        range: Some(range.to_string()),
-                    },
-                    config, notion,
-                ).await
-            }
+        "drive_balance" => {
+            crate::tools::drive_assessment::execute(
+                &crate::tools::drive_assessment::DriveAssessmentParams {
+                    boundary: "both".to_string(),
+                    range: Some(range.to_string()),
+                },
+                config, notion,
+            ).await
+        }
+        "reservoir_health" => {
+            crate::tools::health_metrics::execute(
+                &crate::tools::health_metrics::HealthMetricsParams {
+                    metric: "all".to_string(),
+                    range: Some(range.to_string()),
+                },
+                config, notion, schema_cache,
+            ).await
         }
         _ => Err(format!("Unknown mode: {}", params.mode)),
     }

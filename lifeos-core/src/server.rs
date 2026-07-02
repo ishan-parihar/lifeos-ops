@@ -82,7 +82,18 @@ impl LifeosServer {
                     "capabilities": { "tools": {}, "resources": {} },
                     "serverInfo": { "name": "lifeos-mcp", "version": "0.1.0" },
                     "instructions": format!(
-                        "LifeOS v4 Holonic MCP server with {} reservoir databases + satellites. All database keys and structures are defined in lifeos.config.json — never hardcode database names. 19 tools: get_schema, query, query_override, mutate, intelligence_briefing, data_science, review_pipeline, strategic_simulator, sync_note, energy_flow, drive_assessment, health_metrics, get_page, expand, trace, ancestors, backlinks, link, graph_metrics. Relations are shown as (relation→target_db) in schemas. Call get_schema first.",
+                        concat!(
+                            "LifeOS v4 Holonic MCP server with {} reservoir databases + satellites. ",
+                            "All database keys and structures are defined in lifeos.config.json -- never hardcode database names. ",
+                            "19 tools: get_schema (call first), query, query_override, mutate, intelligence_briefing, ",
+                            "data_science, review_pipeline, strategic_simulator, sync_note, energy_flow, ",
+                            "drive_assessment, health_metrics, get_page, expand, trace, ancestors, ",
+                            "backlinks, link, graph_metrics. ",
+                            "Spiral: Matrix->Potentiator (lesser cycle) -> Nexus (transmutation) -> Significator->GreatWay (greater cycle). ",
+                            "4 currencies: Catalyst, Experience, Transformation, Choice. ",
+                            "4 drives: Agency, Communion, Eros, Agape. ",
+                            "Use cycle_reservoirs from holonic config for cycle queries. Relations shown as (relation->target_db) in schemas."
+                        ),
                         db_count
                     )
                 }));
