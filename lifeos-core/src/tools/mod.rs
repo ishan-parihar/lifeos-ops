@@ -17,6 +17,7 @@ pub mod sync_note;
 pub mod energy_flow;
 pub mod drive_assessment;
 pub mod health_metrics;
+pub mod energetics;
 pub mod shared;
 pub mod relations;
 
@@ -69,6 +70,10 @@ pub async fn get_tool_definitions(config: &LifeOSConfig, _notion: &NotionClient,
         tool_def("backlinks", "Find all entries that reference a given page.".to_string(), relations::schema_backlinks()),
         tool_def("link", "Create a relation between two entries.".to_string(), relations::schema_link()),
         tool_def("graph_metrics", "Orphan detection, relation density, broken links.".to_string(), relations::schema_graph_metrics()),
+        tool_def("transmute", "Transmute an entry's currency across a cycle boundary via the Nexus.".to_string(), energetics::transmute_schema()),
+        tool_def("process_currency", "Advance an entry through its currency lifecycle.".to_string(), energetics::process_currency_schema()),
+        tool_def("trigger_nexus", "Detect and execute Nexus firing when pressure exceeds threshold.".to_string(), energetics::trigger_nexus_schema()),
+        tool_def("apply_drive", "Apply Agency/Communion/Eros/Agape at a boundary to regulate currency flow.".to_string(), energetics::apply_drive_schema()),
     ]
 }
 
@@ -190,6 +195,26 @@ pub async fn call_tool(
         }
         "graph_metrics" => {
             relations::execute_graph_metrics(config, notion, schema_cache).await
+        }
+        "transmute" => {
+            let params: energetics::TransmuteParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid transmute params: {}", e))?;
+            energetics::execute_transmute(&params, config, notion, schema_cache).await
+        }
+        "process_currency" => {
+            let params: energetics::ProcessCurrencyParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid process_currency params: {}", e))?;
+            energetics::execute_process_currency(&params, config, notion, schema_cache).await
+        }
+        "trigger_nexus" => {
+            let params: energetics::TriggerNexusParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid trigger_nexus params: {}", e))?;
+            energetics::execute_trigger_nexus(&params, config, notion, schema_cache).await
+        }
+        "apply_drive" => {
+            let params: energetics::ApplyDriveParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid apply_drive params: {}", e))?;
+            energetics::execute_apply_drive(&params, config, notion, schema_cache).await
         }
         _ => Err(format!("Unknown tool: {}", name)),
     }

@@ -32,6 +32,44 @@ pub struct HolonicConfig {
     pub currencies: Vec<String>,
     pub drives: Vec<String>,
     pub cycles: CycleConfig,
+    /// Status progressions per reservoir: reservoir_key → ordered status stages
+    #[serde(default)]
+    pub status_progressions: HashMap<String, Vec<String>>,
+    /// Transmutation map: transmutation_type → { source, target }
+    #[serde(default)]
+    pub transmutation_map: HashMap<String, TransmutationDef>,
+    /// Nexus firing thresholds
+    #[serde(default)]
+    pub nexus_firing: Option<NexusFiringConfig>,
+    /// Drive effects per boundary
+    #[serde(default)]
+    pub drive_effects: HashMap<String, DriveEffectDef>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransmutationDef {
+    pub source: String,
+    pub target: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NexusFiringConfig {
+    #[serde(default = "default_gz_threshold")]
+    pub gz_threshold: f64,
+    #[serde(default = "default_pz_threshold")]
+    pub pz_threshold: f64,
+    #[serde(default = "default_pressure_threshold")]
+    pub pressure_threshold: f64,
+}
+
+fn default_gz_threshold() -> f64 { 35.0 }
+fn default_pz_threshold() -> f64 { 75.0 }
+fn default_pressure_threshold() -> f64 { 110.0 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DriveEffectDef {
+    pub lesser: String,
+    pub greater: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -307,6 +345,41 @@ impl LifeOSConfig {
             }
         }
         keys
+    }
+
+    /// Get the status progression for a reservoir from holonic config.
+    /// Falls back to default progressions if not configured.
+    pub fn status_progression(&self, reservoir_key: &str) -> Vec<String> {
+        if let Some(ref holonic) = self.holonic {
+            if let Some(progression) = holonic.status_progressions.get(reservoir_key) {
+                return progression.clone();
+            }
+        }
+        // Default progressions per archetype
+        match reservoir_key {
+            "matrix" => vec!["Raw".into(), "Processing".into(), "Crystallized".into(), "Integrated".into()],
+            "potentiator" => vec!["Raw".into(), "Processing".into(), "Crystallized".into(), "Catalytic".into()],
+            "significator" => vec!["Latent".into(), "Emerging".into(), "Established".into(), "Directional".into()],
+            "greatway" => vec!["Proposed".into(), "Committed".into(), "Active".into(), "Actualized".into()],
+            "nexus" => vec!["Observed".into(), "Processed".into(), "Integrated".into()],
+            _ => vec![],
+        }
+    }
+
+    /// Get the transmutation source/target pair for a transmutation type.
+    pub fn transmutation_def(&self, transmutation_type: &str) -> Option<&TransmutationDef> {
+        self.holonic.as_ref()?.transmutation_map.get(transmutation_type)
+    }
+
+    /// Get the nexus firing config.
+    pub fn nexus_firing_config(&self) -> NexusFiringConfig {
+        self.holonic.as_ref()
+            .and_then(|h| h.nexus_firing.clone())
+            .unwrap_or_else(|| NexusFiringConfig {
+                gz_threshold: 35.0,
+                pz_threshold: 75.0,
+                pressure_threshold: 110.0,
+            })
     }
 }
 
