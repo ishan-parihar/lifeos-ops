@@ -106,7 +106,7 @@ pub async fn execute(
 // 2. Reflection ratio: Matrix entry count relative to Potentiator (healthy = 0.5-1.0)
 // 3. Cross-scale coherence: entries that span both reservoirs via relations
 
-async fn calculate_g_z(
+pub(crate) async fn calculate_g_z(
     config: &LifeOSConfig,
     notion: &NotionClient,
     _schema_cache: &SchemaCache,
@@ -201,7 +201,7 @@ async fn calculate_g_z(
 // 2. Nexus processing: how active the contact-boundary is
 // 3. Evolutionary pressure: entries that bridge greater-cycle and lesser-cycle
 
-async fn calculate_p_z(
+pub(crate) async fn calculate_p_z(
     config: &LifeOSConfig,
     notion: &NotionClient,
     _schema_cache: &SchemaCache,
