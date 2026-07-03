@@ -56,8 +56,11 @@ All four drives operate at **both** contact boundaries (Matrix⇌Potentiator AND
 | `health_metrics` | Calculate G_z and P_z health metrics |
 | `get_page` / `expand` / `trace` / `ancestors` / `backlinks` / `link` / `graph_metrics` | Relational graph navigation |
 | `orphans` | List entries with zero populated relations — find data-isolation issues |
-| `validate` | Filter entries by YAML-metadata Validation formula status (valid/invalid/legacy/missing) |
+| `validate_yaml` | Validate entries against the v0.9.0 YAML schema hierarchy |
 | `suggest_links` | Suggest likely cross-reservoir links for orphan entries via title similarity |
+| `archetype_index` | List all 22 HoloOS archetypes with role/complex/reservoir mappings |
+| `derive_type` | Derive Holon Type from a Significator's Valence Signature |
+| `valence_signature` | Generate a Valence Signature YAML template |
 
 ### v0.7 Auto-Discovery
 
