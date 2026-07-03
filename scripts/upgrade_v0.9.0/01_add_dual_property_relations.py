@@ -82,6 +82,7 @@ from importlib import import_module
 common = import_module("common")
 
 from common import (NotionClient, discover_db_ids, get_database_container_id,
+                     get_data_source_schema,
                      add_relation_property, print_section, print_kv, MigrationLog)
 
 
@@ -153,10 +154,9 @@ DUAL_PROPERTY_RELATIONS = [
 # Main logic
 # ─────────────────────────────────────────────────────────────────────────────
 
-def find_existing_relation(db_schema: dict, prop_name: str) -> dict | None:
-    """Look up a relation property by name on a database schema."""
-    props = db_schema.get("properties", {})
-    return props.get(prop_name)
+def find_existing_relation(ds_schema: dict, prop_name: str) -> dict | None:
+    """Look up a relation property by name on a data_source schema."""
+    return ds_schema.get(prop_name)
 
 
 def is_dual_property(rel_prop: dict) -> bool:
@@ -186,7 +186,7 @@ def add_dual_relation(
         "notes": notes,
     }
 
-    # Discover source + target DB container IDs
+    # Discover source + target data_source IDs
     src_ds_id = db_ids.get(source_db)
     tgt_ds_id = db_ids.get(target_db)
     if not src_ds_id or not tgt_ds_id:
@@ -195,13 +195,11 @@ def add_dual_relation(
         log.errors.append(op)
         return op
 
-    src_db_container = get_database_container_id(client, src_ds_id)
-    tgt_db_container = get_database_container_id(client, tgt_ds_id)
-    op["src_db_container_id"] = src_db_container
-    op["tgt_db_container_id"] = tgt_db_container
+    op["src_data_source_id"] = src_ds_id
+    op["tgt_data_source_id"] = tgt_ds_id
 
-    # Fetch source DB schema and check if the property already exists
-    src_schema = client.get_database(src_db_container)
+    # Fetch source data_source schema and check if the property already exists
+    src_schema = get_data_source_schema(client, src_ds_id)
     existing = find_existing_relation(src_schema, prop_name)
 
     if existing:
@@ -235,9 +233,9 @@ def add_dual_relation(
     try:
         result = add_relation_property(
             client=client,
-            database_container_id=src_db_container,
+            data_source_id=src_ds_id,
             prop_name=prop_name,
-            target_database_id=tgt_db_container,
+            target_database_id=tgt_ds_id,
             dual_property=True,
             dual_property_name=dual_backlink_name,
         )

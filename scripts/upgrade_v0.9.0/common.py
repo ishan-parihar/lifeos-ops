@@ -287,7 +287,8 @@ def add_relation_property(
         dual_property: If True, create a dual_property (synced) relation.
         dual_property_name: Required if dual_property=True.
     """
-    rel_config: dict = {"database_id": target_database_id}
+    # In API 2025-09-03, relation configs use `data_source_id` (not `database_id`)
+    rel_config: dict = {"data_source_id": target_database_id}
     if dual_property:
         rel_config["type"] = "dual_property"
         if not dual_property_name:
