@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
-NOTION_API = "https://api.notion.com/v1"
+NOTION_API = "https://api.notion.com"
 NOTION_VERSION = "2025-09-03"
 
 DB_KEYS = ("matrix", "potentiator", "nexus", "significator", "greatway")
