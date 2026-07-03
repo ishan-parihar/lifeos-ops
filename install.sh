@@ -51,10 +51,15 @@ download_asset() {
   if [[ -n "${GITHUB_TOKEN:-}" ]]; then
     # Resolve the asset's API ID via the releases API, then download with the
     # octet-stream Accept header (which triggers the 302 → Azure blob path).
+    # Write API response to a temp file to avoid broken-pipe issues under set -e.
+    local api_resp="${TMP_DIR}/release_${version}.json"
+    if ! curl_auth "https://api.github.com/repos/${repo}/releases/tags/${version}" -o "$api_resp" 2>/dev/null; then
+      echo "  ✗ could not fetch release info for ${version}" >&2
+      return 1
+    fi
     local asset_id
-    asset_id="$(curl_auth "https://api.github.com/repos/${repo}/releases/tags/${version}" \
-      | python3 -c "import json,sys; d=json.load(sys.stdin); \
-        print(next(a['id'] for a in d['assets'] if a['name']=='${asset_name}'))" 2>/dev/null || true)"
+    asset_id="$(python3 -c "import json; d=json.load(open('${api_resp}')); \
+      print(next((a['id'] for a in d.get('assets',[]) if a['name']=='${asset_name}'), ''))" 2>/dev/null || true)"
     if [[ -n "$asset_id" ]]; then
       curl_auth -H "Accept: application/octet-stream" \
         "https://api.github.com/repos/${repo}/releases/assets/${asset_id}" \
@@ -98,8 +103,13 @@ fi
 # Resolve "latest" → concrete tag via GitHub API
 if [[ "$VERSION" == "latest" ]]; then
   echo "Resolving latest release..."
-  VERSION="$(curl_auth "https://api.github.com/repos/${REPO}/releases/latest" \
-    | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name":\s*"([^"]+)".*/\1/')"
+  API_RESP="${TMP_DIR}/latest.json"
+  if ! curl_auth "https://api.github.com/repos/${REPO}/releases/latest" -o "$API_RESP" 2>/dev/null; then
+    echo "Could not fetch latest release info." >&2
+    echo "If this is a private repo, set GITHUB_TOKEN before running this script." >&2
+    exit 1
+  fi
+  VERSION="$(grep -m1 '"tag_name"' "$API_RESP" | sed -E 's/.*"tag_name":\s*"([^"]+)".*/\1/')"
   if [[ -z "$VERSION" ]]; then
     echo "Could not resolve latest release tag." >&2
     echo "If this is a private repo, set GITHUB_TOKEN before running this script." >&2
