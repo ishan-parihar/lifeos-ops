@@ -54,9 +54,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from importlib import import_module
-common = import_module("00_common")
+common = import_module("common")
 
 from common import (NotionClient, discover_db_ids, get_database_container_id,
+                     get_data_source_schema,
                      add_select_option_to_existing_property, print_section, print_kv, MigrationLog)
 
 
@@ -153,22 +154,21 @@ def add_entry_type_options(
         log.errors.append(op)
         return op
 
-    db_container = get_database_container_id(client, ds_id)
-    op["db_container_id"] = db_container
+    op["data_source_id"] = ds_id
 
-    # Fetch current schema to see what options already exist
+    # Fetch current schema from the DATA_SOURCE (API 2025-09-03: properties live on data_source, not database container)
     try:
-        schema = client.get_database(db_container)
+        schema = get_data_source_schema(client, ds_id)
     except Exception as e:
         op["status"] = "error"
         op["error"] = f"Failed to fetch schema for {db_key}: {e}"
         log.errors.append(op)
         return op
 
-    existing_prop = schema.get("properties", {}).get(prop_name)
+    existing_prop = schema.get(prop_name)
     if not existing_prop:
         op["status"] = "error"
-        op["error"] = f"Property '{prop_name}' not found on DB '{db_key}'. Available: {list(schema.get('properties', {}).keys())}"
+        op["error"] = f"Property '{prop_name}' not found on DB '{db_key}'. Available: {list(schema.keys())}"
         log.errors.append(op)
         return op
 
@@ -200,7 +200,7 @@ def add_entry_type_options(
     try:
         result = add_select_option_to_existing_property(
             client=client,
-            database_container_id=db_container,
+            data_source_id=ds_id,
             prop_name=prop_name,
             new_options=truly_new,
             prop_type=prop_type,
