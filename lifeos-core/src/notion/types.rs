@@ -169,7 +169,24 @@ pub struct SelectOption {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RelationConfig {
-    pub database_id: String,
+    /// The OTHER database's container ID. Under Notion v2025-09-03 this is
+    /// still returned for backward compatibility, but it is NOT the ID used
+    /// to query the related data source.
+    #[serde(default)]
+    pub database_id: Option<String>,
+    /// Under Notion v2025-09-03, relation properties may also (or instead)
+    /// expose `data_source_id` — the actual queryable ID of the related
+    /// data source. Prefer this over `database_id` when present.
+    #[serde(default)]
+    pub data_source_id: Option<String>,
+    /// Relation type: "single_property" or "dual_property"
+    #[serde(default, rename = "type")]
+    pub rel_type: Option<String>,
+    /// For dual-property relations, the synced property on the target DB
+    #[serde(default)]
+    pub synced_property_name: Option<String>,
+    #[serde(default)]
+    pub synced_property_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

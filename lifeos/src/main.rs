@@ -515,9 +515,18 @@ async fn cmd_discover(mut cfg: LifeOSConfig, token: &str) -> Result<(), String> 
     let mut updated = 0;
     let mut not_found = Vec::new();
 
+    // Build a case-insensitive name → (id, title) lookup so that "Matrix"
+    // matches "matrix", "MATRIX", etc. This matches the behavior of the
+    // auto-discover path in resolve_all_data_sources.
+    let name_map: std::collections::HashMap<String, (String, String)> = notion_dbs
+        .iter()
+        .map(|(id, title)| (title.to_lowercase(), (id.clone(), title.clone())))
+        .collect();
+
     // Discover the 5 unified databases
     for db_config in cfg.databases.values_mut() {
-        if let Some((id, _)) = notion_dbs.iter().find(|(_, title)| title == &db_config.name) {
+        let lookup_key = db_config.name.to_lowercase();
+        if let Some((id, _)) = name_map.get(&lookup_key) {
             let old_id = std::mem::replace(&mut db_config.database_id, id.clone());
             if old_id != db_config.database_id {
                 println!("  [UPDATED] {} : {} -> {}", db_config.name, &old_id[..8.min(old_id.len())], &db_config.database_id[..8.min(db_config.database_id.len())]);

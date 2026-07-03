@@ -7,7 +7,13 @@ use serde::{Deserialize, Serialize};
 /// Used as fallback when no lifeos.config.json is found on disk,
 /// enabling zero-config startup for any Notion workspace with the
 /// same LifeOS architecture (database names match, IDs are auto-discovered).
-const EMBEDDED_CONFIG_JSON: &str = include_str!("../../lifeos.config.json");
+///
+/// NOTE: This file is `lifeos.config.default.json` (NOT `lifeos.config.json`)
+/// so it does NOT conflict with the user's runtime config (which is
+/// gitignored at `lifeos.config.json`). The placeholder `data_source_id`
+/// UUIDs are intentionally invalid — `resolve_all_data_sources` will
+/// auto-discover real IDs by name on first run via the Notion Search API.
+const EMBEDDED_CONFIG_JSON: &str = include_str!("../../lifeos.config.default.json");
 
 /// Parse the embedded default config. Panics if the embedded JSON is invalid
 /// (this is a compile-time guarantee — if lifeos.config.json is malformed,

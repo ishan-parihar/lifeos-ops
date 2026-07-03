@@ -2,7 +2,7 @@
 
 Unified CLI + MCP server for Notion-based personal operating system.
 
-## LifeOS v4 — Holonic Architecture
+## LifeOS v5 — Holonic Architecture
 
 LifeOS operationalizes the HoloOS holonic architecture into 5 Notion databases organized as **4 reservoirs + 1 contact-boundary**.
 
@@ -54,58 +54,163 @@ All four drives operate at **both** contact boundaries (Matrix⇌Potentiator AND
 | `energy_flow` | Trace currency flow across the holonic spiral |
 | `drive_assessment` | Evaluate all 4 drives at each boundary |
 | `health_metrics` | Calculate G_z and P_z health metrics |
+| `get_page` / `expand` / `trace` / `ancestors` / `backlinks` / `link` / `graph_metrics` | Relational graph navigation |
 
 ---
 
-## Features
+## Installation
 
-### CLI Commands
+### One-line install (recommended)
+
+Picks the right binary for your platform and drops it at `/usr/local/bin/lifeos`:
+
 ```bash
-lifeos init       # Initialize vault directory
-lifeos pull        # Pull pages from Notion to vault (reservoirs + satellites)
-lifeos push        # Push vault changes to Notion (reservoirs + satellites)
-lifeos watch      # Watch vault and sync in real-time
-lifeos page new   # Create a new page
-lifeos page edit   # Edit a page with 3-way merge
-lifeos page diff  # Show diff between vault and Notion
-lifeos page merge # Resolve merge conflicts
-lifeos mcp        # Run as MCP server (AI agent integration)
+curl -fsSL https://raw.githubusercontent.com/ishan-parihar/lifeos-ops/main/install.sh | bash
 ```
+
+### Manual install (curl + tar)
+
+Find the latest release at <https://github.com/ishan-parihar/lifeos-ops/releases/latest>. Pick the asset matching your platform and run:
+
+```bash
+# Linux x86_64 (glibc)
+curl -L https://github.com/ishan-parihar/lifeos-ops/releases/latest/download/lifeos-x86_64-unknown-linux-gnu.tar.gz | tar xz -C /tmp
+sudo install /tmp/lifeos /usr/local/bin/
+
+# Linux x86_64 (musl — static binary, works on Alpine etc.)
+curl -L https://github.com/ishan-parihar/lifeos-ops/releases/latest/download/lifeos-x86_64-unknown-linux-musl.tar.gz | tar xz -C /tmp
+sudo install /tmp/lifeos /usr/local/bin/
+
+# macOS (Apple Silicon — M1/M2/M3/M4)
+curl -L https://github.com/ishan-parihar/lifeos-ops/releases/latest/download/lifeos-aarch64-apple-darwin.tar.gz | tar xz -C /tmp
+sudo install /tmp/lifeos /usr/local/bin/
+
+# macOS (Intel)
+curl -L https://github.com/ishan-parihar/lifeos-ops/releases/latest/download/lifeos-x86_64-apple-darwin.tar.gz | tar xz -C /tmp
+sudo install /tmp/lifeos /usr/local/bin/
+```
+
+Verify:
+
+```bash
+lifeos --version
+```
+
+### Update
+
+Re-run the same `curl` command — it always fetches `latest`. The install script also supports an `--version v0.6.1` argument to pin a specific release.
+
+### Build from source
+
+```bash
+git clone https://github.com/ishan-parihar/lifeos-ops.git
+cd lifeos-ops
+cargo build --release
+# Binary lands at target/release/lifeos (or target/x86_64-unknown-linux-musl/release/lifeos
+# if you use the workspace's default musl target — see .cargo/config.toml).
+```
+
+For a fully static binary:
+
+```bash
+rustup target add x86_64-unknown-linux-musl
+cargo build --release --target x86_64-unknown-linux-musl
+```
+
+---
 
 ## Quick Start
 
-1. **Install** — Download the latest release binary for your platform
-2. **Configure** — Create `lifeos.config.json` with your 5 reservoir database IDs
-3. **Set token** — `export NOTION_API_TOKEN=your_token`
+1. **Install** — Use the one-line installer above, or download a release binary.
+2. **Set token** — `export NOTION_API_TOKEN=your_token`
+3. **Discover databases** — `lifeos discover` (auto-resolves the 5 reservoirs by name in your Notion workspace; saves `lifeos.config.json`)
 4. **Init vault** — `lifeos init`
 5. **Pull data** — `lifeos pull`
+6. **Optional — run as MCP server** — `lifeos mcp`
 
-## Build from Source
+> **Zero-config startup:** if you don't create `lifeos.config.json`, the binary falls back to a compiled-in default config (with placeholder IDs). On first run, `resolve_all_data_sources` auto-discovers the real database IDs by name via the Notion Search API and saves the resolved config to disk.
+
+## CLI Commands
 
 ```bash
-# Requires Rust 1.70+
-cargo build --release
-
-# Cross-compile for musl (static binary)
-rustup target add x86_64-unknown-linux-musl
-cargo build --release --target x86_64-unknown-linux-musl
+lifeos init       # Initialize vault directory
+lifeos discover   # Scan Notion, refresh database IDs in config
+lifeos pull       # Pull pages from Notion to vault
+lifeos push       # Push vault changes to Notion
+lifeos watch      # Watch vault and sync in real-time
+lifeos schema     # Show database schemas with property types and relation targets
+lifeos query      # Query a database with filters, sorts, presets
+lifeos mutate     # Create / update / delete / upsert entries
+lifeos graph-metrics   # Orphan detection, relation density
+lifeos get-page   # Fetch entry with relations resolved to titles
+lifeos expand     # Batch-resolve relation IDs to titled entries
+lifeos trace      # Follow relations N levels deep
+lifeos ancestors  # Walk up hierarchy (task→project→QG→AG)
+lifeos backlinks  # Reverse relation lookup
+lifeos link       # Create a relation between two entries
+lifeos intelligence      # Role or cycle briefing
+lifeos data-science      # Temporal patterns, correlations
+lifeos review           # Daily/weekly/monthly/quarterly review
+lifeos strategic        # Cross-DB strategic analysis
+lifeos energy-flow      # Trace currency flow across the spiral
+lifeos drive-assessment # A_z / C_z / P_z / G_z at each boundary
+lifeos health-metrics   # G_z + P_z holonic health
+lifeos page new/edit/diff/merge  # 3-way merge workflow
+lifeos mcp        # Run as MCP server (AI agent integration)
 ```
 
 ## Architecture
 
 ```
 lifeos-ops/
-├── lifeos-core/     # Shared library (notion client, sync, transform, tools, MCP)
-├── lifeos/          # Binary crate (CLI + MCP runner)
-├── Cargo.toml       # Workspace root
-└── lifeos.config.json  # Your configuration (not in repo)
+├── lifeos-core/                    # Shared library
+│   ├── src/
+│   │   ├── notion/                 # Notion API client (v2025-09-03)
+│   │   │   ├── client.rs           # data_source / database / page / block APIs
+│   │   │   └── types.rs            # Typed response schemas
+│   │   ├── config.rs               # LifeOSConfig, DbConfig, HolonicConfig
+│   │   ├── util/
+│   │   │   ├── schema_engine.rs    # Cached schemas + relation graph
+│   │   │   ├── id_resolver.rs      # Fuzzy name → Notion ID resolution
+│   │   │   └── date_filter.rs      # Date-range filter construction
+│   │   ├── tools/                  # 16+ MCP/CLI tools
+│   │   ├── transform/              # Notion blocks ↔ markdown
+│   │   ├── sync/                   # Bidirectional Notion ↔ vault sync
+│   │   └── server.rs               # MCP JSON-RPC server
+│   └── Cargo.toml
+├── lifeos/                         # Binary crate (CLI + MCP runner)
+│   ├── src/main.rs
+│   └── Cargo.toml
+├── lifeos.config.default.json      # Compiled-in fallback config (no secrets)
+├── lifeos.config.json              # Your runtime config (gitignored)
+├── .github/workflows/release.yml   # Multi-platform release pipeline
+└── Cargo.toml                      # Workspace root
 ```
 
+### Notion API version
+
+LifeOS targets **Notion API version `2025-09-03`**, which introduced the
+**data source** abstraction:
+
+- A Notion *database container* (returned by `GET /v1/databases/{id}`) holds
+  metadata and one or more *data source* entries in its `data_sources` array.
+- A *data source* (returned by `GET /v1/data_sources/{id}`) is the actual
+  queryable table — that's the ID used for `POST /v1/data_sources/{id}/query`,
+  for page parents, and for relation targets under the new API.
+
+The CLI's `database_id` config field (serialized as `data_source_id` in JSON)
+accepts **either** form: `resolve_data_source_id` tries the data-source
+endpoint first and falls back to the database-container endpoint, so old
+configs that pre-date the split keep working.
+
 ### MCP Server Integration
+
 Connect to AI agents via stdio JSON-RPC:
+
 ```bash
 lifeos mcp
 ```
+
 Compatible with Claude Desktop, Cursor, and any MCP-compatible AI client.
 
 ## License
