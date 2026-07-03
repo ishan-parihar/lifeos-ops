@@ -21,6 +21,7 @@ pub mod energetics;
 pub mod shared;
 pub mod relations;
 pub mod audit;
+pub mod ontology;
 
 fn enrich_database_param(schema: &mut Value, param_name: &str, schema_cache: &SchemaCache) {
     let db_keys: Vec<Value> = schema_cache.db_keys().iter().map(|k| Value::String(k.clone())).collect();
@@ -78,6 +79,9 @@ pub async fn get_tool_definitions(config: &LifeOSConfig, _notion: &NotionClient,
         tool_def("orphans", "List entries with zero populated relations — find data-isolation issues.".to_string(), audit::schema_orphans()),
         tool_def("validate", "Filter entries by YAML-metadata Validation formula status (valid/invalid/legacy/missing).".to_string(), audit::schema_validate()),
         tool_def("suggest_links", "Suggest likely cross-reservoir links for orphan entries via title similarity.".to_string(), audit::schema_suggest_links()),
+        tool_def("archetype_index", "List all 22 HoloOS archetypes with role, complex, reservoir, and polarity mappings.".to_string(), serde_json::json!({"type": "object", "properties": {}})),
+        tool_def("derive_type", "Derive the Holon Type (Donor/Acceptor/Sharer/Multivalent/Noble) from a Significator entry's Valence Signature.".to_string(), ontology::schema_derive_type()),
+        tool_def("valence_signature", "Generate a Valence Signature YAML template for a Significator entry.".to_string(), ontology::schema_valence_signature()),
     ]
 }
 
@@ -234,6 +238,19 @@ pub async fn call_tool(
             let params: audit::SuggestLinksParams = serde_json::from_value(args.clone())
                 .map_err(|e| format!("Invalid suggest_links params: {}", e))?;
             audit::execute_suggest_links(&params, config, notion, schema_cache).await
+        }
+        "archetype_index" => {
+            Ok(ontology::execute_archetype_index())
+        }
+        "derive_type" => {
+            let params: ontology::DeriveTypeParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid derive_type params: {}", e))?;
+            ontology::execute_derive_type(&params, config, notion, schema_cache).await
+        }
+        "valence_signature" => {
+            let params: ontology::ValenceSignatureParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid valence_signature params: {}", e))?;
+            ontology::execute_valence_signature(&params, config, notion, schema_cache).await
         }
         _ => Err(format!("Unknown tool: {}", name)),
     }

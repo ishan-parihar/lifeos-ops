@@ -163,6 +163,21 @@ pub enum Commands {
         /// Query all reservoirs in a cycle (lesser/greater)
         #[arg(short, long)]
         cycle: Option<String>,
+        /// Filter by Archetype Role (Matrix/Potentiator/Catalyst/Experience/Significator/Transformation/Great Way/Choice)
+        #[arg(long)]
+        archetype: Option<String>,
+        /// Filter by Complex (Mind/Body/Spirit/None)
+        #[arg(long)]
+        complex: Option<String>,
+        /// Filter by Drive Activation (Agency/Communion/Eros/Agape) — multi_select contains
+        #[arg(long)]
+        drive: Option<String>,
+        /// Filter by Shadow Pattern (None/Dark-Addiction/Dark-Allergy/Golden-Addiction/Golden-Allergy)
+        #[arg(long)]
+        shadow: Option<String>,
+        /// Filter by Digestion Stage (1-9) — matches by stage number or full name
+        #[arg(long)]
+        digestion_stage: Option<String>,
     },
 
     /// Create, update, or delete an entry
@@ -340,6 +355,26 @@ pub enum Commands {
         /// Max orphans to suggest links for (default: 20)
         #[arg(short, long, default_value = "20")]
         limit: u32,
+    },
+
+    /// List all 22 HoloOS archetypes with role, complex, reservoir, and polarity mappings
+    ArchetypeIndex,
+
+    /// Derive the Holon Type (Donor/Acceptor/Sharer/Multivalent/Noble) from a Significator's Valence Signature
+    DeriveType {
+        /// Significator page ID to derive the type for
+        #[arg(short, long)]
+        page_id: String,
+    },
+
+    /// Generate a Valence Signature YAML template for a Significator entry
+    ValenceSignature {
+        /// Significator page ID
+        #[arg(short, long)]
+        page_id: String,
+        /// Output format: template (default) or full
+        #[arg(short, long)]
+        format: Option<String>,
     },
 }
 
