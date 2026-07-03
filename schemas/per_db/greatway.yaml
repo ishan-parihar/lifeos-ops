@@ -1,0 +1,275 @@
+# GreatWay DB — Per-Database Schema
+# =============================================================================
+# Great Way = operating environment (HoloOS doc 00.md §2.1)
+# "The larger context that receives directional outputs and generates
+# threshold pressures."
+#
+# The Great Way is the most superstrate DB. It contains:
+#   - Goal/Project/Task hierarchies (operational environment)
+#   - External holons: People, Communities, Groups (relational environment)
+#   - Resources, Systems, Budgets (resource environment)
+#   - Sprints, Milestones, Campaigns, Content (operational rhythm)
+#
+# Per HoloOS doc 08.5 §1.2: "The Great Way is a collective reservoir — it
+# contains the accumulated Experience of ALL holons that participate in it."
+# Per HoloOS doc 02.3 §4: Bonding happens at the Significator⇄Great-Way surface.
+#
+# Cycle: greater  |  Scale: all-stage  |  Dimension: extra-holonic
+# Currency In:  Choice  |  Currency Out: Transformation
+# Entry-Type property: "Item Type" (select)
+#
+# v0.9.0 RELOCATIONS INTO GreatWay (per user directive):
+#   - Person       ← Significator (external holons belong in the Great Way)
+#   - Group        ← Significator (external holons belong in the Great Way)
+#   - Community    ← Significator (external holons belong in the Great Way)
+#   - Organization ← (new — formal organizations are collective holons)
+#   - Network      ← (new — informal collective holons)
+#   - Movement     ← (new — ideological collective holons)
+#   - Place        ← (new — geographic operating environment)
+#
+# These external-holon entry-types use the new `quadrant` + `dimension`
+# properties (from holon_type_placement.yaml) to record their AQAL position.
+
+schema_version: "0.9.0"
+schema_type: per_db
+applies_to_db: greatway
+
+properties:
+  environmental_basin_breadth:
+    notion_type: number
+    required: false
+    description: |
+      ‖A_G‖ — magnitude of the Great Way attractor basin (HoloOS doc 08.1 §3.3).
+      How broad the coupling surface is.
+      Range: 0.0–10.0.
+
+  great_way_polarity:
+    notion_type: select
+    required: false
+    description: |
+      Collective polarity of the Great Way entry (HoloOS doc 08.1 §3.3).
+      STO-collective enables covalent/metallic bonding;
+      STS-collective enables ionic bonding only.
+    options:
+      - STO-collective   # service-to-others collective — cooperative bonding
+      - STS-collective   # service-to-self collective — extractive bonding
+      - uncommitted      # not yet polarized
+
+  eta_G:
+    notion_type: number
+    required: false
+    description: |
+      Great Way efficiency η_G (HoloOS doc 03.1 §6.3).
+      Fraction of received Choice that converts into Transformation pressure.
+      Range: 0.0–1.0.
+
+  delivery_surface_permeability:
+    notion_type: number
+    required: false
+    description: |
+      Per HoloOS doc 08.5 §1.2: How Choice-configured the Great Way's
+      permeability is — i.e. how readily it ingests new Choices.
+      Range: 0.0 (rejects all Choices) – 1.0 (ingests all Choices).
+
+  choice_filter:
+    notion_type: select
+    required: false
+    description: |
+      Per HoloOS doc 08.5 §1.2: The Great Way filters incoming Choices by polarity.
+    options:
+      - STO           # accepts service-catalyst Choices only
+      - STS           # accepts power-catalyst Choices only
+      - uncommitted   # accepts both
+
+  agape_drive_score:
+    notion_type: number
+    required: false
+    description: |
+      G_z (Agape component) — vertical descent drive at the Great Way
+      (HoloOS doc 02.1 §5, 08.5 §3.2).
+      Range: 0–100. Failure mode (low) = stagnation / regression.
+
+  # ── External-holon properties (for relocated Person/Group/Community/etc.) ──
+  quadrant:
+    notion_type: select
+    required: false
+    description: |
+      AQAL quadrant (HoloOS doc holon_type_placement.yaml).
+      Required for external-holon entry-types (Person, Group, Community, etc.).
+    options:
+      - UL  # Upper-Left — individual interior (psychology, consciousness)
+      - UR  # Upper-Right — individual exterior (behavior, body)
+      - LL  # Lower-Left — collective interior (culture, worldview)
+      - LR  # Lower-Right — collective exterior (systems, institutions)
+
+  dimension:
+    notion_type: select
+    required: false
+    description: |
+      Interior/Exterior dimension (HoloOS doc holon_type_placement.yaml).
+    options:
+      - Interior
+      - Exterior
+
+  # ── Bonding-chemistry (HoloOS doc 02.3 §4) ──
+  bonding_disposition:
+    notion_type: select
+    required: false
+    description: |
+      Per HoloOS doc 02.3 §4: Bonding occurs at the Significator⇄Great-Way surface.
+      4 bonding types: ionic, covalent, dative, metallic.
+      Used for Person/Group/Community entries to record how they bond
+      with the focal holon's Significator.
+    options:
+      - ionic       # donor→acceptor transfer (one-directional giving)
+      - covalent    # sharer↔sharer pooling (mutual exchange)
+      - dative      # noble→empty register scaffolding (mentorship)
+      - metallic    # delocalized pooling across a lattice (collective field)
+
+  bonding_partner_count:
+    notion_type: number
+    required: false
+    description: |
+      Number of active Significator-side bonds this GreatWay entry maintains.
+      Used to compute the metallic-bonding lattice density.
+      Range: 0–1000.
+
+relations:
+  - name: "Parent item"
+    target_db: greatway
+    direction: dual_property
+    dual_backlink: "Sub-item"
+    cardinality: one_to_many
+    description: |
+      Operational hierarchy: Annual Goal → Quarterly Goal → Goal → Project → Task.
+      Also: Community → Group → Person (relational hierarchy).
+
+  - name: "Blocks"
+    target_db: greatway
+    direction: dual_property
+    dual_backlink: "Blocked By"
+    cardinality: many_to_many
+    description: |
+      One GreatWay entry blocks another from progressing.
+      v0.8.0 had this as single_property — v0.9.0 makes it dual.
+
+  - name: "Contains Significators Of"
+    target_db: significator
+    direction: dual_property
+    dual_backlink: "Participates In Great Way"
+    cardinality: one_to_many
+    description: |
+      HoloOS doc 08.5 §1.2: The Great Way contains the Significators of all
+      participating holons. This relation links a GreatWay entry to the
+      Significator entries that participate in it.
+
+inter_db_relations:
+  - name: "For Significator"
+    target_db: significator
+    direction: dual_property
+    dual_backlink: "For Great Way"
+    cardinality: many_to_many
+    description: |
+      HoloOS doc 02.2 §6: The Significator faces Transformation pressure from
+      the Great Way. This GreatWay entry is currently exerting pressure on the
+      linked Significator entry.
+
+  - name: "Sourced From"
+    target_db: nexus
+    direction: dual_property
+    dual_backlink: "Sources To (GreatWay)"
+    cardinality: many_to_many
+    description: |
+      HoloOS doc 03.1 §3 stage 9: A Choice-kind Nexus entry carries Choice
+      into this GreatWay entry.
+
+  - name: "Transforms From"
+    target_db: significator
+    direction: dual_property
+    dual_backlink: "Transforms To"
+    cardinality: many_to_many
+    description: |
+      HoloOS doc 02.2 §6: This GreatWay entry is generating Transformation
+      pressure that is acting on the linked Significator entry.
+
+  - name: "Receives Choice From"
+    target_db: nexus
+    direction: dual_property
+    dual_backlink: "Emits Choice To"
+    cardinality: many_to_many
+    description: |
+      HoloOS doc 03.1 §3 stage 9: This GreatWay entry is ingesting Choice
+      emitted by the linked Choice-kind Nexus entry.
+
+  - name: "Sends Catalyst To (Significator)"
+    target_db: nexus
+    direction: dual_property
+    dual_backlink: "Receives Catalyst From (Great Way)"
+    cardinality: many_to_many
+    description: |
+      HoloOS doc 02.2 §2: This GreatWay entry delivers Catalyst (via a
+      Catalyst-kind Nexus entry) to a Significator entry.
+
+  - name: "Sub-holon Of"
+    target_db: potentiator
+    direction: dual_property
+    dual_backlink: "Contains Great Way Of"
+    cardinality: many_to_one
+    description: |
+      HoloOS doc 08.5 §1.4: G of sub-holon = P of parent holon.
+      This GreatWay entry IS the parent-holon's Potentiator — they are linked.
+
+  - name: "Coheres With (Significator)"
+    target_db: significator
+    direction: dual_property
+    dual_backlink: "Coheres With (GreatWay)"
+    cardinality: many_to_many
+    description: |
+      HoloOS doc 02.3 §4: Bonding occurs at the Significator⇄Great-Way surface.
+      For Person/Group/Community entries — links to Significator entries that
+      are bonded with this external holon.
+
+entry_types:
+  # ── Existing operational entry-types ──
+  - Annual Goal
+  - Quarterly Goal
+  - Goal
+  - Project
+  - Task
+  - System
+  - Resource
+  - Sprint
+  - Milestone
+  - Budget
+  - Campaign
+  - Content
+
+  # ── RELOCATED FROM Significator (external holons, per user directive) ──
+  - Person          # external individual holon — quadrant: UL or UR
+  - Group           # small collective holon — quadrant: LL
+  - Community       # larger collective holon — quadrant: LL
+  - Organization    # formal collective holon — quadrant: LR
+  - Network         # informal collective holon — quadrant: LR
+  - Movement        # ideological collective holon — quadrant: LL
+  - Place           # geographic operating environment — quadrant: LR
+
+default_archetype_mapping:
+  "Annual Goal":    { archetype_role: "Great Way", complex: "Mind" }
+  "Quarterly Goal": { archetype_role: "Great Way", complex: "Mind" }
+  Goal:             { archetype_role: "Great Way", complex: "Mind" }
+  Project:          { archetype_role: "Great Way", complex: "Body" }
+  Task:             { archetype_role: "Great Way", complex: "Body" }
+  System:           { archetype_role: "Great Way", complex: "Body" }
+  Resource:         { archetype_role: "Great Way", complex: "Body" }
+  Sprint:           { archetype_role: "Great Way", complex: "Body" }
+  Milestone:        { archetype_role: "Great Way", complex: "Body" }
+  Budget:           { archetype_role: "Great Way", complex: "Body" }
+  Campaign:         { archetype_role: "Great Way", complex: "Mind" }
+  Content:          { archetype_role: "Great Way", complex: "Mind" }
+  Person:           { archetype_role: "Great Way", complex: "Spirit" }
+  Group:            { archetype_role: "Great Way", complex: "Spirit" }
+  Community:        { archetype_role: "Great Way", complex: "Spirit" }
+  Organization:     { archetype_role: "Great Way", complex: "Body" }
+  Network:          { archetype_role: "Great Way", complex: "Spirit" }
+  Movement:         { archetype_role: "Great Way", complex: "Spirit" }
+  Place:            { archetype_role: "Great Way", complex: "Body" }

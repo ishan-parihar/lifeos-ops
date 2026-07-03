@@ -41,7 +41,8 @@
       "communion": { "lesser": "C_z_lesser", "greater": "C_z_greater" },
       "eros": { "lesser": "P_z_lesser", "greater": "P_z_greater" },
       "agape": { "lesser": "G_z_lesser", "greater": "G_z_greater" }
-    }
+    },
+    "yaml_schemas_path": "schemas"
   },
   "databases": {
     "matrix": {
@@ -66,7 +67,7 @@
       "currency_out": "Catalyst",
       "cycle": "lesser",
       "entry_type_property": "Entry Type",
-      "description": "Latent-state generator — ingests Experience, produces crystallized Catalyst. Consolidates Activity/Subjective/Relational/Systemic/Diet/Financial/Observation entry types. Crystallized entries link back to Matrix via Reveals/Crystallized To."
+      "description": "Latent-state generator — ingests Experience, produces crystallized Catalyst. Consolidates Activity/Subjective/Relational/Systemic/Diet/Financial/Observation + Goal/Vision/Aspiration (relocated from GreatWay in v0.9.0) entry types. Notes and Knowledge-Categories were relocated OUT to Nexus in v0.9.0 (they are currency-flow entries, not latent-state). Crystallized entries link back to Matrix via Reveals/Crystallized To. Dual_property backlinks added in v0.9.0: Generates Into ↔ Matrix.Generated From, Rewritten By ← Nexus.Rewrites (Potentiator)."
     },
     "significator": {
       "name": "Significator",
@@ -78,7 +79,7 @@
       "currency_out": "Choice",
       "cycle": "greater",
       "entry_type_property": "Entry Type",
-      "description": "Persistent identity-pattern — ingests Transformation, emits Choice. Consolidates Purpose/Value/Principle/Identity-Statement/Pillar/Strategic-Ideal/Person/Group entry types via intra-DB hierarchies (Sub-item, Parent item, In Tension With) and inter-DB links (Anchored In Matrix, Transforms To GreatWay)."
+      "description": "Persistent identity-pattern — ingests Transformation, emits Choice. The Significator is the bridge between cycles (HoloOS doc 02.2 §6) — it lives in BOTH lesser and greater cycles. Consolidates Purpose/Value/Principle/Identity-Statement/Pillar/Strategic-Ideal/Archetype entry types. Person/Group/Community were relocated OUT to GreatWay in v0.9.0 (external holons belong in the operating environment per HoloOS doc 08.5). v0.9.0 dual_property relations: Anchored In ↔ Matrix.Anchors, Sub-holon Of ↔ Matrix.Contains Significator Of, Transforms To ↔ GreatWay.Transforms From, Coheres With (GreatWay) ↔ GreatWay.Cohers With (Significator)."
     },
     "greatway": {
       "name": "GreatWay",
@@ -90,7 +91,7 @@
       "currency_out": "Transformation",
       "cycle": "greater",
       "entry_type_property": "Item Type",
-      "description": "Operating environment — ingests Choice, produces Transformation. Consolidates Annual Goal/Quarterly Goal/Goal/Project/Task/System/Resource/Sprint/Milestone/Budget/Campaign/Content entry types via intra-DB hierarchies (Parent item, Sub-item) and inter-DB links (For Significator, Sourced From Nexus)."
+      "description": "Operating environment (HoloOS doc 00.md §2.1, 08.5). The Great Way is a collective reservoir — it contains the accumulated Experience of ALL holons that participate in it (HoloOS doc 08.5 §1.2). Consolidates operational entry-types (Annual Goal/Quarterly Goal/Goal/Project/Task/System/Resource/Sprint/Milestone/Budget/Campaign/Content) AND external-holon entry-types relocated FROM Significator in v0.9.0: Person, Group, Community, Organization, Network, Movement, Place. Bonding occurs at the Significator⇄Great-Way surface (HoloOS doc 02.3 §4) — use the Coheres With (Significator) dual_property relation to bond external holons with Significator entries. v0.9.0 dual_property relations: For Significator ↔ Significator.For Great Way, Sub-holon Of ↔ Potentiator.Contains Great Way Of."
     },
     "nexus": {
       "name": "Nexus",
@@ -103,7 +104,7 @@
       "cycle": "both",
       "entry_type_property": "Category",
       "currency_property": "Kind",
-      "description": "Contact-boundary where all 4 currencies transmute. Consolidates Opportunity/Strength/Directive/Risk/Insight/Reflection/Integration/Pattern entry types. The Kind property tags each entry with the currency being transmuted (Catalyst/Experience/Transformation/Choice). Links to all 4 reservoirs (Tension→Significator, Counter-Tension→GreatWay, Sourced From→Potentiator, Updates→Matrix)."
+      "description": "Contact-boundary (HoloOS doc 02.1 §5) where all 4 currencies (Catalyst/Experience/Transformation/Choice) transmute. The Nexus is the most structurally rich DB — it holds 4 of the 8 functional roles. Consolidates Opportunity/Insight/Reflection/Integration/Pattern/Risk/Directive entry types PLUS v0.9.0 relocations FROM Potentiator: Note (Catalyst-kind — raw notes are unprocessed perturbations per HoloOS doc 02.1 §1), Knowledge-Category (Experience-kind — digested notes), Knowledge-Atom (Experience-kind), and NEW entry-types: Decision (Choice-kind), Crisis (Transformation-kind), Transformation-Event (Transformation-kind). The Kind property tags each entry with the currency being transmuted. v0.9.0 dual_property relations added: Rewrites (Matrix) ↔ Matrix.Rewritten By, Rewrites (Potentiator) ↔ Potentiator.Rewritten By, Sends Catalyst To (Matrix) ↔ Matrix.Receives Catalyst From, Sends Experience To (Potentiator) ↔ Potentiator.Receives Experience From, Sends Catalyst To (Significator) ↔ Significator.Receives Catalyst From (Great Way), Emits Choice To ↔ GreatWay.Receives Choice From."
     }
   },
   "briefings": {

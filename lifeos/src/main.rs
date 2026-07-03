@@ -34,6 +34,51 @@ async fn main() {
         Commands::MCP => {
             mcp::run_server().await;
         }
+        // validate-yaml --self-test only validates local YAML schema files — no Notion API needed
+        Commands::ValidateYaml { self_test: true, .. } => {
+            let schemas_dir = lifeos_core::util::yaml_schemas::YamlSchemaRegistry::discover_schemas_dir();
+            match schemas_dir {
+                Some(dir) => {
+                    let registry = lifeos_core::util::yaml_schemas::YamlSchemaRegistry::load(&dir);
+                    if !registry.load_errors.is_empty() {
+                        eprintln!("Schema load errors:");
+                        for e in &registry.load_errors {
+                            eprintln!("  - {e}");
+                        }
+                        std::process::exit(1);
+                    }
+                    let issues = registry.self_test();
+                    if issues.is_empty() {
+                        println!("✅ All schemas passed self-test.");
+                        println!("  Loaded: 1 universal + {} per_db + {} per_entry_type schemas",
+                            registry.per_db.len(), registry.per_entry_type.len());
+                        if let Some(uni) = &registry.universal {
+                            println!("  Universal layer: {} properties, {} validation rules",
+                                uni.properties.len(), uni.validation_rules.len());
+                        }
+                        for db in ["matrix", "potentiator", "nexus", "significator", "greatway"] {
+                            if let Some(layer) = registry.per_db.get(db) {
+                                let pet_count = registry.per_entry_type.keys().filter(|(d, _)| d == db).count();
+                                println!("  per_db/{}.yaml: {} properties, {} entry-types, {} per_entry_type files",
+                                    db, layer.properties.len(),
+                                    layer_raw_entry_types_count(&dir, db), pet_count);
+                            }
+                        }
+                    } else {
+                        eprintln!("❌ {} schema self-test issues:", issues.len());
+                        for i in &issues {
+                            eprintln!("  - {i}");
+                        }
+                        std::process::exit(1);
+                    }
+                }
+                None => {
+                    eprintln!("Could not discover schemas directory.");
+                    eprintln!("Set LIFEOS_SCHEMAS_DIR env var or run from the lifeos-ops repo root.");
+                    std::process::exit(1);
+                }
+            }
+        }
         command => {
             let notion_token = match std::env::var("NOTION_API_TOKEN") {
                 Ok(t) => t,
@@ -316,9 +361,24 @@ async fn main() {
                         Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
                     }
                 }
+                Commands::ValidateYaml { self_test: _, all, database, page_id, limit } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::validate_yaml::ValidateYamlParams {
+                        database, page_id, self_test: Some(false), all: Some(all), limit: Some(limit),
+                    };
+                    match lifeos_core::tools::validate_yaml::execute(&params, &cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
             }
         }
     }
+}
+
+/// Helper for the validate-yaml --self-test path: count entry-types declared
+/// in a per_db/<db>.yaml file. Delegates to lifeos-core.
+fn layer_raw_entry_types_count(schemas_dir: &Path, db: &str) -> usize {
+    lifeos_core::util::yaml_schemas::count_declared_entry_types(schemas_dir, db)
 }
 
 fn resolve_config(config_path: Option<&str>) -> LifeOSConfig {

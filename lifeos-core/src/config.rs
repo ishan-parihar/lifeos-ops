@@ -50,6 +50,11 @@ pub struct HolonicConfig {
     /// Drive effects per boundary
     #[serde(default)]
     pub drive_effects: HashMap<String, DriveEffectDef>,
+    /// v0.9.0: Path to the YAML schemas directory (relative to the config file
+    /// or absolute). If omitted, the validator auto-discovers via
+    /// `YamlSchemaRegistry::discover_schemas_dir()`.
+    #[serde(default)]
+    pub yaml_schemas_path: Option<String>,
     /// DEPRECATED in v0.7+. Entry type descriptions per DB. Kept for backward
     /// compatibility — entry types themselves are now auto-discovered from Notion.
     /// Use the `lifeos schema` command to see live entry types per DB.

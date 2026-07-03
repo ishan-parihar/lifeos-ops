@@ -22,6 +22,7 @@ pub mod shared;
 pub mod relations;
 pub mod audit;
 pub mod ontology;
+pub mod validate_yaml;
 
 fn enrich_database_param(schema: &mut Value, param_name: &str, schema_cache: &SchemaCache) {
     let db_keys: Vec<Value> = schema_cache.db_keys().iter().map(|k| Value::String(k.clone())).collect();
@@ -82,6 +83,7 @@ pub async fn get_tool_definitions(config: &LifeOSConfig, _notion: &NotionClient,
         tool_def("archetype_index", "List all 22 HoloOS archetypes with role, complex, reservoir, and polarity mappings.".to_string(), serde_json::json!({"type": "object", "properties": {}})),
         tool_def("derive_type", "Derive the Holon Type (Donor/Acceptor/Sharer/Multivalent/Noble) from a Significator entry's Valence Signature.".to_string(), ontology::schema_derive_type()),
         tool_def("valence_signature", "Generate a Valence Signature YAML template for a Significator entry.".to_string(), ontology::schema_valence_signature()),
+        tool_def("validate_yaml", "Validate Notion entries against the v0.9.0 YAML schema hierarchy (universal → per_db → per_entry_type).".to_string(), validate_yaml::schema()),
     ]
 }
 
@@ -251,6 +253,11 @@ pub async fn call_tool(
             let params: ontology::ValenceSignatureParams = serde_json::from_value(args.clone())
                 .map_err(|e| format!("Invalid valence_signature params: {}", e))?;
             ontology::execute_valence_signature(&params, config, notion, schema_cache).await
+        }
+        "validate_yaml" => {
+            let params: validate_yaml::ValidateYamlParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid validate_yaml params: {}", e))?;
+            validate_yaml::execute(&params, config, notion, schema_cache).await
         }
         _ => Err(format!("Unknown tool: {}", name)),
     }
