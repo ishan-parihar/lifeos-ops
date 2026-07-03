@@ -11,27 +11,49 @@ permissions:
 jobs:
   build-release:
     strategy:
+      fail-fast: false
       matrix:
-        target:
+        include:
           - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
             strip: strip
+            archive: tar.gz
           - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
             strip: strip
-            extra: --static
-    runs-on: ubuntu-latest
+            archive: tar.gz
+          - target: aarch64-apple-darwin
+            os: macos-14
+            strip: strip
+            archive: tar.gz
+          - target: x86_64-apple-darwin
+            os: macos-13
+            strip: strip
+            archive: tar.gz
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target.target }}
+          targets: ${{ matrix.target }}
+      - name: Install musl tools (Linux musl only)
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
       - name: Build
         run: |
-          cargo build --release --target ${{ matrix.target.target }}
-          ${{ matrix.target.strip }} target/${{ matrix.target.target }}/release/lifeos
-          gzip -k -f target/${{ matrix.target.target }}/release/lifeos
+          cargo build --release --target ${{ matrix.target }}
+          ${{ matrix.strip }} target/${{ matrix.target }}/release/lifeos
+      - name: Pack archive
+        run: |
+          cd target/${{ matrix.target }}/release
+          if [ "${{ matrix.archive }}" = "tar.gz" ]; then
+            tar -czf lifeos-${{ matrix.target }}.tar.gz lifeos
+          else
+            zip -q lifeos-${{ matrix.target }}.zip lifeos
+          fi
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            target/${{ matrix.target.target }}/release/lifeos
-            target/${{ matrix.target.target }}/release/lifeos.gz
+            target/${{ matrix.target }}/release/lifeos-${{ matrix.target }}.tar.gz
+            target/${{ matrix.target }}/release/lifeos-${{ matrix.target }}.zip
