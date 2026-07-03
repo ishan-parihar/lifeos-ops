@@ -28,6 +28,125 @@ def slug(s: str) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Load universal + per_db property names to detect redundancy at generation time
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _load_layer_property_names(layer: str, db: str = None) -> set[str]:
+    """Load property names from a schema layer (universal or per_db)."""
+    if layer == "universal":
+        path = REPO_ROOT / "schemas" / "universal" / "holon_coordinate.yaml"
+    else:
+        path = REPO_ROOT / "schemas" / "per_db" / f"{db}.yaml"
+    if not path.exists():
+        return set()
+    with open(path) as f:
+        schema = yaml.safe_load(f) or {}
+    return set((schema.get("properties") or {}).keys())
+
+
+# Cache these at module load time so the generator can detect redundancy
+_UNIVERSAL_PROPS = _load_layer_property_names("universal")
+_PER_DB_PROPS = {db: _load_layer_property_names("per_db", db) for db in
+                 ("matrix", "potentiator", "nexus", "significator", "greatway")}
+
+
+def filter_redundant_props(db: str, props: dict) -> dict:
+    """Remove any property from `props` that's already in universal or per_db for this DB.
+
+    This prevents the generator from reintroducing redundancy that was cleaned up
+    by fix_schema_redundancy.py.
+    """
+    redundant = _UNIVERSAL_PROPS | _PER_DB_PROPS.get(db, set())
+    return {k: v for k, v in props.items() if k not in redundant}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Shared property blocks for entry-types that share common properties.
+# These are properties that were MOVED OUT of per_db into per_entry_type by
+# fix_schema_redundancy.py — they must be declared here so the generator
+# produces complete per_entry_type files on re-run.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Properties required by ALL external-holon entry-types in GreatWay
+# (Person, Group, Community, Organization, Network, Movement, Place).
+# Per HoloOS doc holon_type_placement.yaml + 02.3 §4 (bonding at Significator⇄Great-Way surface).
+EXTERNAL_HOLON_PROPS = {
+    "quadrant": {
+        "notion_type": "select", "required": False,
+        "description": "AQAL quadrant (HoloOS doc holon_type_placement.yaml).",
+        "options": ["UL", "UR", "LL", "LR"],
+    },
+    "dimension": {
+        "notion_type": "select", "required": False,
+        "description": "Interior/Exterior dimension (HoloOS doc holon_type_placement.yaml).",
+        "options": ["Interior", "Exterior"],
+    },
+}
+
+# Bonding properties — only for entry-types that can bond with a Significator
+# (Person, Group, Community, Organization, Network, Movement — NOT Place, which
+# is a geographic environment, not a bonding partner).
+BONDING_PROPS = {
+    "bonding_disposition": {
+        "notion_type": "select", "required": False,
+        "description": "Per HoloOS doc 02.3 §4: Bonding occurs at the Significator⇄Great-Way surface. 4 bonding types: ionic, covalent, dative, metallic.",
+        "options": ["ionic", "covalent", "dative", "metallic"],
+    },
+    "bonding_partner_count": {
+        "notion_type": "number", "required": False,
+        "description": "Number of active Significator-side bonds this GreatWay entry maintains. Used to compute metallic-bonding lattice density.",
+    },
+}
+
+# Properties required by Transformation-kind Nexus entry-types
+# (Pattern, Crisis, Transformation-Event).
+TRANSFORMATION_KIND_PROPS = {
+    "crucible_intensity": {
+        "notion_type": "select", "required": False,
+        "description": "Per HoloOS doc holon_states.yaml greater_cycle.preconditions.",
+        "options": ["moderate", "acute"],
+    },
+    "transformation_threshold": {
+        "notion_type": "number", "required": False,
+        "description": "T_thresh — the threshold the Significator must reach for this Transformation-kind Nexus entry to fire (HoloOS doc 03.1 §3 stage 8). Default: 110.0 (from lifeos.config.default.json nexus_firing.pressure_threshold).",
+    },
+}
+
+# Properties required by Choice-kind Nexus entry-types (Directive, Decision).
+CHOICE_KIND_PROPS = {
+    "choice_polarity": {
+        "notion_type": "select", "required": False,
+        "description": "STO/STS polarity of an emitted Choice (HoloOS doc 02.4 §2.3).",
+        "options": ["STO", "STS", "neutral"],
+    },
+    "crystallization_ratio": {
+        "notion_type": "number", "required": False,
+        "description": "Per HoloOS doc holon_states.yaml greater_cycle.preconditions. Min 0.7 required for `choice-locked` greater-cycle phase. Range: 0.0-1.0.",
+    },
+}
+
+# Properties required by Note/Knowledge Nexus entry-types
+# (Note, Knowledge-Category, Knowledge-Atom).
+KNOWLEDGE_FLOW_PROPS = {
+    "synthesis_state": {
+        "notion_type": "select", "required": False,
+        "description": "Tracks the 9-stage digestion state of a note/knowledge atom as it crystallizes from Catalyst-class Note into Experience-class Knowledge into refined Catalyst.",
+        "options": ["raw_note", "annotated", "synthesized", "applied"],
+    },
+}
+
+# Properties required by Principle-family Significator entry-types
+# (Purpose, Value, Principle — per Flag 3 consolidation).
+PRINCIPLE_FAMILY_PROPS = {
+    "principle_sub_type": {
+        "notion_type": "select", "required": False,
+        "description": "For Principle-family entries only (per Flag 3 — consolidates Purpose/Value/Principle into one entry-type with a sub-type discriminator).",
+        "options": ["Purpose", "Value", "Principle"],
+    },
+}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Per-entry-type specializations.
 # Each entry: (db, entry_type, archetype_num_or_None, extra_props, extra_rules, doc_ref)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -806,7 +925,22 @@ SPECIALIZATIONS = [
 ]
 
 
-def build_schema(db: str, entry_type: str, archetype_num, extra_props: dict, extra_rules: list, doc_ref: str) -> dict:
+def build_schema(db: str, entry_type: str, archetype_num, extra_props: dict, extra_rules: list, doc_ref: str,
+                 shared_props: dict = None) -> dict:
+    # Merge shared props (from MOVES) with extra_props (entry-type-specific).
+    # Shared props come FIRST (they're the moved-out-from-per_db properties),
+    # then extra_props (truly entry-type-specific).
+    merged: dict = {}
+    if shared_props:
+        merged.update(shared_props)
+    merged.update(extra_props)
+
+    # Filter out any properties that are already in universal or per_db to prevent redundancy
+    filtered_props = filter_redundant_props(db, merged)
+    if len(filtered_props) < len(merged):
+        removed = set(merged.keys()) - set(filtered_props.keys())
+        print(f"  ⚠️  Filtered redundant props from {db}__{entry_type}: {removed}")
+
     schema = {
         "schema_version": "0.9.0",
         "schema_type": "per_entry_type",
@@ -817,7 +951,7 @@ def build_schema(db: str, entry_type: str, archetype_num, extra_props: dict, ext
             f"per_db/{db}.yaml",
         ],
         "documentation_ref": doc_ref,
-        "properties": extra_props,
+        "properties": filtered_props,
     }
     if archetype_num is not None:
         schema["archetype_number"] = archetype_num
@@ -826,10 +960,54 @@ def build_schema(db: str, entry_type: str, archetype_num, extra_props: dict, ext
     return schema
 
 
+def get_shared_props(db: str, entry_type: str) -> dict:
+    """Determine which shared property blocks apply to a (db, entry_type) pair.
+
+    This mirrors the MOVES dict in fix_schema_redundancy.py — properties that
+    were moved OUT of per_db into per_entry_type must be declared here so the
+    generator produces complete per_entry_type files on re-run.
+    """
+    shared: dict = {}
+
+    # External-holon entry-types in GreatWay get EXTERNAL_HOLON_PROPS
+    external_holon_types = {"Person", "Group", "Community", "Organization", "Network", "Movement", "Place"}
+    if db == "greatway" and entry_type in external_holon_types:
+        shared.update(EXTERNAL_HOLON_PROPS)
+
+    # Bonding-eligible external-holons (not Place) also get BONDING_PROPS
+    bonding_types = {"Person", "Group", "Community", "Organization", "Network", "Movement"}
+    if db == "greatway" and entry_type in bonding_types:
+        shared.update(BONDING_PROPS)
+
+    # Transformation-kind Nexus entry-types get TRANSFORMATION_KIND_PROPS
+    transformation_kind_types = {"Pattern", "Crisis", "Transformation-Event"}
+    if db == "nexus" and entry_type in transformation_kind_types:
+        shared.update(TRANSFORMATION_KIND_PROPS)
+
+    # Choice-kind Nexus entry-types get CHOICE_KIND_PROPS
+    choice_kind_types = {"Directive", "Decision"}
+    if db == "nexus" and entry_type in choice_kind_types:
+        shared.update(CHOICE_KIND_PROPS)
+
+    # Note/Knowledge Nexus entry-types get KNOWLEDGE_FLOW_PROPS
+    knowledge_types = {"Note", "Knowledge-Category", "Knowledge-Atom"}
+    if db == "nexus" and entry_type in knowledge_types:
+        shared.update(KNOWLEDGE_FLOW_PROPS)
+
+    # Principle-family Significator entry-types get PRINCIPLE_FAMILY_PROPS
+    principle_family_types = {"Purpose", "Value", "Principle"}
+    if db == "significator" and entry_type in principle_family_types:
+        shared.update(PRINCIPLE_FAMILY_PROPS)
+
+    return shared
+
+
 def main() -> int:
     written = []
     for db, entry_type, archetype_num, extra_props, extra_rules, doc_ref in SPECIALIZATIONS:
-        schema = build_schema(db, entry_type, archetype_num, extra_props, extra_rules, doc_ref)
+        shared = get_shared_props(db, entry_type)
+        schema = build_schema(db, entry_type, archetype_num, extra_props, extra_rules, doc_ref,
+                              shared_props=shared)
         out_file = OUT_DIR / f"{db}__{slug(entry_type)}.yaml"
         with open(out_file, "w") as f:
             f.write(f"# Per-Entry-Type Schema: {db}.{entry_type}\n")

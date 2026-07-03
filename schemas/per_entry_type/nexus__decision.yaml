@@ -12,6 +12,19 @@ inherits_from:
 - per_db/nexus.yaml
 documentation_ref: RELOCATED FROM GreatWay per Flag 3 (Decisions are Choice-class currency)
 properties:
+  choice_polarity:
+    notion_type: select
+    required: false
+    description: STO/STS polarity of an emitted Choice (HoloOS doc 02.4 §2.3).
+    options:
+    - STO
+    - STS
+    - neutral
+  crystallization_ratio:
+    notion_type: number
+    required: false
+    description: 'Per HoloOS doc holon_states.yaml greater_cycle.preconditions. Min 0.7 required for `choice-locked` greater-cycle
+      phase. Range: 0.0-1.0.'
   decision_polarity:
     notion_type: select
     required: false

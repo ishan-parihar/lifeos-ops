@@ -12,6 +12,15 @@ inherits_from:
 - per_db/nexus.yaml
 documentation_ref: RELOCATED FROM Potentiator (raw notes are Catalyst-class currency per HoloOS doc 02.1 §1)
 properties:
+  synthesis_state:
+    notion_type: select
+    required: false
+    options:
+    - raw_note
+    - annotated
+    - synthesized
+    - applied
+    description: Tracks the 9-stage digestion state of this note.
   source_url:
     notion_type: url
     required: false
@@ -33,15 +42,6 @@ properties:
     notion_type: number
     required: false
     description: Number of highlights extracted.
-  synthesis_state:
-    notion_type: select
-    required: false
-    options:
-    - raw_note
-    - annotated
-    - synthesized
-    - applied
-    description: Tracks the 9-stage digestion state of this note.
 validation_rules:
 - id: note_kind_constraint
   description: Note entries must have Kind=Catalyst (raw notes are unprocessed perturbations).

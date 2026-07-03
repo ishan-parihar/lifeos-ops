@@ -34,157 +34,175 @@
 #   - Rewritten By      ← Nexus         ⟷  Nexus.Rewrites (Matrix)
 #   - Receives Catalyst From ← Nexus    ⟷  Nexus.Sends Catalyst To (Matrix)
 
-schema_version: "0.9.0"
+schema_version: 0.9.0
 schema_type: per_db
 applies_to_db: matrix
-
-# ── Matrix-specific extended properties ─────────────────────────────────
-# Each property is grounded in a specific HoloOS doc passage.
 properties:
-  # ── Metabolic efficiency (HoloOS doc 03.1 §5.1) ──
   eta_M:
     notion_type: number
     required: false
-    description: |
-      Matrix consolidation efficiency η_M (HoloOS doc 03.1 §5.1).
+    description: 'Matrix consolidation efficiency η_M (HoloOS doc 03.1 §5.1).
+
       Fraction of ingested Catalyst converted into integrated Experience.
+
       Range: 0.0–1.0. Below 0.3 → dark-addiction shadow active.
 
+      '
   matrix_load:
     notion_type: number
     required: false
-    description: |
-      ℓ_M — basin depth (HoloOS doc 08.1 §5). How consolidated the Matrix is.
+    description: 'ℓ_M — basin depth (HoloOS doc 08.1 §5). How consolidated the Matrix is.
+
       Higher = more rigidly stable; lower = more malleable.
+
       Range: 0.0–10.0.
 
+      '
   current_configuration:
     notion_type: rich_text
     required: false
-    description: |
-      x_t ∈ X — the active state vector (HoloOS doc 03.1 §2.2).
+    description: 'x_t ∈ X — the active state vector (HoloOS doc 03.1 §2.2).
+
       Free-form text describing the current configuration of this Matrix entry.
 
-  # ── Shadow attractor (HoloOS doc 02.1 §4, 08.1) ──
+      '
   dark_shadow_state:
     notion_type: select
     required: false
-    description: |
-      Per-complex Matrix shadow (HoloOS doc 02.1 §4).
-      Differentiates from the universal `shadow_pattern` property by isolating
-      the Matrix-specific (lesser-cycle, dark-reservoir) shadow.
-    options:
-      - balanced
-      - dark-addiction
-      - dark-allergy
+    description: 'Per-complex Matrix shadow (HoloOS doc 02.1 §4).
 
+      Differentiates from the universal `shadow_pattern` property by isolating
+
+      the Matrix-specific (lesser-cycle, dark-reservoir) shadow.
+
+      '
+    options:
+    - balanced
+    - dark-addiction
+    - dark-allergy
   homeostatic_basin_depth:
     notion_type: number
     required: false
-    description: |
-      ‖A_M‖ — magnitude of the Matrix attractor basin (HoloOS doc 08.1 §3.1).
+    description: '‖A_M‖ — magnitude of the Matrix attractor basin (HoloOS doc 08.1 §3.1).
+
       How strongly this Matrix entry pulls toward its current state.
+
       Range: 0.0–10.0.
 
+      '
   agency_drive_score:
     notion_type: number
     required: false
-    description: |
-      A_z — Agency drive score for this Matrix entry (HoloOS doc 02.1 §5, 08.5 §3.1).
+    description: 'A_z — Agency drive score for this Matrix entry (HoloOS doc 02.1 §5, 08.5 §3.1).
+
       Computed: A_z = 100 · exp(-|ln(Ω_A)|), where Ω_A = (M · η_M)/(|C| + ε).
+
       Range: 0–100. Failure mode (low A_z) = isolation.
 
-# ── Intra-DB Hierarchy Relations ────────────────────────────────────────
+      '
 relations:
-  - name: "Parent"
-    target_db: matrix
-    direction: dual_property
-    dual_backlink: "Children"
-    cardinality: one_to_many
-    description: Sub-pattern containment (parent Matrix entry contains child sub-Matrix entries).
-
-  - name: "Blocked By"
-    target_db: matrix
-    direction: dual_property
-    dual_backlink: "Blocks"
-    cardinality: many_to_many
-    description: Sequential dependency — this Matrix entry cannot consolidate until the blocker does.
-
-  - name: "Refines"
-    target_db: matrix
-    direction: dual_property
-    dual_backlink: "Refined By"
-    cardinality: many_to_many
-    description: One Matrix sub-pattern refines another (e.g. a specialized practice refines a base practice).
-
-  - name: "Supersedes"
-    target_db: matrix
-    direction: dual_property
-    dual_backlink: "Superseded By"
-    cardinality: many_to_many
-    description: Newer version of a Matrix entry replaces an older one (e.g. v2 supersedes v1).
-
-# ── Inter-DB Hierarchy Relations (the dual_property upgrades) ───────────
+- name: Parent
+  target_db: matrix
+  direction: dual_property
+  dual_backlink: Children
+  cardinality: one_to_many
+  description: Sub-pattern containment (parent Matrix entry contains child sub-Matrix entries).
+- name: Blocked By
+  target_db: matrix
+  direction: dual_property
+  dual_backlink: Blocks
+  cardinality: many_to_many
+  description: Sequential dependency — this Matrix entry cannot consolidate until the blocker does.
+- name: Refines
+  target_db: matrix
+  direction: dual_property
+  dual_backlink: Refined By
+  cardinality: many_to_many
+  description: One Matrix sub-pattern refines another (e.g. a specialized practice refines a base practice).
+- name: Supersedes
+  target_db: matrix
+  direction: dual_property
+  dual_backlink: Superseded By
+  cardinality: many_to_many
+  description: Newer version of a Matrix entry replaces an older one (e.g. v2 supersedes v1).
 inter_db_relations:
-  - name: "Accumulates Into"
-    target_db: significator
-    direction: dual_property
-    dual_backlink: "Accumulated From"
-    cardinality: many_to_one
-    description: |
-      HoloOS doc 03.1 §3 stage 7: S_t = S_{t-1} + w_t * e_t.
-      Experience accumulates upward from Matrix into Significator.
-      v0.8.0 had this as single_property — v0.9.0 adds the dual backlink.
+- name: Accumulates Into
+  target_db: significator
+  direction: dual_property
+  dual_backlink: Accumulated From
+  cardinality: many_to_one
+  description: 'HoloOS doc 03.1 §3 stage 7: S_t = S_{t-1} + w_t * e_t.
 
-  - name: "Generated From"
-    target_db: potentiator
-    direction: dual_property
-    dual_backlink: "Generates Into"
-    cardinality: many_to_many
-    description: |
-      HoloOS doc 02.1 §3 Loop B: Potentiator returns refined Catalyst to Matrix.
-      The Catalyst that this Matrix entry is currently ingesting came from
-      this Potentiator entry.
+    Experience accumulates upward from Matrix into Significator.
 
-  - name: "Rewritten By"
-    target_db: nexus
-    direction: dual_property
-    dual_backlink: "Rewrites (Matrix)"
-    cardinality: many_to_many
-    description: |
-      HoloOS doc 03.1 §3 stage 9: After Transformation fires, the Significator
-      executes a downward rewrite that reconfigures the Matrix.
-      This Matrix entry was last rewritten by this Nexus (Transformation-kind) entry.
+    v0.8.0 had this as single_property — v0.9.0 adds the dual backlink.
 
-  - name: "Receives Catalyst From"
-    target_db: nexus
-    direction: dual_property
-    dual_backlink: "Sends Catalyst To (Matrix)"
-    cardinality: many_to_many
-    description: |
-      HoloOS doc 02.1 §1: Catalyst flows extra→intra through the contact boundary.
-      A Nexus entry tagged `Kind: Catalyst` is the carrier for this Matrix's input.
+    '
+- name: Generated From
+  target_db: potentiator
+  direction: dual_property
+  dual_backlink: Generates Into
+  cardinality: many_to_many
+  description: 'HoloOS doc 02.1 §3 Loop B: Potentiator returns refined Catalyst to Matrix.
 
-# ── Per-Entry-Type specializations (referenced from per_entry_type/*.yaml) ──
+    The Catalyst that this Matrix entry is currently ingesting came from
+
+    this Potentiator entry.
+
+    '
+- name: Rewritten By
+  target_db: nexus
+  direction: dual_property
+  dual_backlink: Rewrites (Matrix)
+  cardinality: many_to_many
+  description: 'HoloOS doc 03.1 §3 stage 9: After Transformation fires, the Significator
+
+    executes a downward rewrite that reconfigures the Matrix.
+
+    This Matrix entry was last rewritten by this Nexus (Transformation-kind) entry.
+
+    '
+- name: Receives Catalyst From
+  target_db: nexus
+  direction: dual_property
+  dual_backlink: Sends Catalyst To (Matrix)
+  cardinality: many_to_many
+  description: 'HoloOS doc 02.1 §1: Catalyst flows extra→intra through the contact boundary.
+
+    A Nexus entry tagged `Kind: Catalyst` is the carrier for this Matrix''s input.
+
+    '
 entry_types:
-  - Pattern
-  - Practice
-  - Inventory
-  - Foundation
-  - Threshold
-  - Active Project
-  - Habit
-  - Routine
-
-# ── Default Archetype Role Mapping ──────────────────────────────────────
-# Used by `lifeos auto-tag` (the Flag 4 batch script) to populate
-# `archetype_role` + `complex` for existing entries based on their entry_type.
+- Pattern
+- Practice
+- Inventory
+- Foundation
+- Threshold
+- Active Project
+- Habit
+- Routine
 default_archetype_mapping:
-  Pattern:    { archetype_role: "Matrix",       complex: "Mind" }
-  Practice:   { archetype_role: "Matrix",       complex: "Body" }
-  Inventory:  { archetype_role: "Matrix",       complex: "Body" }
-  Foundation: { archetype_role: "Matrix",       complex: "Spirit" }
-  Threshold:  { archetype_role: "Catalyst",     complex: "Mind" }
-  "Active Project": { archetype_role: "Matrix", complex: "Mind" }
-  Habit:      { archetype_role: "Matrix",       complex: "Body" }
-  Routine:    { archetype_role: "Matrix",       complex: "Body" }
+  Pattern:
+    archetype_role: Matrix
+    complex: Mind
+  Practice:
+    archetype_role: Matrix
+    complex: Body
+  Inventory:
+    archetype_role: Matrix
+    complex: Body
+  Foundation:
+    archetype_role: Matrix
+    complex: Spirit
+  Threshold:
+    archetype_role: Catalyst
+    complex: Mind
+  Active Project:
+    archetype_role: Matrix
+    complex: Mind
+  Habit:
+    archetype_role: Matrix
+    complex: Body
+  Routine:
+    archetype_role: Matrix
+    complex: Body
