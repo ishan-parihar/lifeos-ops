@@ -296,11 +296,50 @@ pub enum Commands {
     /// Run as MCP server (stdio JSON-RPC)
     MCP,
 
-    /// Scan Notion for databases and update config with correct IDs
+    /// Scan Notion for databases and update config with correct IDs + auto-discover full schema
     Discover {
         /// Path to lifeos.config.json
         #[arg(short, long)]
         config: Option<String>,
+    },
+
+    /// List orphan entries (entries with zero populated relations)
+    Orphans {
+        /// Optional: filter to a specific database
+        #[arg(short, long)]
+        database: Option<String>,
+        /// Max results per database (default: 50)
+        #[arg(short, long, default_value = "50")]
+        limit: u32,
+    },
+
+    /// Validate entries by their YAML-metadata Validation formula status
+    Validate {
+        /// Optional: filter to a specific database
+        #[arg(short, long)]
+        database: Option<String>,
+        /// Filter by validation status: valid, invalid, legacy, missing, all
+        #[arg(short, long, default_value = "all")]
+        status: String,
+        /// Max results per database (default: 50)
+        #[arg(short, long, default_value = "50")]
+        limit: u32,
+    },
+
+    /// Suggest likely cross-reservoir links for orphan entries (title similarity)
+    SuggestLinks {
+        /// Optional: source database to find orphans in
+        #[arg(short, long)]
+        source: Option<String>,
+        /// Optional: target database to suggest links into
+        #[arg(short, long)]
+        target: Option<String>,
+        /// Min similarity score (0.0–1.0, default: 0.5)
+        #[arg(short = 't', long, default_value = "0.5")]
+        threshold: f64,
+        /// Max orphans to suggest links for (default: 20)
+        #[arg(short, long, default_value = "20")]
+        limit: u32,
     },
 }
 

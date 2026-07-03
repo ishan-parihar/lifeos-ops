@@ -79,17 +79,35 @@ pub async fn execute(
     let mut reservoir_entries: std::collections::HashMap<String, Vec<serde_json::Value>> = std::collections::HashMap::new();
 
     for res_key in &reservoir_keys {
-        let (ds_id, archetype, currency_in, currency_out) = match crate::config::resolve_db(config, res_key) {
+        let (ds_id, archetype, currency_in, currency_out, currency_property) = match crate::config::resolve_db(config, res_key) {
             Some(db) => {
                 (db.ds_id().to_string(),
                  db.archetype.as_deref().unwrap_or("unknown").to_string(),
                  db.currency_in.as_deref().unwrap_or("?").to_string(),
-                 db.currency_out.as_deref().unwrap_or("?").to_string())
+                 db.currency_out.as_deref().unwrap_or("?").to_string(),
+                 db.currency_property.clone())  // Nexus only: property name that tags entries with a currency (e.g. "Kind")
             }
             None => continue,
         };
 
-        let query = serde_json::json!({ "page_size": limit });
+        let mut query = serde_json::json!({ "page_size": limit });
+
+        // Nexus currency filter: if this is the Nexus DB and the user requested
+        // a specific currency, filter Nexus entries by the `Kind` property
+        // (Catalyst/Experience/Transformation/Choice). This is the v0.7 Nexus
+        // Kind awareness feature — surfaces the currency tag that Notion-side
+        // Nexus uses to mark which currency each entry transmutes.
+        if res_key == "nexus" {
+            if let Some(ref cur_prop) = currency_property {
+                if currency != "all" {
+                    query["filter"] = serde_json::json!({
+                        "property": cur_prop,
+                        "select": { "equals": currency }
+                    });
+                }
+            }
+        }
+
         if let Ok(page_result) = notion.query_data_source(&ds_id, &query).await {
             let items: Vec<serde_json::Value> = page_result.results.iter().map(|p| {
                 let title = crate::transform::extract_title(p);
@@ -101,6 +119,14 @@ pub async fn execute(
                     "currency_in": &currency_in,
                     "currency_out": &currency_out,
                 });
+                // For Nexus: include the per-entry currency tag (Kind) so users
+                // can see which currency each Nexus entry transmutes.
+                if let Some(ref cur_prop) = currency_property {
+                    let kind = crate::transform::extract_string(p, cur_prop);
+                    if !kind.is_empty() {
+                        entry["currency_kind"] = serde_json::json!(kind);
+                    }
+                }
                 if show_metabolism {
                     entry["metabolism"] = score_entry_metabolism(p, &archetype);
                 }
@@ -205,7 +231,10 @@ async fn find_flow_paths(
                 None => continue,
             };
 
-            let query = serde_json::json!({ "page_size": limit.min(5) });
+            // Bug D fix: previously `page_size: limit.min(5)` sampled only 5 entries
+            // per source DB, missing >95% of edges. Now we use the full `limit`
+            // parameter so energy-flow reports are complete.
+            let query = serde_json::json!({ "page_size": limit });
             if let Ok(result) = notion.query_data_source(&ds_id, &query).await {
                 for page in &result.results {
                     if let Some(PropertyValue::Relation { relation, .. }) = page.properties.get(&edge.prop_name) {

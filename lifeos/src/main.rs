@@ -270,6 +270,33 @@ async fn main() {
                         std::process::exit(1);
                     }
                 }
+                Commands::Orphans { database, limit } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::audit::OrphansParams {
+                        database, limit: Some(limit),
+                    };
+                    match lifeos_core::tools::audit::execute_orphans(&params, &cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::Validate { database, status, limit } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::audit::ValidateParams {
+                        database, status, limit: Some(limit),
+                    };
+                    match lifeos_core::tools::audit::execute_validate(&params, &cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::SuggestLinks { source, target, threshold, limit } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::audit::SuggestLinksParams {
+                        source, target, threshold, limit: Some(limit),
+                    };
+                    match lifeos_core::tools::audit::execute_suggest_links(&params, &cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
             }
         }
     }
@@ -313,11 +340,23 @@ async fn resolve_config_with_ds(config_path_arg: Option<&str>, token: &str) -> (
 }
 
 /// Resolve config + Notion client + SchemaCache in one call.
+///
+/// This is the primary initialization path for any CLI command that needs schema
+/// awareness. It:
+///   1. Loads the config file (or embedded default).
+///   2. Resolves all 5 data_source_ids via Notion Search API (auto-discover by name).
+///   3. Initializes SchemaCache — fetches every DB's full schema (properties,
+///      entry-type options, relation edges) from Notion in parallel.
+///   4. Propagates the auto-discovered property map back into the config so
+///      downstream code using `DbConfig::notion_prop()` works without needing
+///      direct SchemaCache access.
 async fn resolve_with_schema(config_path: Option<&str>, token: &str) -> (Arc<LifeOSConfig>, Arc<NotionClient>, Arc<SchemaCache>) {
-    let (cfg, notion) = resolve_config_with_ds(config_path, token).await;
-    let cfg = Arc::new(cfg);
+    let (mut cfg, notion) = resolve_config_with_ds(config_path, token).await;
     let notion = Arc::new(notion);
-    let sc = SchemaCache::init(&cfg, &notion).await;
+    let sc = SchemaCache::init(&Arc::new(cfg.clone()), &notion).await;
+    // Propagate auto-discovered properties back into config for downstream code
+    sc.propagate_to_config(&mut cfg);
+    let cfg = Arc::new(cfg);
     (cfg, notion, Arc::new(sc))
 }
 
@@ -537,16 +576,58 @@ async fn cmd_discover(mut cfg: LifeOSConfig, token: &str) -> Result<(), String> 
         }
     }
 
+    // Resolve data source IDs (validates each ID via /v1/data_sources/{id})
+    let notion = NotionClient::new(cfg.clone(), token.to_string());
+    let failures = resolve_all_data_sources(&mut cfg, &notion).await;
+    if !failures.is_empty() {
+        tracing::warn!("{}/{} databases unresolved", failures.len(), cfg.databases.len());
+        for (db_key, _) in &failures {
+            tracing::warn!("  unresolved database: {db_key}");
+        }
+    }
+
+    // ── Full schema sync ──
+    // In v0.7+, `discover` also fetches the live schema for each DB and
+    // propagates auto-discovered properties + entry-type options back into
+    // the config. This means the config file stays in sync with Notion
+    // without manual edits.
+    println!("\nFetching full schemas from Notion...");
+    let cfg_arc = Arc::new(cfg.clone());
+    let notion_arc = Arc::new(notion.clone());
+    let sc = SchemaCache::init(&cfg_arc, &notion_arc).await;
+    sc.propagate_to_config(&mut cfg);
+    let props_synced: usize = cfg.databases.values()
+        .map(|db| db.discovered_properties.len())
+        .sum();
+    println!("  Synced {} property mappings across {} databases", props_synced, cfg.databases.len());
+
+    // Report entry-type options discovered per DB
+    for (db_key, db_cfg) in &cfg.databases {
+        if db_cfg.entry_type_property.is_some() {
+            let opts = sc.get_entry_type_options(db_key, &cfg);
+            if !opts.is_empty() {
+                println!("  {} entry types ({}): {}", db_cfg.name, opts.len(), opts.join(", "));
+            }
+        }
+    }
+
+    // Report relation edges discovered
+    let total_edges: usize = sc.all_relation_edges().values().map(|v| v.len()).sum();
+    println!("  Discovered {} relation edges across all databases", total_edges);
+
     save_config(&cfg, &path).map_err(|e| e.to_string())?;
 
     println!("\nDiscover complete:");
     println!("  Updated: {} databases", updated);
+    println!("  Schemas synced: {} property mappings", props_synced);
+    println!("  Relations discovered: {}", total_edges);
     println!("  Not found: {}", not_found.len());
     if !not_found.is_empty() {
         for name in &not_found {
             println!("    - {name}");
         }
     }
+    println!("\n  Config saved to: {}", path.display());
 
     Ok(())
 }

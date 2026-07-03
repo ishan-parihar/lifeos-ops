@@ -103,11 +103,92 @@ pub async fn execute_get_page(
         "properties": all_properties,
     });
 
+    // ── Bug F fix: parse YAML Metadata into structured fields ──
+    // Each of the 5 reservoirs has a "YAML Metadata" rich_text property that
+    // stores per-entry-type structured metadata (e.g. Matrix.Pattern requires
+    // pattern_type, manifestations, shadow_link, frequency). Parse it and add
+    // as a top-level `yaml_metadata` field for easy access.
+    if let Some(yaml_str) = page.properties.iter()
+        .find(|(name, _)| name.to_lowercase().contains("yaml") && name.to_lowercase().contains("metadata"))
+        .and_then(|(_, v)| match v {
+            PropertyValue::RichText { rich_text, .. } => Some(rich_text.iter()
+                .filter_map(|rt| rt.plain_text.as_deref())
+                .collect::<String>()),
+            _ => None,
+        })
+    {
+        if !yaml_str.trim().is_empty() {
+            // Try parsing as YAML; if it fails, include the raw string under `raw`.
+            match serde_yaml::from_str::<serde_yaml::Value>(&yaml_str) {
+                Ok(yaml_value) => {
+                    if let serde_yaml::Value::Mapping(map) = &yaml_value {
+                        let mut parsed = serde_json::Map::new();
+                        for (k, v) in map {
+                            let key = match k {
+                                serde_yaml::Value::String(s) => s.clone(),
+                                _ => continue,
+                            };
+                            let json_val = serde_yaml_to_json(v);
+                            parsed.insert(key, json_val);
+                        }
+                        result["yaml_metadata"] = serde_json::json!({
+                            "parsed": serde_json::Value::Object(parsed),
+                            "raw": yaml_str,
+                        });
+                    } else {
+                        result["yaml_metadata"] = serde_json::json!({
+                            "raw": yaml_str,
+                            "parse_error": "YAML is not a mapping",
+                        });
+                    }
+                }
+                Err(e) => {
+                    result["yaml_metadata"] = serde_json::json!({
+                        "raw": yaml_str,
+                        "parse_error": format!("{}", e),
+                    });
+                }
+            }
+        }
+    }
+
     if !resolved_relations.is_empty() {
         result["relations"] = serde_json::json!(resolved_relations);
     }
 
     Ok(crate::toon_format::encode(&result))
+}
+
+/// Convert a serde_yaml::Value to a serde_json::Value for the yaml_metadata field.
+fn serde_yaml_to_json(v: &serde_yaml::Value) -> serde_json::Value {
+    match v {
+        serde_yaml::Value::Null => serde_json::Value::Null,
+        serde_yaml::Value::Bool(b) => serde_json::json!(b),
+        serde_yaml::Value::Number(n) => {
+            if let Some(i) = n.as_i64() { serde_json::json!(i) }
+            else if let Some(u) = n.as_u64() { serde_json::json!(u) }
+            else if let Some(f) = n.as_f64() { serde_json::json!(f) }
+            else { serde_json::Value::Null }
+        }
+        serde_yaml::Value::String(s) => serde_json::json!(s),
+        serde_yaml::Value::Sequence(arr) => {
+            serde_json::Value::Array(arr.iter().map(serde_yaml_to_json).collect())
+        }
+        serde_yaml::Value::Mapping(map) => {
+            let mut obj = serde_json::Map::new();
+            for (k, v) in map {
+                let key = match k {
+                    serde_yaml::Value::String(s) => s.clone(),
+                    serde_yaml::Value::Bool(b) => b.to_string(),
+                    serde_yaml::Value::Number(n) => n.to_string(),
+                    _ => continue,
+                };
+                obj.insert(key, serde_yaml_to_json(v));
+            }
+            serde_json::Value::Object(obj)
+        }
+        _ => serde_json::Value::Null,
+    }
 }
 
 // ── expand ────────────────────────────────────────────────────────

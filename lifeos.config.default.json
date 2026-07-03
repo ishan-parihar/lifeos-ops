@@ -41,35 +41,6 @@
       "communion": { "lesser": "C_z_lesser", "greater": "C_z_greater" },
       "eros": { "lesser": "P_z_lesser", "greater": "P_z_greater" },
       "agape": { "lesser": "G_z_lesser", "greater": "G_z_greater" }
-    },
-    "entry_type_descriptions": {
-      "matrix": {
-        "Pattern": "Recurring behavioral or environmental pattern observed in current-state",
-        "Practice": "Active ritual or habit being cultivated",
-        "Inventory": "Asset, resource, or tool available in current-state"
-      },
-      "potentiator": {
-        "Activity": "Discrete activity event with duration and type",
-        "Reflection": "Subjective journal reflection on a lived experience",
-        "Metric": "Quantitative measurement captured over a window"
-      },
-      "significator": {
-        "Vision": "Long-term aspirational identity statement",
-        "Value": "Core principle that governs decision-making",
-        "Person": "Significant person in the holon's relational field"
-      },
-      "greatway": {
-        "Annual Goal": "Year-scale committed outcome",
-        "Quarterly Goal": "Quarter-scale committed outcome",
-        "Project": "Multi-week initiative with deliverables",
-        "Task": "Atomic actionable unit of work",
-        "Campaign": "Outbound push with audience and timeline"
-      },
-      "nexus": {
-        "Opportunity": "Emergent possibility detected at a contact boundary",
-        "Directive": "Strategic instruction issued from nexus analysis",
-        "Risk": "Threat to holonic stability requiring mitigation"
-      }
     }
   },
   "databases": {
@@ -83,14 +54,7 @@
       "currency_out": "Experience",
       "cycle": "lesser",
       "entry_type_property": "Entry Type",
-      "entry_type_property_type": "multi_select",
-      "description": "Current-state organizer — ingests Catalyst (perturbation), produces Experience (update).",
-      "properties": {
-        "title": "Name",
-        "entry_type": "Entry Type",
-        "status": "Status",
-        "review_cadence": "Review Cadence"
-      }
+      "description": "Current-state organizer — ingests Catalyst (perturbation), produces Experience (update). Consolidates Pattern/Practice/Inventory/Threshold/Foundation entry types via intra-DB hierarchies (Parent, Blocked By) and inter-DB links (Generated From Potentiator, Integrated Into Significator)."
     },
     "potentiator": {
       "name": "Potentiator",
@@ -102,16 +66,7 @@
       "currency_out": "Catalyst",
       "cycle": "lesser",
       "entry_type_property": "Entry Type",
-      "entry_type_property_type": "select",
-      "description": "Latent-state generator — ingests Experience, produces crystallized Catalyst.",
-      "properties": {
-        "title": "Name",
-        "entry_type": "Entry Type",
-        "status": "Digestion Status",
-        "duration": "Duration",
-        "yaml_metadata": "YAML Metadata",
-        "date": "Date"
-      }
+      "description": "Latent-state generator — ingests Experience, produces crystallized Catalyst. Consolidates Activity/Subjective/Relational/Systemic/Diet/Financial/Observation entry types. Crystallized entries link back to Matrix via Reveals/Crystallized To."
     },
     "significator": {
       "name": "Significator",
@@ -123,14 +78,7 @@
       "currency_out": "Choice",
       "cycle": "greater",
       "entry_type_property": "Entry Type",
-      "entry_type_property_type": "select",
-      "description": "Persistent identity-pattern — ingests Transformation, emits Choice.",
-      "properties": {
-        "title": "Name",
-        "entry_type": "Entry Type",
-        "status": "Status",
-        "stage": "Stage"
-      }
+      "description": "Persistent identity-pattern — ingests Transformation, emits Choice. Consolidates Purpose/Value/Principle/Identity-Statement/Pillar/Strategic-Ideal/Person/Group entry types via intra-DB hierarchies (Sub-item, Parent item, In Tension With) and inter-DB links (Anchored In Matrix, Transforms To GreatWay)."
     },
     "greatway": {
       "name": "GreatWay",
@@ -142,14 +90,7 @@
       "currency_out": "Transformation",
       "cycle": "greater",
       "entry_type_property": "Item Type",
-      "entry_type_property_type": "select",
-      "description": "Operating environment — ingests Choice, produces Transformation.",
-      "properties": {
-        "title": "Name",
-        "entry_type": "Item Type",
-        "status": "Status",
-        "priority": "Priority"
-      }
+      "description": "Operating environment — ingests Choice, produces Transformation. Consolidates Annual Goal/Quarterly Goal/Goal/Project/Task/System/Resource/Sprint/Milestone/Budget/Campaign/Content entry types via intra-DB hierarchies (Parent item, Sub-item) and inter-DB links (For Significator, Sourced From Nexus)."
     },
     "nexus": {
       "name": "Nexus",
@@ -161,13 +102,8 @@
       "currency_out": "all",
       "cycle": "both",
       "entry_type_property": "Category",
-      "entry_type_property_type": "select",
-      "description": "Contact-boundary where all 4 currencies transmute.",
-      "properties": {
-        "title": "Name",
-        "entry_type": "Category",
-        "status": "Status"
-      }
+      "currency_property": "Kind",
+      "description": "Contact-boundary where all 4 currencies transmute. Consolidates Opportunity/Strength/Directive/Risk/Insight/Reflection/Integration/Pattern entry types. The Kind property tags each entry with the currency being transmuted (Catalyst/Experience/Transformation/Choice). Links to all 4 reservoirs (Tension→Significator, Counter-Tension→GreatWay, Sourced From→Potentiator, Updates→Matrix)."
     }
   },
   "briefings": {

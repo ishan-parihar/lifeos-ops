@@ -55,6 +55,33 @@ All four drives operate at **both** contact boundaries (Matrix⇌Potentiator AND
 | `drive_assessment` | Evaluate all 4 drives at each boundary |
 | `health_metrics` | Calculate G_z and P_z health metrics |
 | `get_page` / `expand` / `trace` / `ancestors` / `backlinks` / `link` / `graph_metrics` | Relational graph navigation |
+| `orphans` | List entries with zero populated relations — find data-isolation issues |
+| `validate` | Filter entries by YAML-metadata Validation formula status (valid/invalid/legacy/missing) |
+| `suggest_links` | Suggest likely cross-reservoir links for orphan entries via title similarity |
+
+### v0.7 Auto-Discovery
+
+In v0.7+, the **config file no longer needs to enumerate properties, entry types, or relations** — everything is auto-discovered from Notion at runtime.
+
+- `lifeos discover` resolves the 5 reservoir IDs **AND** fetches the full schema (all properties, entry-type options, relation edges) from Notion, propagating them into the in-memory config.
+- `SchemaCache::init` (called automatically by every command) fetches every DB's schema in parallel and builds:
+  - Snake_case config keys (e.g. `entry_type`, `status`, `date`, `digestion_status`) → Notion property names (e.g. `Entry Type`, `Digestion Status`)
+  - Entry-type option lists (e.g. `Pattern/Practice/Inventory` for Matrix)
+  - Relation graph (e.g. `Matrix.Generated From → Potentiator`)
+  - Auto-corrected `entry_type_property_type` (fixes the v0.6.1 Significator bug at runtime without config edits)
+- Emoji-aware status matching — Notion status options like `💡 Identified` match user-supplied `Identified`.
+- `get-page` parses YAML Metadata into structured key-value pairs.
+- Nexus `Kind` property (Catalyst/Experience/Transformation/Choice currency tag) is surfaced in `energy-flow` output.
+
+The config file (`lifeos.config.default.json`) now contains ONLY:
+- Reservoir name + placeholder `data_source_id` (auto-discovered by name)
+- Holonic metadata (archetype, scale, dimension, currency_in/out, cycle)
+- `entry_type_property` (the Notion property name that discriminates entry types)
+- `currency_property` (Nexus only — the `Kind` property that tags currency)
+- Briefing role/module definitions
+- Holonic config (currencies, drives, cycles, status progressions, transmutation map, nexus firing thresholds, drive effects)
+
+NO `properties` map, NO `entry_type_descriptions`, NO hardcoded relation definitions — all discovered live.
 
 ---
 
@@ -142,10 +169,14 @@ cargo build --release --target x86_64-unknown-linux-musl
 
 1. **Install** — Use the one-line installer above, or download a release binary.
 2. **Set token** — `export NOTION_API_TOKEN=your_token`
-3. **Discover databases** — `lifeos discover` (auto-resolves the 5 reservoirs by name in your Notion workspace; saves `lifeos.config.json`)
-4. **Init vault** — `lifeos init`
-5. **Pull data** — `lifeos pull`
-6. **Optional — run as MCP server** — `lifeos mcp`
+3. **Discover databases + schema** — `lifeos discover` (auto-resolves the 5 reservoirs by name in your Notion workspace AND fetches full schema: properties, entry types, relation edges. Saves `lifeos.config.json`.)
+4. **Inspect schema** — `lifeos schema` (shows all 5 reservoirs with auto-discovered properties, entry types, and relations)
+5. **Init vault** — `lifeos init`
+6. **Pull data** — `lifeos pull`
+7. **Find orphans** — `lifeos orphans` (entries with zero relations — the holonic spiral is dormant for these)
+8. **Validate entries** — `lifeos validate --status invalid` (entries with broken YAML metadata)
+9. **Suggest links** — `lifeos suggest-links --source matrix --target significator` (find likely cross-reservoir links)
+10. **Optional — run as MCP server** — `lifeos mcp`
 
 > **Zero-config startup:** if you don't create `lifeos.config.json`, the binary falls back to a compiled-in default config (with placeholder IDs). On first run, `resolve_all_data_sources` auto-discovers the real database IDs by name via the Notion Search API and saves the resolved config to disk.
 
