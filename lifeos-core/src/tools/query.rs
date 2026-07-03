@@ -70,44 +70,56 @@ pub async fn execute(
     };
     let ds_id = db.ds_id();
     let name = &db.name;
-    let properties = &db.properties;
-
 
     let limit = params.limit.unwrap_or(50).min(100) as u64;
     let mut body = serde_json::json!({ "page_size": limit });
 
-    // Handle entry_type filter — filter by the DB's entry type property
+    // Handle entry_type filter — use auto-discovered property name + type.
+    // `db.notion_prop("entry_type")` returns the Notion property name (e.g. "Entry Type"
+    // for Matrix, "Item Type" for GreatWay, "Category" for Nexus). Falls back to the
+    // DB's configured `entry_type_property` if discovery hasn't run.
     if let Some(ref entry_type) = params.entry_type {
-        if let Some(et_prop) = properties.get("entry_type") {
-            // Get the actual Notion property type from schema cache
-            let actual_type = schema_cache.get_prop_type(&params.database, "entry_type")
-                .unwrap_or("select");
-            body["filter"] = build_filter(et_prop, actual_type, entry_type);
+        // Try entry_type_property first, then auto-discovered "entry_type" alias
+        let et_notion_name: Option<String> = db.entry_type_property.clone()
+            .or_else(|| db.notion_prop("entry_type").map(|s| s.to_string()));
+        if let Some(et_prop) = et_notion_name {
+            // Get the ACTUAL property type from the live schema (auto-discovered).
+            // Falls back to the deprecated config `entry_type_property_type`.
+            let actual_type = schema_cache.get_prop_type(&params.database, &et_prop)
+                .or_else(|| schema_cache.get_prop_type(&params.database, "entry_type"))
+                .unwrap_or(db.entry_type_property_type.as_str());
+            body["filter"] = build_filter(&et_prop, actual_type, entry_type);
         } else {
             return Err(format!(
-                "Database '{}' does not define an entry_type property. \
-Valid entry type properties for this DB are not configured. \
-Use get_schema to check which databases support entry_type filtering.",
+                "Database '{}' has no entry_type_property configured and no auto-discovered \
+'entry_type' property. Set `entry_type_property` in the config or run `lifeos discover` \
+to auto-detect the property name.",
                 params.database
             ));
         }
     }
 
-    // Handle preset filters — schema-aware: detect actual prop_type + use valid enum values
+    // Handle preset filters — schema-aware: use auto-discovered property names
     if params.entry_type.is_none() {
         if let Some(ref preset) = params.preset {
             let now = chrono::Utc::now();
             match preset.as_str() {
                 "active" => {
-                    if let Some(prop) = properties.get("status") {
-                        let actual_type = schema_cache.get_prop_type(&params.database, "status").unwrap_or("select");
+                    if let Some(prop) = db.notion_prop("status") {
+                        let actual_type = schema_cache.get_prop_type(&params.database, "status")
+                            .or_else(|| schema_cache.get_prop_type(&params.database, prop))
+                            .unwrap_or("select");
                         if !NON_FILTERABLE.contains(&actual_type) {
-                            body["filter"] = build_filter_with_prop(prop, actual_type, "Active");
+                            // Emoji-aware matching: if the user passes "Active" but the actual
+                            // option is "✅ Activated", match by alpha substring. See
+                            // `resolve_enum_value` for details.
+                            let resolved = resolve_enum_value(schema_cache, &params.database, "status", "Active");
+                            body["filter"] = build_filter_with_prop(prop, actual_type, &resolved);
                         }
                     }
                 }
                 "this_week" => {
-                    if let Some(prop) = properties.get("date") {
+                    if let Some(prop) = db.notion_prop("date") {
                         let start = (now - chrono::Duration::days(7)).format("%Y-%m-%d").to_string();
                         body["filter"] = serde_json::json!({
                             "property": prop, "date": { "on_or_after": start }
@@ -115,7 +127,7 @@ Use get_schema to check which databases support entry_type filtering.",
                     }
                 }
                 "this_month" => {
-                    if let Some(prop) = properties.get("date") {
+                    if let Some(prop) = db.notion_prop("date") {
                         let start = (now - chrono::Duration::days(30)).format("%Y-%m-%d").to_string();
                         body["filter"] = serde_json::json!({
                             "property": prop, "date": { "on_or_after": start }
@@ -123,10 +135,13 @@ Use get_schema to check which databases support entry_type filtering.",
                     }
                 }
                 "needs_review" => {
-                    if let Some(prop) = properties.get("status") {
-                        let actual_type = schema_cache.get_prop_type(&params.database, "status").unwrap_or("select");
+                    if let Some(prop) = db.notion_prop("status") {
+                        let actual_type = schema_cache.get_prop_type(&params.database, "status")
+                            .or_else(|| schema_cache.get_prop_type(&params.database, prop))
+                            .unwrap_or("select");
                         if !NON_FILTERABLE.contains(&actual_type) {
-                            body["filter"] = build_filter_with_prop(prop, actual_type, "Needs Review");
+                            let resolved = resolve_enum_value(schema_cache, &params.database, "status", "Needs Review");
+                            body["filter"] = build_filter_with_prop(prop, actual_type, &resolved);
                         }
                     }
                 }
@@ -135,20 +150,35 @@ Use get_schema to check which databases support entry_type filtering.",
         }
     }
 
-    // Handle manual filter — map config-key → Notion property name, validate type against schema
+    // Handle manual filter — resolve config_key → Notion property name (via auto-discovery),
+    // validate type against schema, and apply emoji-aware matching for enum types.
     if let (Some(ref prop_key), Some(ref val)) = (&params.filter_property, &params.filter_value) {
-        let notion_prop = properties.get(prop_key).map(|s| s.as_str()).unwrap_or(prop_key.as_str());
+        // Try direct config-key lookup (auto-discovered), then treat the input itself
+        // as a Notion property name (so users can pass either form).
+        let notion_prop = db.notion_prop(prop_key).unwrap_or(prop_key.as_str());
         let filter_type = params.filter_type.as_deref()
             .or_else(|| schema_cache.get_prop_type(&params.database, prop_key))
+            .or_else(|| schema_cache.get_prop_type(&params.database, notion_prop))
             .unwrap_or("rich_text");
-        body["filter"] = build_filter(notion_prop, filter_type, val);
+        // Emoji-aware enum value resolution: if the user types "Identified" but
+        // the actual Notion status option is "💡 Identified", match by alpha substring.
+        let resolved_val = resolve_enum_value(schema_cache, &params.database, prop_key, val);
+        let resolved_val = if &resolved_val == val {
+            // Try with the notion_prop too (in case prop_key was the Notion name)
+            resolve_enum_value(schema_cache, &params.database, notion_prop, val)
+        } else {
+            resolved_val
+        };
+        body["filter"] = build_filter(notion_prop, filter_type, &resolved_val);
     }
 
     // Handle sort
     if let Some(ref sort_prop) = params.sort_property {
+        // Resolve config_key → Notion name for sort property too
+        let notion_sort = db.notion_prop(sort_prop).unwrap_or(sort_prop.as_str());
         let direction = params.sort_direction.as_deref().unwrap_or("descending");
         body["sorts"] = serde_json::json!([
-            { "property": sort_prop, "direction": direction }
+            { "property": notion_sort, "direction": direction }
         ]);
     }
 
@@ -161,7 +191,8 @@ Use get_schema to check which databases support entry_type filtering.",
 
         if let Some(ref props) = params.return_properties {
             for prop_key in props {
-                if let Some(notion_name) = properties.get(prop_key) {
+                // Resolve config_key → Notion property name for extraction
+                if let Some(notion_name) = db.notion_prop(prop_key) {
                     if let Some(val) = crate::transform::extract_property_value(page, notion_name) {
                         if !val.is_null() {
                             item[prop_key] = val;
@@ -186,6 +217,61 @@ Use get_schema to check which databases support entry_type filtering.",
     let toon_data = serde_json::Value::Object(data);
 
     Ok(crate::toon_format::encode(&toon_data))
+}
+
+/// Resolve a user-supplied enum value against the actual Notion option list,
+/// handling emoji-prefixed options (Bug C fix).
+///
+/// Notion's Nexus `Status` property has emoji-prefixed options like
+/// `💡 Identified`, `✅ Activated`, `🏆 Capitalized`, `🧊 Archived`. The user
+/// types `Identified` (no emoji) and expects a match. This function:
+///   1. Returns the value as-is if it exactly matches a Notion option.
+///   2. Otherwise looks for an option whose alpha-only form equals the value
+///      (e.g. "Identified" matches "💡 Identified").
+///   3. Otherwise looks for an option whose alpha-only form contains the value
+///      case-insensitively.
+///   4. Returns the original value if no match found (Notion will return zero
+///      results — better than silently matching the wrong option).
+fn resolve_enum_value(
+    schema_cache: &SchemaCache,
+    db_key: &str,
+    prop_key: &str,
+    value: &str,
+) -> String {
+    // Direct match — fast path
+    if let Some(opts) = schema_cache.get_enum_options(db_key, prop_key) {
+        if opts.iter().any(|o| o == value) {
+            return value.to_string();
+        }
+        // Try alpha-only matching: strip non-alphanumeric chars from each option
+        // and compare case-insensitively.
+        let value_alpha = alpha_only(value);
+        let value_lower = value.to_lowercase();
+        // Exact alpha-only match
+        for opt in opts {
+            let opt_alpha = alpha_only(opt);
+            if opt_alpha == value_alpha && !opt_alpha.is_empty() {
+                return opt.clone();
+            }
+        }
+        // Substring match (case-insensitive)
+        for opt in opts {
+            let opt_lower = opt.to_lowercase();
+            if opt_lower.contains(&value_lower) && !value_lower.is_empty() {
+                return opt.clone();
+            }
+        }
+    }
+    value.to_string()
+}
+
+/// Strip non-alphanumeric/space chars and trim, for emoji-aware matching.
+fn alpha_only(s: &str) -> String {
+    s.chars()
+        .filter(|c| c.is_alphanumeric() || c.is_whitespace())
+        .collect::<String>()
+        .trim()
+        .to_lowercase()
 }
 
 /// Build filter using the Notion property name (already resolved).
@@ -278,20 +364,22 @@ pub async fn execute_override(
     };
     let ds_id = db.ds_id();
     let db_name = &db.name;
-    let properties = &db.properties;
 
     let limit = params.limit.unwrap_or(50).min(100) as u64;
     let mut body = serde_json::json!({ "page_size": limit });
 
-    // Handle entry_type filter — same as query tool
+    // Handle entry_type filter — use auto-discovered property name + type
     if let Some(ref entry_type) = params.entry_type {
-        if let Some(et_prop) = properties.get("entry_type") {
-            let actual_type = schema_cache.get_prop_type(&params.database, "entry_type")
-                .unwrap_or("select");
-            body["filter"] = build_filter(et_prop, actual_type, entry_type);
+        let et_notion_name: Option<String> = db.entry_type_property.clone()
+            .or_else(|| db.notion_prop("entry_type").map(|s| s.to_string()));
+        if let Some(et_prop) = et_notion_name {
+            let actual_type = schema_cache.get_prop_type(&params.database, &et_prop)
+                .or_else(|| schema_cache.get_prop_type(&params.database, "entry_type"))
+                .unwrap_or(db.entry_type_property_type.as_str());
+            body["filter"] = build_filter(&et_prop, actual_type, entry_type);
         } else {
             return Err(format!(
-                "Database '{}' does not define an entry_type property. Use get_schema to check.",
+                "Database '{}' has no entry_type property. Set `entry_type_property` in config or run `lifeos discover`.",
                 params.database
             ));
         }
@@ -308,26 +396,38 @@ pub async fn execute_override(
             .and_then(|v| v.as_str())
             .unwrap_or("");
 
-        let notion_prop = properties.get(prop_key)
-            .map(|s| s.as_str())
-            .unwrap_or(prop_key);
+        // Use auto-discovered property name lookup
+        let notion_prop = db.notion_prop(prop_key).unwrap_or(prop_key);
 
         let prop_type = schema_cache.get_prop_type(&params.database, prop_key)
+            .or_else(|| schema_cache.get_prop_type(&params.database, notion_prop))
             .unwrap_or("rich_text");
         if NON_FILTERABLE.contains(&prop_type) {
-            return Err(format!(
-                "Property '{}' is type '{}' which cannot be filtered. Valid filterable properties: {}",
-                prop_key, prop_type,
-                properties.keys().filter(|k| {
-                    schema_cache.get_prop_type(&params.database, k)
+            // Build list of filterable Notion property names from auto-discovery
+            let filterable: Vec<String> = schema_cache.get_property_names(&params.database).iter()
+                .filter(|n| {
+                    schema_cache.get_prop_type(&params.database, n)
                         .map(|t| !NON_FILTERABLE.contains(&t))
                         .unwrap_or(true)
-                }).map(|s| s.as_str()).collect::<Vec<_>>().join(", ")
+                })
+                .cloned()
+                .collect();
+            return Err(format!(
+                "Property '{}' is type '{}' which cannot be filtered. Valid filterable properties: {}",
+                prop_key, prop_type, filterable.join(", ")
             ));
         }
 
+        // Emoji-aware enum value resolution
+        let resolved_val = resolve_enum_value(schema_cache, &params.database, prop_key, value);
+        let resolved_val = if resolved_val == value {
+            resolve_enum_value(schema_cache, &params.database, notion_prop, value)
+        } else {
+            resolved_val
+        };
+
         body["filter"] = match operator {
-            "equals" => build_filter(notion_prop, prop_type, value),
+            "equals" => build_filter(notion_prop, prop_type, &resolved_val),
             "contains" => serde_json::json!({ "property": notion_prop, "rich_text": { "contains": value } }),
             "starts_with" => serde_json::json!({ "property": notion_prop, "rich_text": { "starts_with": value } }),
             "ends_with" => serde_json::json!({ "property": notion_prop, "rich_text": { "ends_with": value } }),
@@ -335,7 +435,7 @@ pub async fn execute_override(
             "after" => serde_json::json!({ "property": notion_prop, "date": { "after": value } }),
             "on_or_before" => serde_json::json!({ "property": notion_prop, "date": { "on_or_before": value } }),
             "on_or_after" => serde_json::json!({ "property": notion_prop, "date": { "on_or_after": value } }),
-            _ => build_filter(notion_prop, prop_type, value),
+            _ => build_filter(notion_prop, prop_type, &resolved_val),
         };
     }
 
@@ -346,8 +446,10 @@ pub async fn execute_override(
         let direction = sort_obj.get("direction")
             .and_then(|v| v.as_str())
             .unwrap_or("descending");
+        // Resolve config_key → Notion name for sort
+        let notion_sort = db.notion_prop(sort_prop).unwrap_or(sort_prop);
         body["sorts"] = serde_json::json!([
-            { "property": sort_prop, "direction": direction }
+            { "property": notion_sort, "direction": direction }
         ]);
     }
 
@@ -359,7 +461,7 @@ pub async fn execute_override(
 
         if let Some(ref props) = params.return_properties {
             for prop_key in props {
-                if let Some(notion_name) = properties.get(prop_key) {
+                if let Some(notion_name) = db.notion_prop(prop_key) {
                     if let Some(val) = crate::transform::extract_property_value(page, notion_name) {
                         if !val.is_null() {
                             item[prop_key] = val;
@@ -416,11 +518,15 @@ async fn execute_cycle_query(
         let mut body = serde_json::json!({ "page_size": limit });
 
         // Apply entry_type filter within each reservoir (if specified)
+        // Uses auto-discovered property name + type.
         if let Some(ref entry_type) = params.entry_type {
-            if let Some(et_prop) = db.properties.get("entry_type") {
-                let actual_type = schema_cache.get_prop_type(res_key, "entry_type")
-                    .unwrap_or("select");
-                body["filter"] = build_filter(et_prop, actual_type, entry_type);
+            let et_notion_name: Option<String> = db.entry_type_property.clone()
+                .or_else(|| db.notion_prop("entry_type").map(|s| s.to_string()));
+            if let Some(et_prop) = et_notion_name {
+                let actual_type = schema_cache.get_prop_type(res_key, &et_prop)
+                    .or_else(|| schema_cache.get_prop_type(res_key, "entry_type"))
+                    .unwrap_or(db.entry_type_property_type.as_str());
+                body["filter"] = build_filter(&et_prop, actual_type, entry_type);
             }
         }
 
@@ -430,13 +536,13 @@ async fn execute_cycle_query(
                 let now = chrono::Utc::now();
                 match preset.as_str() {
                     "this_week" => {
-                        if let Some(prop) = db.properties.get("date") {
+                        if let Some(prop) = db.notion_prop("date") {
                             let start = (now - chrono::Duration::days(7)).format("%Y-%m-%d").to_string();
                             body["filter"] = serde_json::json!({ "property": prop, "date": { "on_or_after": start } });
                         }
                     }
                     "this_month" => {
-                        if let Some(prop) = db.properties.get("date") {
+                        if let Some(prop) = db.notion_prop("date") {
                             let start = (now - chrono::Duration::days(30)).format("%Y-%m-%d").to_string();
                             body["filter"] = serde_json::json!({ "property": prop, "date": { "on_or_after": start } });
                         }

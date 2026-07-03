@@ -26,13 +26,19 @@ pub(crate) fn embedded_config() -> LifeOSConfig {
 // ── v5 Holonic Architecture ─────────────────────────────────────────
 
 /// Top-level holonic architecture configuration.
+///
+/// NOTE: In v0.7+, the `entry_type_descriptions` field is deprecated — entry types
+/// are auto-discovered from Notion at runtime by `SchemaCache::init`. The field is
+/// kept (with `#[serde(default)]`) for backward compatibility with older configs.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HolonicConfig {
     pub version: String,
     pub currencies: Vec<String>,
     pub drives: Vec<String>,
     pub cycles: CycleConfig,
-    /// Status progressions per reservoir: reservoir_key → ordered status stages
+    /// Status progressions per reservoir: reservoir_key → ordered status stages.
+    /// Used by health_metrics + drive_assessment. Optional — if omitted, falls back
+    /// to hardcoded defaults per archetype.
     #[serde(default)]
     pub status_progressions: HashMap<String, Vec<String>>,
     /// Transmutation map: transmutation_type → { source, target }
@@ -44,7 +50,9 @@ pub struct HolonicConfig {
     /// Drive effects per boundary
     #[serde(default)]
     pub drive_effects: HashMap<String, DriveEffectDef>,
-    /// Entry type descriptions per DB: db_key → { entry_type_name → description }
+    /// DEPRECATED in v0.7+. Entry type descriptions per DB. Kept for backward
+    /// compatibility — entry types themselves are now auto-discovered from Notion.
+    /// Use the `lifeos schema` command to see live entry types per DB.
     #[serde(default)]
     pub entry_type_descriptions: HashMap<String, HashMap<String, String>>,
 }
@@ -92,12 +100,13 @@ pub struct CycleDefinition {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DbConfig {
     pub name: String,
-    /// The Notion database container ID (what you see in URLs)
+    /// The Notion data_source_id — the ID used for `/v1/data_sources/{id}/query`.
+    /// Placeholder UUIDs (`00000000-...`) are auto-discovered by `lifeos discover`
+    /// via the Notion Search API (matched by `name`).
     #[serde(rename = "data_source_id")]
     pub database_id: String,
-    pub properties: HashMap<String, String>,
 
-    // ── v5 Holonic Metadata ──
+    // ── v5 Holonic Metadata (the ONLY required identity fields) ──
     /// Archetype role: "matrix", "potentiator", "significator", "greatway", "nexus"
     #[serde(default)]
     pub archetype: Option<String>,
@@ -119,24 +128,69 @@ pub struct DbConfig {
     /// Human-readable description of this DB's holonic role
     #[serde(default)]
     pub description: Option<String>,
-    /// The Notion property name that holds entry type discrimination
-    /// (e.g., "Entry Type" for Potentiator, "Item Type" for GreatWay)
+    /// The Notion property name that holds entry-type discrimination
+    /// (e.g., "Entry Type" for Potentiator, "Item Type" for GreatWay, "Category" for Nexus).
+    /// Required for entry-type filtering; if omitted, `lifeos schema` will report
+    /// no entry types even if the property exists in Notion.
     #[serde(default)]
     pub entry_type_property: Option<String>,
-    /// Notion property type for entry_type_property: "select" or "multi_select".
-    /// Defaults to "select" if omitted.
+    /// DEPRECATED in v0.7+. Auto-discovered from Notion at runtime by SchemaCache.
+    /// Kept for backward compatibility — if present and the live Notion schema
+    /// disagrees, the Notion schema wins.
     #[serde(default = "default_entry_type_property_type")]
     pub entry_type_property_type: String,
+    /// For Nexus only: the Notion property name that tags entries with a currency
+    /// (Catalyst/Experience/Transformation/Choice). Used by `energy-flow` to filter
+    /// Nexus entries by currency flow.
+    #[serde(default)]
+    pub currency_property: Option<String>,
 
-    /// Resolved at runtime via GET /v1/databases/{database_id} → data_sources[0].id
+    // ── DEPRECATED: legacy static property map ──
+    /// Legacy field kept ONLY so old config files continue to parse. In v0.7+ this
+    /// is unused — the live Notion schema is auto-discovered at runtime by
+    /// `SchemaCache::init` and stored in `discovered_properties`. Always empty in
+    /// fresh configs. Direct access to this field is discouraged; use
+    /// `DbConfig::notion_prop()` which consults `discovered_properties` first and
+    /// falls back to this map only as a legacy safety net.
+    #[serde(default)]
+    pub properties: HashMap<String, String>,
+
+    // ── Auto-discovered at runtime (NOT in config file) ──
+    /// Resolved at runtime via GET /v1/data_sources/{id} (or auto-discovered by name).
     #[serde(skip)]
     pub resolved_data_source_id: Option<String>,
+    /// Auto-discovered property map: config_key (snake_case alias) → Notion property name.
+    /// Populated by `SchemaCache::init` from the live Notion schema. Empty in config file.
+    #[serde(skip)]
+    pub discovered_properties: HashMap<String, String>,
 }
 
 impl DbConfig {
     /// Returns the data_source_id if resolved, otherwise falls back to database_id.
     pub fn ds_id(&self) -> &str {
         self.resolved_data_source_id.as_deref().unwrap_or(&self.database_id)
+    }
+
+    /// Get the Notion property name for a config key. Prefers auto-discovered
+    /// properties (which are always authoritative since they come from Notion);
+    /// falls back to the legacy static `properties` map (for pre-v0.7 configs).
+    ///
+    /// Auto-discovery keys use snake_case aliases of the actual Notion names:
+    ///   - `name` → "Name" (title)
+    ///   - `entry_type` → entry_type_property (e.g. "Entry Type")
+    ///   - `status` → "Status" / "Digestion Status" (per DB)
+    ///   - `<snake_case>` → matching Notion property name
+    pub fn notion_prop(&self, config_key: &str) -> Option<&str> {
+        if let Some(n) = self.discovered_properties.get(config_key) {
+            return Some(n.as_str());
+        }
+        self.properties.get(config_key).map(|s| s.as_str())
+    }
+
+    /// Get the entry_type_property Notion name, with fallback.
+    pub fn entry_type_notion_name(&self) -> Option<&str> {
+        self.entry_type_property.as_deref()
+            .or_else(|| self.discovered_properties.get("entry_type").map(|s| s.as_str()))
     }
 }
 

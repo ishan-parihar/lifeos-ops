@@ -20,6 +20,7 @@ pub mod health_metrics;
 pub mod energetics;
 pub mod shared;
 pub mod relations;
+pub mod audit;
 
 fn enrich_database_param(schema: &mut Value, param_name: &str, schema_cache: &SchemaCache) {
     let db_keys: Vec<Value> = schema_cache.db_keys().iter().map(|k| Value::String(k.clone())).collect();
@@ -74,6 +75,9 @@ pub async fn get_tool_definitions(config: &LifeOSConfig, _notion: &NotionClient,
         tool_def("process_currency", "Advance an entry through its currency lifecycle.".to_string(), energetics::process_currency_schema()),
         tool_def("trigger_nexus", "Detect and execute Nexus firing when pressure exceeds threshold.".to_string(), energetics::trigger_nexus_schema()),
         tool_def("apply_drive", "Apply Agency/Communion/Eros/Agape at a boundary to regulate currency flow.".to_string(), energetics::apply_drive_schema()),
+        tool_def("orphans", "List entries with zero populated relations — find data-isolation issues.".to_string(), audit::schema_orphans()),
+        tool_def("validate", "Filter entries by YAML-metadata Validation formula status (valid/invalid/legacy/missing).".to_string(), audit::schema_validate()),
+        tool_def("suggest_links", "Suggest likely cross-reservoir links for orphan entries via title similarity.".to_string(), audit::schema_suggest_links()),
     ]
 }
 
@@ -215,6 +219,21 @@ pub async fn call_tool(
             let params: energetics::ApplyDriveParams = serde_json::from_value(args.clone())
                 .map_err(|e| format!("Invalid apply_drive params: {}", e))?;
             energetics::execute_apply_drive(&params, config, notion, schema_cache).await
+        }
+        "orphans" => {
+            let params: audit::OrphansParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid orphans params: {}", e))?;
+            audit::execute_orphans(&params, config, notion, schema_cache).await
+        }
+        "validate" => {
+            let params: audit::ValidateParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid validate params: {}", e))?;
+            audit::execute_validate(&params, config, notion, schema_cache).await
+        }
+        "suggest_links" => {
+            let params: audit::SuggestLinksParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid suggest_links params: {}", e))?;
+            audit::execute_suggest_links(&params, config, notion, schema_cache).await
         }
         _ => Err(format!("Unknown tool: {}", name)),
     }

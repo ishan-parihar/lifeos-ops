@@ -329,17 +329,34 @@ pub async fn execute(
                 for (db_key, entry_types) in &entry_type_filters {
                     if let Some(db) = crate::config::resolve_db(config, db_key) {
                         let mut db_entries = serde_json::json!({});
+                        // Use the DB's configured entry_type_property (authoritative) —
+                        // fall back to "entry_type" alias auto-discovered by SchemaCache.
+                        let et_notion_name = db.entry_type_notion_name()
+                            .unwrap_or("Entry Type");
+                        // Get the ACTUAL Notion property type from the live schema
+                        // (auto-discovered). Falls back to the DB's deprecated config
+                        // entry_type_property_type, then to "select".
+                        let et_prop_type = schema_cache
+                            .get_prop_type(db_key, et_notion_name)
+                            .or_else(|| schema_cache.get_prop_type(db_key, "entry_type"))
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| db.entry_type_property_type.clone());
                         for entry_type in entry_types {
                             let mut query = serde_json::json!({ "page_size": 20 });
-                            // Filter by entry type using the DB's entry_type_property
-                            if let Some(et_prop) = db.properties.get("entry_type") {
-                                let prop_type = schema_cache.get_prop_type(db_key, "entry_type")
-                                    .unwrap_or("select");
-                                query["filter"] = serde_json::json!({
-                                    "property": et_prop,
-                                    prop_type: { "equals": entry_type }
-                                });
-                            }
+                            // Build entry-type filter using the correct property type:
+                            //   - select     → {"select": {"equals": ...}}
+                            //   - multi_select → {"multi_select": {"contains": ...}}
+                            let filter = match et_prop_type.as_str() {
+                                "multi_select" => serde_json::json!({
+                                    "property": et_notion_name,
+                                    "multi_select": { "contains": entry_type }
+                                }),
+                                _ => serde_json::json!({
+                                    "property": et_notion_name,
+                                    "select": { "equals": entry_type }
+                                }),
+                            };
+                            query["filter"] = filter;
                             match notion.query_data_source(db.ds_id(), &query).await {
                                 Ok(result) => {
                                     let items: Vec<serde_json::Value> = result.results.iter()

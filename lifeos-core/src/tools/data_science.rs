@@ -162,14 +162,15 @@ async fn fetch_entries(
 
     // Entry type filter
     if let Some(et) = entry_type {
-        if let Some(et_prop) = properties.get("entry_type") {
-            let mut et_type = db.entry_type_property_type.as_str();
-            // Runtime fallback: significator uses multi_select even if config defaults to select
-            if et_type == "select" && db_key == "significator" {
-                et_type = "multi_select";
-            }
-            filters.push(build_entry_type_filter(et_prop, et, et_type));
-        }
+        // Use the DB's configured entry_type_property name (authoritative); fall back to "Entry Type"
+        let et_notion_name = db.entry_type_notion_name().unwrap_or("Entry Type");
+        // The DB's entry_type_property_type is auto-corrected at runtime by
+        // `SchemaCache::propagate_to_config` (called from main.rs resolve_with_schema),
+        // which sets `entry_type_property_type` to match the live Notion schema when
+        // discovered_properties is populated. As a defensive fallback for callers that
+        // didn't go through resolve_with_schema, the original config value is used.
+        let et_type = db.entry_type_property_type.clone();
+        filters.push(build_entry_type_filter(et_notion_name, et, &et_type));
     }
 
     let filter = if filters.is_empty() {
