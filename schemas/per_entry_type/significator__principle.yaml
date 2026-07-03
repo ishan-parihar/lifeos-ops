@@ -12,6 +12,15 @@ inherits_from:
 - per_db/significator.yaml
 documentation_ref: Significator Principle entry-type (per Flag 3 consolidation)
 properties:
+  principle_sub_type:
+    notion_type: select
+    required: false
+    description: For Principle-family entries only (per Flag 3 — consolidates Purpose/Value/Principle into one entry-type
+      with a sub-type discriminator).
+    options:
+    - Purpose
+    - Value
+    - Principle
   principle_domain:
     notion_type: select
     required: false

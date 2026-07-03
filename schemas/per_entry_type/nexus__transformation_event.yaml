@@ -12,6 +12,18 @@ inherits_from:
 - per_db/nexus.yaml
 documentation_ref: Operational transformation-event entry-type
 properties:
+  crucible_intensity:
+    notion_type: select
+    required: false
+    description: Per HoloOS doc holon_states.yaml greater_cycle.preconditions.
+    options:
+    - moderate
+    - acute
+  transformation_threshold:
+    notion_type: number
+    required: false
+    description: 'T_thresh — the threshold the Significator must reach for this Transformation-kind Nexus entry to fire (HoloOS
+      doc 03.1 §3 stage 8). Default: 110.0 (from lifeos.config.default.json nexus_firing.pressure_threshold).'
   transformation_magnitude:
     notion_type: select
     required: false

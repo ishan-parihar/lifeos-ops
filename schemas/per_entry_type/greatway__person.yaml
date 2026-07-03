@@ -12,6 +12,36 @@ inherits_from:
 - per_db/greatway.yaml
 documentation_ref: RELOCATED FROM Significator (external holons belong in the Great Way per HoloOS doc 08.5)
 properties:
+  quadrant:
+    notion_type: select
+    required: false
+    description: AQAL quadrant (HoloOS doc holon_type_placement.yaml).
+    options:
+    - UL
+    - UR
+    - LL
+    - LR
+  dimension:
+    notion_type: select
+    required: false
+    description: Interior/Exterior dimension (HoloOS doc holon_type_placement.yaml).
+    options:
+    - Interior
+    - Exterior
+  bonding_disposition:
+    notion_type: select
+    required: false
+    description: HoloOS doc 02.3 §4 — bonding type at Significator⇄Great-Way surface.
+    options:
+    - ionic
+    - covalent
+    - dative
+    - metallic
+  bonding_partner_count:
+    notion_type: number
+    required: false
+    description: Number of active Significator-side bonds this GreatWay entry maintains. Used to compute metallic-bonding
+      lattice density.
   person_type:
     notion_type: select
     required: false
@@ -28,15 +58,6 @@ properties:
     - vendor
     - public_figure
     - ancestor
-  bonding_disposition:
-    notion_type: select
-    required: false
-    description: HoloOS doc 02.3 §4 — bonding type at Significator⇄Great-Way surface.
-    options:
-    - ionic
-    - covalent
-    - dative
-    - metallic
   valence_complementarity:
     notion_type: rich_text
     required: false

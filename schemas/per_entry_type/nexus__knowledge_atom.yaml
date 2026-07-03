@@ -12,6 +12,16 @@ inherits_from:
 - per_db/nexus.yaml
 documentation_ref: RELOCATED FROM Potentiator (single synthesized knowledge units)
 properties:
+  synthesis_state:
+    notion_type: select
+    required: false
+    description: Tracks the 9-stage digestion state of a note/knowledge atom as it crystallizes from Catalyst-class Note into
+      Experience-class Knowledge into refined Catalyst.
+    options:
+    - raw_note
+    - annotated
+    - synthesized
+    - applied
   atom_statement:
     notion_type: rich_text
     required: true
