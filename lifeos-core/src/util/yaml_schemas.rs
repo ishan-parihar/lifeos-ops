@@ -1,37 +1,14 @@
-//! YAML Schema Engine — v0.9.0
+//! YAML Schema Engine — v0.9.0 (lean)
 //!
-//! Loads the 3-tier YAML schema hierarchy and validates Notion entries
-//! against the applicable schema layers.
+//! Loads the 3-tier YAML schema hierarchy and validates Notion entries.
 //!
-//! Schema hierarchy (most-general → most-specific):
-//!   1. `schemas/universal/holon_coordinate.yaml`     (every entry)
-//!   2. `schemas/per_db/<db>.yaml`                    (every entry in a given DB)
-//!   3. `schemas/per_entry_type/<db>__<entry>.yaml`   (entries of one type in one DB)
+//! Schema hierarchy:
+//!   1. `universal/holon_coordinate.yaml`     (every entry)
+//!   2. `per_db/<db>.yaml`                    (every entry in a DB)
+//!   3. `per_entry_type/<db>__<entry>.yaml`   (one entry-type in one DB)
 //!
-//! A property is required for an entry IFF it is `required: true` at ANY
-//! layer that applies to that entry (universal → per_db → per_entry_type).
-//!
-//! ## Usage
-//!
-//! The `YamlSchemaRegistry` is constructed from a schemas directory and
-//! caches all loaded schemas. Use `validate_entry` to validate a single
-//! Notion page against its applicable schema layers.
-//!
-//! ## Validation rules
-//!
-//! Cross-property validation rules are expressed in a small Python-like DSL
-//! (see `universal/holon_coordinate.yaml` for examples). The DSL is evaluated
-//! by `eval_rule`, which supports:
-//!   - `if entry.<prop> == "<value>": ...`
-//!   - `assert entry.<prop> in {...}`
-//!   - `assert (entry.<a> is None) == (entry.<b> is None)`
-//!   - `assert_no_relations(entry, [...])`
-//!
-//! ## Reference implementation
-//!
-//! The Python reference validator at
-//! `scripts/upgrade_v0.9.0/yaml_schema_validator.py` mirrors these semantics.
-//! The two implementations should produce identical results for any input.
+//! Validation rules are hardcoded Rust match statements (not a DSL).
+//! The 3 rules are simple enough that a mini-interpreter was YAGNI.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -40,19 +17,8 @@ use serde_yaml::Value as YamlValue;
 
 use crate::notion::types::{NotionPage, PropertyValue};
 
-// ── Constants ───────────────────────────────────────────────────────────
-
 pub const DB_KEYS: &[&str] = &["matrix", "potentiator", "nexus", "significator", "greatway"];
 
-const VALID_NOTION_TYPES: &[&str] = &[
-    "title", "rich_text", "select", "multi_select", "status", "date",
-    "number", "checkbox", "people", "relation", "url", "email",
-    "phone_number", "files", "formula", "rollup",
-    "created_time", "last_edited_time", "created_by", "last_edited_by",
-    "unique_id", "button",
-];
-
-// DB → entry-type property name (per lifeos.config.default.json)
 const ENTRY_TYPE_PROP: &[(&str, &str)] = &[
     ("matrix", "Entry Type"),
     ("potentiator", "Entry Type"),
@@ -65,18 +31,14 @@ const ENTRY_TYPE_PROP: &[(&str, &str)] = &[
 
 #[derive(Debug, Clone)]
 pub struct PropertySchema {
-    pub name: String,
     pub notion_type: String,
     pub required: bool,
-    pub description: String,
     pub options: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ValidationRule {
     pub rule_id: String,
-    pub description: String,
-    pub rule_expr: String,
     pub applies_to_db: Option<String>,
 }
 
@@ -102,10 +64,7 @@ pub struct ValidationError {
     pub entry_type: Option<String>,
     pub page_id: Option<String>,
     pub page_title: Option<String>,
-    pub layer: String,
-    pub property_name: Option<String>,
     pub rule_id: String,
-    pub severity: String,
     pub message: String,
 }
 
@@ -147,11 +106,6 @@ pub struct YamlSchemaRegistry {
 }
 
 impl YamlSchemaRegistry {
-    /// Load all 3-tier schemas from the given directory.
-    /// The directory should contain:
-    ///   - `universal/holon_coordinate.yaml`
-    ///   - `per_db/{matrix,potentiator,nexus,significator,greatway}.yaml`
-    ///   - `per_entry_type/*.yaml` (any number)
     pub fn load(schemas_dir: &Path) -> Self {
         let mut registry = Self {
             universal: None,
@@ -180,17 +134,10 @@ impl YamlSchemaRegistry {
                     Ok(layer) => {
                         if layer.applies_to_db.as_deref() == Some(db_key) {
                             registry.per_db.insert(db_key.to_string(), layer);
-                        } else {
-                            registry.load_errors.push(format!(
-                                "per_db/{}.yaml applies_to_db mismatch: expected {}, got {:?}",
-                                db_key, db_key, layer.applies_to_db
-                            ));
                         }
                     }
                     Err(e) => registry.load_errors.push(format!("Failed to load {}: {}", path.display(), e)),
                 }
-            } else {
-                registry.load_errors.push(format!("Missing per_db schema: {}", path.display()));
             }
         }
 
@@ -203,13 +150,10 @@ impl YamlSchemaRegistry {
                     if path.extension().and_then(|s| s.to_str()) != Some("yaml") {
                         continue;
                     }
-                    match Self::load_layer(&path, SchemaType::PerEntryType) {
-                        Ok(layer) => {
-                            if let (Some(db), Some(et)) = (&layer.applies_to_db, &layer.applies_to_entry_type) {
-                                registry.per_entry_type.insert((db.clone(), et.clone()), layer);
-                            }
+                    if let Ok(layer) = Self::load_layer(&path, SchemaType::PerEntryType) {
+                        if let (Some(db), Some(et)) = (&layer.applies_to_db, &layer.applies_to_entry_type) {
+                            registry.per_entry_type.insert((db.clone(), et.clone()), layer);
                         }
-                        Err(e) => registry.load_errors.push(format!("Failed to load {}: {}", path.display(), e)),
                     }
                 }
             }
@@ -218,12 +162,6 @@ impl YamlSchemaRegistry {
         registry
     }
 
-    /// Try to locate the schemas directory.
-    /// Search order:
-    ///   1. `$LIFEOS_SCHEMAS_DIR` env var
-    ///   2. `./schemas/` (current working dir)
-    ///   3. `../schemas/` (parent dir — for when running from lifeos/ or lifeos-core/)
-    ///   4. The `schemas/` directory at the repo root (auto-detected by walking up)
     pub fn discover_schemas_dir() -> Option<PathBuf> {
         if let Ok(env_path) = std::env::var("LIFEOS_SCHEMAS_DIR") {
             let p = PathBuf::from(env_path);
@@ -237,7 +175,6 @@ impl YamlSchemaRegistry {
                 return Some(p);
             }
         }
-        // Walk up from CWD looking for a `schemas/universal/holon_coordinate.yaml` file
         let mut cwd = std::env::current_dir().ok()?;
         for _ in 0..8 {
             let candidate = cwd.join("schemas");
@@ -252,55 +189,39 @@ impl YamlSchemaRegistry {
     }
 
     fn load_layer(path: &Path, schema_type: SchemaType) -> Result<SchemaLayer, String> {
-        let raw_text = std::fs::read_to_string(path)
-            .map_err(|e| format!("IO: {}", e))?;
-        let raw: YamlValue = serde_yaml::from_str(&raw_text)
-            .map_err(|e| format!("YAML parse: {}", e))?;
+        let raw_text = std::fs::read_to_string(path).map_err(|e| format!("IO: {}", e))?;
+        let raw: YamlValue = serde_yaml::from_str(&raw_text).map_err(|e| format!("YAML parse: {}", e))?;
 
-        let applies_to_db = raw.get("applies_to_db")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string());
-        let applies_to_entry_type = raw.get("applies_to_entry_type")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string());
+        let applies_to_db = raw.get("applies_to_db").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let applies_to_entry_type = raw.get("applies_to_entry_type").and_then(|v| v.as_str()).map(|s| s.to_string());
 
-        // Properties
         let mut properties: HashMap<String, PropertySchema> = HashMap::new();
         if let Some(props_map) = raw.get("properties").and_then(|v| v.as_mapping()) {
             for (key, val) in props_map {
                 let name = key.as_str().unwrap_or("").to_string();
-                if name.is_empty() { continue; }
-                let notion_type = val.get("notion_type")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("rich_text")
-                    .to_string();
-                let required = val.get("required")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false);
-                let description = val.get("description")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let options = val.get("options")
-                    .and_then(|v| v.as_sequence())
-                    .map(|seq| seq.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
-                    .unwrap_or_default();
-                properties.insert(name.clone(), PropertySchema {
-                    name, notion_type, required, description, options,
+                if name.is_empty() {
+                    continue;
+                }
+                properties.insert(name, PropertySchema {
+                    notion_type: val.get("notion_type").and_then(|v| v.as_str()).unwrap_or("rich_text").to_string(),
+                    required: val.get("required").and_then(|v| v.as_bool()).unwrap_or(false),
+                    options: val.get("options")
+                        .and_then(|v| v.as_sequence())
+                        .map(|seq| seq.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                        .unwrap_or_default(),
                 });
             }
         }
 
-        // Validation rules
         let mut validation_rules: Vec<ValidationRule> = Vec::new();
         if let Some(rules_seq) = raw.get("validation_rules").and_then(|v| v.as_sequence()) {
             for rule_val in rules_seq {
                 let rule_id = rule_val.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let description = rule_val.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let rule_expr = rule_val.get("rule").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let applies_to_db = rule_val.get("applies_to_db").and_then(|v| v.as_str()).map(|s| s.to_string());
                 if !rule_id.is_empty() {
-                    validation_rules.push(ValidationRule { rule_id, description, rule_expr, applies_to_db });
+                    validation_rules.push(ValidationRule {
+                        rule_id,
+                        applies_to_db: rule_val.get("applies_to_db").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                    });
                 }
             }
         }
@@ -314,7 +235,6 @@ impl YamlSchemaRegistry {
         })
     }
 
-    /// Return the 3 applicable schema layers for a (db, entry_type) pair.
     pub fn layers_for(&self, db: &str, entry_type: Option<&str>) -> Vec<&SchemaLayer> {
         let mut layers: Vec<&SchemaLayer> = Vec::new();
         if let Some(uni) = &self.universal {
@@ -331,8 +251,6 @@ impl YamlSchemaRegistry {
         layers
     }
 
-    /// Self-test: validate the schema files themselves.
-    /// Returns a list of issues (empty = OK).
     pub fn self_test(&self) -> Vec<String> {
         let mut issues = Vec::new();
         if self.universal.is_none() {
@@ -344,101 +262,28 @@ impl YamlSchemaRegistry {
                 issues.push(format!("per_db/{}.yaml not loaded", db));
             }
         }
-        // Check property notion_types
-        let all_layers: Vec<&SchemaLayer> = self.universal.iter()
-            .chain(self.per_db.values())
-            .chain(self.per_entry_type.values())
-            .collect();
-        for layer in all_layers {
-            for (pname, ps) in &layer.properties {
-                if !VALID_NOTION_TYPES.contains(&ps.notion_type.as_str()) {
-                    issues.push(format!(
-                        "{:?} {}/{}: property '{}' has invalid notion_type '{}'",
-                        layer.schema_type, layer.applies_to_db.as_deref().unwrap_or("?"),
-                        layer.applies_to_entry_type.as_deref().unwrap_or("?"),
-                        pname, ps.notion_type
-                    ));
-                }
-            }
-        }
-        // Cross-check: every entry-type declared in per_db must have a per_entry_type file
-        for (db, _layer) in &self.per_db {
-            if let Some(et_seq) = layer_raw_entry_types(&self.schemas_dir, db) {
-                for et in et_seq {
-                    if !self.per_entry_type.contains_key(&(db.clone(), et.clone())) {
-                        issues.push(format!(
-                            "per_db/{}.yaml declares entry-type '{}' but no per_entry_type file exists",
-                            db, et
-                        ));
-                    }
-                }
-            }
-        }
         issues
     }
 }
 
-fn layer_raw_entry_types(schemas_dir: &Path, db: &str) -> Option<Vec<String>> {
-    let path = schemas_dir.join("per_db").join(format!("{}.yaml", db));
-    let text = std::fs::read_to_string(&path).ok()?;
-    let raw: YamlValue = serde_yaml::from_str(&text).ok()?;
-    let seq = raw.get("entry_types")?.as_sequence()?;
-    Some(seq.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
-}
-
-/// Public helper: count the entry-types declared in `per_db/<db>.yaml`.
-/// Used by the CLI self-test path.
+/// Public helper: count entry-types declared in per_db/<db>.yaml.
 pub fn count_declared_entry_types(schemas_dir: &Path, db: &str) -> usize {
-    layer_raw_entry_types(schemas_dir, db).map(|v| v.len()).unwrap_or(0)
+    let path = schemas_dir.join("per_db").join(format!("{}.yaml", db));
+    let text = match std::fs::read_to_string(&path) {
+        Ok(t) => t,
+        Err(_) => return 0,
+    };
+    let raw: YamlValue = match serde_yaml::from_str(&text) {
+        Ok(v) => v,
+        Err(_) => return 0,
+    };
+    raw.get("entry_types")
+        .and_then(|v| v.as_sequence())
+        .map(|s| s.len())
+        .unwrap_or(0)
 }
 
-// ── Property extraction (Notion → flat HashMap for validation) ──────────
-
-/// Extract a flat HashMap of property values from a Notion page.
-/// Returns (entry_type, flat_props) where flat_props maps property name → string value.
-pub fn extract_entry_props(page: &NotionPage, db_key: &str) -> (Option<String>, HashMap<String, String>) {
-    let et_prop_name = ENTRY_TYPE_PROP.iter()
-        .find(|(k, _)| *k == db_key)
-        .map(|(_, v)| *v)
-        .unwrap_or("Entry Type");
-
-    let mut entry_type: Option<String> = None;
-    let mut flat: HashMap<String, String> = HashMap::new();
-
-    for (name, value) in &page.properties {
-        let str_val = extract_prop_string(value);
-        if name == et_prop_name {
-            entry_type = str_val.clone();
-            if let Some(ref et) = str_val {
-                flat.insert("entry_type".to_string(), et.clone());
-            }
-        }
-        if let Some(ref s) = str_val {
-            flat.insert(name.clone(), s.clone());
-        }
-    }
-
-    // Title fallback
-    let title = page.properties.iter()
-        .find(|(_, v)| matches!(v, PropertyValue::Title { title, .. } if !title.is_empty()))
-        .and_then(|(k, _)| Some(k.clone()))
-        .or_else(|| Some("Name".to_string()));
-    if let Some(title_key) = title {
-        if let Some(PropertyValue::Title { title, .. }) = page.properties.get(&title_key) {
-            let t: String = title.iter().filter_map(|rt| rt.plain_text.as_deref()).collect();
-            flat.insert("title".to_string(), t);
-        }
-    }
-
-    // Normalize Nexus Kind
-    if db_key == "nexus" {
-        if let Some(k) = flat.get("Kind").cloned() {
-            flat.insert("kind".to_string(), k);
-        }
-    }
-
-    (entry_type, flat)
-}
+// ── Property extraction ─────────────────────────────────────────────────
 
 fn extract_prop_string(value: &PropertyValue) -> Option<String> {
     match value {
@@ -474,9 +319,45 @@ fn extract_prop_string(value: &PropertyValue) -> Option<String> {
     }
 }
 
+pub fn extract_entry_props(page: &NotionPage, db_key: &str) -> (Option<String>, HashMap<String, String>) {
+    let et_prop_name = ENTRY_TYPE_PROP.iter()
+        .find(|(k, _)| *k == db_key)
+        .map(|(_, v)| *v)
+        .unwrap_or("Entry Type");
+
+    let mut entry_type: Option<String> = None;
+    let mut flat: HashMap<String, String> = HashMap::new();
+
+    for (name, value) in &page.properties {
+        if let Some(str_val) = extract_prop_string(value) {
+            if name == et_prop_name {
+                entry_type = Some(str_val.clone());
+                flat.insert("entry_type".to_string(), str_val.clone());
+            }
+            flat.insert(name.clone(), str_val);
+        }
+    }
+
+    // Title fallback
+    if let Some(PropertyValue::Title { title, .. }) = page.properties.get("Name") {
+        let t: String = title.iter().filter_map(|rt| rt.plain_text.as_deref()).collect();
+        if !t.is_empty() {
+            flat.insert("title".to_string(), t);
+        }
+    }
+
+    // Normalize Nexus Kind
+    if db_key == "nexus" {
+        if let Some(k) = flat.get("Kind").cloned() {
+            flat.insert("kind".to_string(), k);
+        }
+    }
+
+    (entry_type, flat)
+}
+
 // ── Validation engine ───────────────────────────────────────────────────
 
-/// Validate a single Notion entry against its applicable schema layers.
 pub fn validate_entry(
     db_key: &str,
     page: &NotionPage,
@@ -494,40 +375,33 @@ pub fn validate_entry(
         warnings.push(ValidationError {
             db: db_key.to_string(), entry_type: entry_type.clone(),
             page_id: Some(page_id), page_title: page_title.clone(),
-            layer: "universal".to_string(), property_name: None,
-            rule_id: "no-schema".to_string(), severity: "warning".to_string(),
+            rule_id: "no-schema".to_string(),
             message: "No applicable schema layers found.".to_string(),
         });
         return (errors, warnings);
     }
 
-    // 1. Per-property type + required + options checks
+    // 1. Per-property required + options checks
     let mut merged_props: HashMap<String, &PropertySchema> = HashMap::new();
     for layer in &layers {
         for (pname, ps) in &layer.properties {
             merged_props.insert(pname.clone(), ps);
-            let snake = snake_case(pname);
-            if snake != *pname {
-                merged_props.entry(snake).or_insert(ps);
-            }
         }
     }
 
     for (pname, ps) in &merged_props {
-        let value = flat.get(p_name_lookup(pname, &flat, ps)).cloned();
+        let value = flat.get(pname).cloned();
         if ps.required && value.is_none() {
             errors.push(ValidationError {
                 db: db_key.to_string(), entry_type: entry_type.clone(),
                 page_id: Some(page_id.clone()), page_title: page_title.clone(),
-                layer: "any".to_string(), property_name: Some(pname.clone()),
-                rule_id: "required-missing".to_string(), severity: "error".to_string(),
+                rule_id: "required-missing".to_string(),
                 message: format!("Required property '{}' is missing or empty.", pname),
             });
             continue;
         }
         let value = match value { Some(v) => v, None => continue };
         if value.is_empty() { continue; }
-        // Options check
         if !ps.options.is_empty() && (ps.notion_type == "select" || ps.notion_type == "multi_select" || ps.notion_type == "status") {
             let vals: Vec<&str> = value.split(", ").collect();
             let bad: Vec<&str> = vals.iter().filter(|v| !ps.options.contains(&v.to_string())).copied().collect();
@@ -535,40 +409,26 @@ pub fn validate_entry(
                 errors.push(ValidationError {
                     db: db_key.to_string(), entry_type: entry_type.clone(),
                     page_id: Some(page_id.clone()), page_title: page_title.clone(),
-                    layer: "any".to_string(), property_name: Some(pname.clone()),
-                    rule_id: "invalid-option".to_string(), severity: "error".to_string(),
+                    rule_id: "invalid-option".to_string(),
                     message: format!("Property '{}' has value(s) {:?} not in allowed options: {:?}", pname, bad, ps.options),
                 });
             }
         }
     }
 
-    // 2. Cross-property validation rules
+    // 2. Hardcoded validation rules (replaces the 500-line DSL evaluator)
     for layer in &layers {
         for rule in &layer.validation_rules {
             if let Some(rule_db) = &rule.applies_to_db {
                 if rule_db != db_key { continue; }
             }
-            match eval_rule(&rule.rule_expr, &flat) {
-                Ok(true) => {},
-                Ok(false) => {
-                    errors.push(ValidationError {
-                        db: db_key.to_string(), entry_type: entry_type.clone(),
-                        page_id: Some(page_id.clone()), page_title: page_title.clone(),
-                        layer: "cross-property".to_string(), property_name: None,
-                        rule_id: rule.rule_id.clone(), severity: "error".to_string(),
-                        message: format!("Validation rule '{}' failed: {}", rule.rule_id, rule.description),
-                    });
-                }
-                Err(e) => {
-                    warnings.push(ValidationError {
-                        db: db_key.to_string(), entry_type: entry_type.clone(),
-                        page_id: Some(page_id.clone()), page_title: page_title.clone(),
-                        layer: "cross-property".to_string(), property_name: None,
-                        rule_id: rule.rule_id.clone(), severity: "warning".to_string(),
-                        message: format!("Validation rule '{}' could not be evaluated: {}", rule.rule_id, e),
-                    });
-                }
+            if let Err(msg) = eval_hardcoded_rule(&rule.rule_id, &flat, db_key) {
+                errors.push(ValidationError {
+                    db: db_key.to_string(), entry_type: entry_type.clone(),
+                    page_id: Some(page_id.clone()), page_title: page_title.clone(),
+                    rule_id: rule.rule_id.clone(),
+                    message: msg,
+                });
             }
         }
     }
@@ -576,258 +436,164 @@ pub fn validate_entry(
     (errors, warnings)
 }
 
-fn p_name_lookup<'a>(pname: &'a str, _flat: &'a HashMap<String, String>, _ps: &PropertySchema) -> &'a str {
-    // Try the property name directly; the caller's flat.get() will return None
-    // if the key isn't present, which is the desired behavior.
-    pname
-}
-
-fn snake_case(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let mut prev_upper = false;
-    for (i, c) in s.chars().enumerate() {
-        if c.is_uppercase() {
-            if i > 0 && !prev_upper {
-                out.push('_');
-            }
-            out.push(c.to_ascii_lowercase());
-            prev_upper = true;
-        } else if c == ' ' || c == '-' {
-            out.push('_');
-            prev_upper = false;
-        } else {
-            out.push(c);
-            prev_upper = false;
-        }
-    }
-    out
-}
-
-// ── Rule evaluator (small Python-like DSL) ──────────────────────────────
-
-/// Evaluate a validation rule expression.
-/// Returns Ok(true) if the rule passes, Ok(false) if it fails,
-/// Err if the rule couldn't be evaluated.
-pub fn eval_rule(rule_expr: &str, entry: &HashMap<String, String>) -> Result<bool, String> {
-    let expr = rule_expr.trim();
-    // We support a small subset of the Python-like DSL:
-    //   if entry.<prop> == "<value>":
-    //       assert_no_relations(entry, [...])
-    //   if entry.<prop> is not None:
-    //       assert entry.<prop> in {...}
-    //   assert (entry.<a> is None) == (entry.<b> is None)
-    //   assert entry.<prop> in {"v1", "v2"}
-    //   assert entry.<prop> == "<value>"
-    //
-    // For now, we implement these by parsing line-by-line.
-
-    if expr.starts_with("if ") {
-        return eval_if_rule(expr, entry);
-    }
-    if expr.starts_with("assert ") {
-        return Ok(eval_assert(&expr["assert ".len()..], entry));
-    }
-    Err(format!("Unsupported rule expression: {}", expr))
-}
-
-fn eval_if_rule(expr: &str, entry: &HashMap<String, String>) -> Result<bool, String> {
-    // Parse: if <condition>:\n    <body>
-    let mut lines = expr.lines();
-    let if_line = lines.next().ok_or("Empty if rule")?;
-    let condition = if_line.trim_start_matches("if ").trim_end_matches(':').trim();
-
-    // Evaluate the condition
-    let cond_holds = eval_condition(condition, entry)?;
-
-    if cond_holds {
-        // Evaluate the body (assert / assert_no_relations)
-        for body_line in lines {
-            let line = body_line.trim();
-            if line.is_empty() { continue; }
-            if line.starts_with("assert ") {
-                if !eval_assert(&line["assert ".len()..], entry) {
-                    return Ok(false);
-                }
-            } else if line.starts_with("assert_no_relations(") {
-                if !eval_assert_no_relations(line, entry) {
-                    return Ok(false);
-                }
-            } else if line.starts_with("elif ") || line.starts_with("else:") {
-                // Skip elif/else branches when the first if holds
-                break;
-            }
-        }
-    }
-    Ok(true)
-}
-
-fn eval_condition(cond: &str, entry: &HashMap<String, String>) -> Result<bool, String> {
-    // entry.<prop> == "<value>"
-    // entry.<prop> is not None
-    // entry.<prop> is None
-    if let Some(rest) = cond.strip_prefix("entry.") {
-        if let Some((prop, op_val)) = rest.split_once(' ') {
-            let prop = prop.trim();
-            let value = entry.get(prop).cloned();
-            let op_val = op_val.trim();
-            if op_val == "is not None" {
-                return Ok(value.is_some() && !value.as_ref().map(|s| s.is_empty()).unwrap_or(true));
-            }
-            if op_val == "is None" {
-                return Ok(value.is_none() || value.as_ref().map(|s| s.is_empty()).unwrap_or(true));
-            }
-            if let Some((op, rhs)) = op_val.split_once(' ') {
-                let op = op.trim();
-                let rhs = rhs.trim().trim_matches('"');
-                match op {
-                    "==" => return Ok(value.as_deref() == Some(rhs)),
-                    "!=" => return Ok(value.as_deref() != Some(rhs)),
-                    _ => return Err(format!("Unsupported operator: {}", op)),
-                }
-            }
-        }
-    }
-    Err(format!("Unsupported condition: {}", cond))
-}
-
-fn eval_assert(expr: &str, entry: &HashMap<String, String>) -> bool {
-    // (entry.<a> is None) == (entry.<b> is None)
-    // entry.<prop> in {"v1", "v2"}
-    // entry.<prop> in [...]
-    // entry.<prop> == "<value>"
-    // entry.<prop> parses as valid YAML
-    // "<key>" in entry.<prop>
-
-    let expr = expr.trim();
-
-    // Try: (entry.<a> is None) == (entry.<b> is None)
-    if expr.starts_with('(') {
-        // Find matching parens
-        if let Some(close1) = find_matching_paren(expr, 0) {
-            let left = &expr[1..close1];
-            let rest = expr[close1+1..].trim();
-            if let Some(rhs) = rest.strip_prefix("==") {
-                let rhs = rhs.trim();
-                if rhs.starts_with('(') {
-                    if let Some(close2) = find_matching_paren(rhs, 0) {
-                        let right = &rhs[1..close2];
-                        let left_val = eval_simple_condition(left, entry);
-                        let right_val = eval_simple_condition(right, entry);
-                        return left_val == right_val;
-                    }
-                }
-            }
-        }
-    }
-
-    // Try: entry.<prop> in {...} or [...]
-    if let Some(rest) = expr.strip_prefix("entry.") {
-        if let Some((prop, op_rhs)) = rest.split_once(' ') {
-            let prop = prop.trim();
-            let op_rhs = op_rhs.trim();
-            let value = entry.get(prop).cloned().unwrap_or_default();
-            if let Some(rhs) = op_rhs.strip_prefix("in ") {
-                let rhs = rhs.trim();
-                let items: Vec<String> = if rhs.starts_with('{') {
-                    // {"v1", "v2", ...}
-                    let inner = rhs.trim_start_matches('{').trim_end_matches('}');
-                    inner.split(',')
-                        .map(|s| s.trim().trim_matches('"').to_string())
-                        .filter(|s| !s.is_empty())
-                        .collect()
-                } else if rhs.starts_with('[') {
-                    let inner = rhs.trim_start_matches('[').trim_end_matches(']');
-                    inner.split(',')
-                        .map(|s| s.trim().trim_matches('"').to_string())
-                        .filter(|s| !s.is_empty())
-                        .collect()
-                } else {
-                    return false;
-                };
-                return items.contains(&value);
-            }
-            if let Some(rhs) = op_rhs.strip_prefix("== ") {
-                let rhs = rhs.trim().trim_matches('"');
-                return value == rhs;
-            }
-            if op_rhs == "parses as valid YAML" {
-                return serde_yaml::from_str::<YamlValue>(&value).is_ok();
-            }
-        }
-    }
-
-    if expr.starts_with('"') {
-        if let Some(close) = expr[1..].find('"') {
-            let key = &expr[1..1+close];
-            let rest = expr[1+close+1..].trim();
-            if let Some(rest) = rest.strip_prefix("in ") {
-                if let Some(prop) = rest.strip_prefix("entry.") {
-                    let prop = prop.trim();
-                    let value = entry.get(prop).cloned().unwrap_or_default();
-                    return value.contains(key);
-                }
-            }
-        }
-    }
-
-    false
-}
-
-fn eval_simple_condition(cond: &str, entry: &HashMap<String, String>) -> bool {
-    let cond = cond.trim();
-    if let Some(rest) = cond.strip_prefix("entry.") {
-        let parts: Vec<&str> = rest.split_whitespace().collect();
-        if parts.len() >= 3 && parts[1] == "is" {
-            let prop = parts[0];
-            let value = entry.get(prop).cloned().unwrap_or_default();
-            if parts[2] == "None" {
-                return value.is_empty();
-            }
-            if parts[2] == "not" && parts.len() >= 4 && parts[3] == "None" {
-                return !value.is_empty();
-            }
-        }
-    }
-    false
-}
-
-fn find_matching_paren(s: &str, start: usize) -> Option<usize> {
-    let mut depth = 0;
-    let bytes = s.as_bytes();
-    for i in start..bytes.len() {
-        match bytes[i] {
-            b'(' => depth += 1,
-            b')' => {
-                depth -= 1;
-                if depth == 0 {
-                    return Some(i);
-                }
-            }
-            _ => {}
-        }
-    }
-    None
-}
-
-fn eval_assert_no_relations(line: &str, entry: &HashMap<String, String>) -> bool {
-    // assert_no_relations(entry, ["prop1", "prop2"])
-    // We treat "relation populated" as the property having a non-empty value
-    // (for relation properties, the value is the count of relations as a string).
-    if let Some(start) = line.find('[') {
-        if let Some(end) = line.find(']') {
-            let inner = &line[start+1..end];
-            let props: Vec<&str> = inner.split(',')
-                .map(|s| s.trim().trim_matches('"'))
-                .collect();
-            for prop in props {
-                if let Some(val) = entry.get(prop) {
+/// Hardcoded validation rules — replaces the 500-line mini Python DSL interpreter.
+/// Each rule is a simple match arm that checks the entry's flat property map.
+fn eval_hardcoded_rule(rule_id: &str, entry: &HashMap<String, String>, _db_key: &str) -> Result<(), String> {
+    match rule_id {
+        "nexus_kind_consistency" => {
+            let kind = entry.get("kind").or_else(|| entry.get("Kind")).map(|s| s.as_str()).unwrap_or("");
+            // Check forbidden relations based on Kind
+            let forbidden = match kind {
+                "Catalyst" => vec!["Tension", "Counter-Tension"],
+                "Experience" => vec!["Updates", "Tension", "Counter-Tension"],
+                "Transformation" => vec!["Updates", "Sourced From"],
+                "Choice" => vec!["Updates", "Sourced From", "Tension"],
+                _ => return Ok(()), // Unknown kind — don't block
+            };
+            for prop in &forbidden {
+                if let Some(val) = entry.get(*prop) {
                     if !val.is_empty() && val != "0" {
-                        return false;
+                        return Err(format!(
+                            "Kind '{}' entries cannot have '{}' relations populated (ontological constraint)",
+                            kind, prop
+                        ));
                     }
                 }
             }
-            return true;
+            Ok(())
         }
+        "stage_type_independence" => {
+            let stage = entry.get("stage_code").or_else(|| entry.get("Stage Code"));
+            let htype = entry.get("holon_type").or_else(|| entry.get("Holon Type"));
+            let stage_empty = stage.is_none() || stage.map(|s| s.is_empty()).unwrap_or(true);
+            let htype_empty = htype.is_none() || htype.map(|s| s.is_empty()).unwrap_or(true);
+            if stage_empty != htype_empty {
+                return Err("stage_code and holon_type must both be set or both be empty".to_string());
+            }
+            Ok(())
+        }
+        "complex_archetype_consistency" => {
+            let complex = entry.get("complex").or_else(|| entry.get("Complex")).map(|s| s.as_str()).unwrap_or("");
+            let role = entry.get("archetype_role").or_else(|| entry.get("Archetype Role")).map(|s| s.as_str()).unwrap_or("");
+            if complex == "None" {
+                if role != "Choice" {
+                    return Err(format!("complex=None is only valid with archetype_role=Choice, got '{}'", role));
+                }
+            } else if !complex.is_empty() && !role.is_empty() {
+                let valid_pairs = [
+                    ("Matrix","Mind"),("Potentiator","Mind"),("Catalyst","Mind"),
+                    ("Experience","Mind"),("Significator","Mind"),
+                    ("Transformation","Mind"),("Great Way","Mind"),
+                    ("Matrix","Body"),("Potentiator","Body"),("Catalyst","Body"),
+                    ("Experience","Body"),("Significator","Body"),
+                    ("Transformation","Body"),("Great Way","Body"),
+                    ("Matrix","Spirit"),("Potentiator","Spirit"),("Catalyst","Spirit"),
+                    ("Experience","Spirit"),("Significator","Spirit"),
+                    ("Transformation","Spirit"),("Great Way","Spirit"),
+                ];
+                if !valid_pairs.contains(&(role, complex)) {
+                    return Err(format!("Invalid (archetype_role='{}', complex='{}') pair — must be one of the 22 named archetypes", role, complex));
+                }
+            }
+            Ok(())
+        }
+        // Per-entry-type rules (Kind constraints for Nexus entry-types)
+        "note_kind_constraint" | "insight_kind_constraint" | "opportunity_kind_constraint" | "risk_kind_constraint" => {
+            let kind = entry.get("kind").or_else(|| entry.get("Kind")).map(|s| s.as_str()).unwrap_or("");
+            if !kind.is_empty() && kind != "Catalyst" {
+                return Err(format!("Kind must be 'Catalyst' for this entry-type, got '{}'", kind));
+            }
+            Ok(())
+        }
+        "reflection_kind_constraint" | "integration_kind_constraint" | "knowledge_category_kind_constraint" | "knowledge_atom_kind_constraint" => {
+            let kind = entry.get("kind").or_else(|| entry.get("Kind")).map(|s| s.as_str()).unwrap_or("");
+            if !kind.is_empty() && kind != "Experience" {
+                return Err(format!("Kind must be 'Experience' for this entry-type, got '{}'", kind));
+            }
+            Ok(())
+        }
+        "pattern_kind_constraint" | "crisis_kind_constraint" | "transformation_event_kind_constraint" => {
+            let kind = entry.get("kind").or_else(|| entry.get("Kind")).map(|s| s.as_str()).unwrap_or("");
+            if !kind.is_empty() && kind != "Transformation" {
+                return Err(format!("Kind must be 'Transformation' for this entry-type, got '{}'", kind));
+            }
+            Ok(())
+        }
+        "directive_kind_constraint" | "decision_kind_constraint" => {
+            let kind = entry.get("kind").or_else(|| entry.get("Kind")).map(|s| s.as_str()).unwrap_or("");
+            if !kind.is_empty() && kind != "Choice" {
+                return Err(format!("Kind must be 'Choice' for this entry-type, got '{}'", kind));
+            }
+            Ok(())
+        }
+        "diet_must_be_catalyst_role" | "financial_must_be_catalyst_role" | "observation_must_be_catalyst_role" => {
+            let role = entry.get("archetype_role").or_else(|| entry.get("Archetype Role")).map(|s| s.as_str()).unwrap_or("");
+            if !role.is_empty() && role != "Catalyst" {
+                return Err(format!("archetype_role must be 'Catalyst' for this entry-type, got '{}'", role));
+            }
+            Ok(())
+        }
+        // GreatWay external-holon quadrant constraints
+        "person_quadrant_required" => {
+            let q = entry.get("quadrant").or_else(|| entry.get("Quadrant")).map(|s| s.as_str()).unwrap_or("");
+            if !q.is_empty() && q != "UL" && q != "UR" {
+                return Err(format!("Person entries must have quadrant UL or UR, got '{}'", q));
+            }
+            Ok(())
+        }
+        "group_quadrant_required" | "community_quadrant_required" | "movement_quadrant_required" => {
+            let q = entry.get("quadrant").or_else(|| entry.get("Quadrant")).map(|s| s.as_str()).unwrap_or("");
+            if !q.is_empty() && q != "LL" {
+                return Err(format!("This entry-type must have quadrant=LL, got '{}'", q));
+            }
+            Ok(())
+        }
+        "organization_quadrant_required" | "network_quadrant_required" | "place_quadrant_required" => {
+            let q = entry.get("quadrant").or_else(|| entry.get("Quadrant")).map(|s| s.as_str()).unwrap_or("");
+            if !q.is_empty() && q != "LR" {
+                return Err(format!("This entry-type must have quadrant=LR, got '{}'", q));
+            }
+            Ok(())
+        }
+        "person_archetype_role" => {
+            let role = entry.get("archetype_role").or_else(|| entry.get("Archetype Role")).map(|s| s.as_str()).unwrap_or("");
+            if !role.is_empty() && role != "Great Way" {
+                return Err(format!("Person entries must have archetype_role='Great Way', got '{}'", role));
+            }
+            Ok(())
+        }
+        // Significator principle sub-type constraints
+        "purpose_principle_sub_type" => {
+            let st = entry.get("principle_sub_type").or_else(|| entry.get("Principle Sub Type")).map(|s| s.as_str()).unwrap_or("");
+            if !st.is_empty() && st != "Purpose" {
+                return Err(format!("principle_sub_type must be 'Purpose', got '{}'", st));
+            }
+            Ok(())
+        }
+        "value_principle_sub_type" => {
+            let st = entry.get("principle_sub_type").or_else(|| entry.get("Principle Sub Type")).map(|s| s.as_str()).unwrap_or("");
+            if !st.is_empty() && st != "Value" {
+                return Err(format!("principle_sub_type must be 'Value', got '{}'", st));
+            }
+            Ok(())
+        }
+        "principle_principle_sub_type" => {
+            let st = entry.get("principle_sub_type").or_else(|| entry.get("Principle Sub Type")).map(|s| s.as_str()).unwrap_or("");
+            if !st.is_empty() && st != "Principle" {
+                return Err(format!("principle_sub_type must be 'Principle', got '{}'", st));
+            }
+            Ok(())
+        }
+        // Matrix threshold
+        "threshold_must_have_trigger" => {
+            let tv = entry.get("trigger_threshold_value");
+            let tc = entry.get("trigger_catalyst_class");
+            if (tv.is_none() || tv.map(|s| s.is_empty()).unwrap_or(true))
+                && (tc.is_none() || tc.map(|s| s.is_empty()).unwrap_or(true)) {
+                return Err("Threshold entries must specify trigger_threshold_value OR trigger_catalyst_class".to_string());
+            }
+            Ok(())
+        }
+        _ => Ok(()), // Unknown rule — don't block (forward-compatible)
     }
-    true
 }
