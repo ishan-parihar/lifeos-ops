@@ -469,6 +469,31 @@ pub enum Commands {
         #[arg(short, long)]
         links: String,
     },
+
+    /// Daily review: relational gaps + holonic synthesis + recent entries in one call
+    Daily,
+
+    /// LifeOS dashboard: orphan count per DB, recent entries, top gaps, health metrics
+    Dashboard,
+
+    /// Quick-link two entries by title (resolves titles to page IDs automatically)
+    QuickLink {
+        /// Source database key
+        #[arg(short = 'S', long)]
+        source_db: String,
+        /// Source entry title (fuzzy match)
+        #[arg(short = 's', long)]
+        source_title: String,
+        /// Target database key
+        #[arg(short = 'T', long)]
+        target_db: String,
+        /// Target entry title (fuzzy match)
+        #[arg(short = 't', long)]
+        target_title: String,
+        /// Relation property name on source page
+        #[arg(short, long)]
+        property: String,
+    },
 }
 
 #[derive(clap::Subcommand, Debug)]
