@@ -370,6 +370,69 @@ async fn main() {
                         Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
                     }
                 }
+                Commands::RelationalGaps { database, min_relations, limit } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::relational_gaps::RelationalGapsParams {
+                        database, min_relations: Some(min_relations), limit: Some(limit),
+                    };
+                    match lifeos_core::tools::relational_gaps::execute(&params, &cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::BuildContext { page_id, depth } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::build_context::BuildContextParams {
+                        page_id, depth: Some(depth),
+                    };
+                    match lifeos_core::tools::build_context::execute(&params, &cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::HolonicSynthesis { page_id, days_back } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::holonic_synthesis::HolonicSynthesisParams {
+                        page_id, days_back: Some(days_back),
+                    };
+                    match lifeos_core::tools::holonic_synthesis::execute(&params, &cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::SuggestCategorization { database, limit } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::suggest_categorization::SuggestCategorizationParams {
+                        database, limit: Some(limit),
+                    };
+                    match lifeos_core::tools::suggest_categorization::execute(&params, &cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::RelationalGraph { database, show_counts } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::relational_graph::RelationalGraphParams {
+                        database, show_counts: Some(show_counts),
+                    };
+                    match lifeos_core::tools::relational_graph::execute(&params, &cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::Unlink { source, target, property } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::relation_ops::UnlinkParams {
+                        source_page: source, target_page: target, property,
+                    };
+                    match lifeos_core::tools::relation_ops::execute_unlink(&params, &cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::BatchLink { links } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let links_vec: Vec<lifeos_core::tools::relation_ops::BatchLinkItem> = serde_json::from_str(&links)
+                        .unwrap_or_else(|e| { tracing::error!("Invalid links JSON: {e}"); std::process::exit(1); });
+                    let params = lifeos_core::tools::relation_ops::BatchLinkParams { links: links_vec };
+                    match lifeos_core::tools::relation_ops::execute_batch_link(&params, &cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
             }
         }
     }

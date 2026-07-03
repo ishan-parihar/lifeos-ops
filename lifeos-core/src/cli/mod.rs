@@ -399,6 +399,76 @@ pub enum Commands {
         #[arg(short, long, default_value = "0")]
         limit: u32,
     },
+
+    /// Surface entries with zero or sparse relations + ontology-expected relations that are missing
+    RelationalGaps {
+        /// Optional: filter to a specific database
+        #[arg(short, long)]
+        database: Option<String>,
+        /// Show entries with at most this many relations (default: 0 = orphans only)
+        #[arg(long, default_value = "0")]
+        min_relations: u32,
+        /// Max entries per DB (default: 100)
+        #[arg(short, long, default_value = "100")]
+        limit: u32,
+    },
+
+    /// Assemble complete relational neighborhood for a single entry
+    BuildContext {
+        /// Page ID to build context for
+        #[arg(short = 'P', long)]
+        page_id: String,
+        /// Neighborhood depth (default: 1, max: 3)
+        #[arg(short, long, default_value = "1")]
+        depth: u32,
+    },
+
+    /// Trace currency flow across the holonic spiral
+    HolonicSynthesis {
+        /// Optional: trace from a specific entry
+        #[arg(short = 'P', long)]
+        page_id: Option<String>,
+        /// Days to look back (default: 7)
+        #[arg(short, long, default_value = "7")]
+        days_back: u32,
+    },
+
+    /// Suggest entry-types for uncategorized entries (read-only, never writes)
+    SuggestCategorization {
+        /// Optional: filter to a specific database
+        #[arg(short, long)]
+        database: Option<String>,
+        /// Max suggestions per DB (default: 20)
+        #[arg(short, long, default_value = "20")]
+        limit: u32,
+    },
+
+    /// High-level relational graph overview with link counts
+    RelationalGraph {
+        /// Optional: focus on one DB's relations
+        #[arg(short, long)]
+        database: Option<String>,
+        /// Show actual link counts (default: true)
+        #[arg(long, default_value = "true")]
+        show_counts: bool,
+    },
+
+    /// Remove a single relation between two entries
+    Unlink {
+        #[arg(short, long)]
+        source: String,
+        #[arg(short, long)]
+        target: String,
+        #[arg(short, long)]
+        property: String,
+    },
+
+    /// Create multiple relations in one call (each must be explicitly specified)
+    BatchLink {
+        /// JSON array of links: [{"source_page":"...","target_page":"...","property":"..."}]
+        #[arg(short, long)]
+        links: String,
+    },
 }
 
 #[derive(clap::Subcommand, Debug)]
