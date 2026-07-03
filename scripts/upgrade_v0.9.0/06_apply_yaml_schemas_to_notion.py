@@ -48,6 +48,7 @@ from importlib import import_module
 common = import_module("common")
 
 from common import (NotionClient, discover_db_ids, get_database_container_id,
+                     get_data_source_schema,
                      add_select_property, add_rich_text_property, add_number_property,
                      add_relation_property, print_section, print_kv, MigrationLog)
 
@@ -125,19 +126,17 @@ def apply_db_schema(
         log.errors.append(op)
         return op
 
-    db_container = get_database_container_id(client, ds_id)
-    op["db_container_id"] = db_container
+    op["data_source_id"] = ds_id
 
-    # Fetch the current Notion schema
+    # Fetch the current Notion schema from the DATA_SOURCE (API 2025-09-03)
     try:
-        notion_schema = client.get_database(db_container)
+        existing_props = get_data_source_schema(client, ds_id)
     except Exception as e:
         op["status"] = "error"
         op["error"] = f"Failed to fetch schema: {e}"
         log.errors.append(op)
         return op
 
-    existing_props = notion_schema.get("properties", {})
     op["existing_prop_count"] = len(existing_props)
 
     # Build the list of properties to create
@@ -170,10 +169,10 @@ def apply_db_schema(
         log.operations.append(op)
         return op
 
-    # Create all missing properties in a single PATCH (Notion API allows multiple properties per call)
+    # Create all missing properties in a single PATCH on the data_source (API 2025-09-03)
     try:
         body = {"properties": to_create}
-        result = client.update_database(db_container, body)
+        result = client.update_data_source(ds_id, body)
         op["status"] = "created"
         op["created_count"] = len(to_create)
         op["created_properties"] = list(to_create.keys())
