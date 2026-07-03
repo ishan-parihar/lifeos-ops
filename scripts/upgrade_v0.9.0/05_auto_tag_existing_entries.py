@@ -48,7 +48,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).parent))
 from importlib import import_module
-common = import_module("00_common")
+common = import_module("common")
 
 from common import (NotionClient, discover_db_ids, get_database_container_id,
                      print_section, print_kv, MigrationLog)

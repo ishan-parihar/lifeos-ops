@@ -181,20 +181,47 @@ def discover_db_ids(client: NotionClient) -> dict[str, str]:
     return found
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# API 2025-09-03 note:
+# In Notion API version 2025-09-03, properties live on the DATA_SOURCE, not the
+# database container. The database container is a metadata wrapper; the
+# data_source is the actual queryable table with properties.
+#
+# To READ properties:    GET /v1/data_sources/{id}
+# To MODIFY properties:  PATCH /v1/data_sources/{id}
+#
+# The old approach (PATCH /v1/databases/{container_id}) silently fails to
+# update properties in the new API version — it returns 200 but doesn't change
+# the data_source's property schema.
+#
+# For relations, the `database_id` in the relation config should be the DATABASE
+# CONTAINER ID (not the data_source ID), because Notion links relations at the
+# database level. Use `get_database_container_id` to resolve it.
+# ─────────────────────────────────────────────────────────────────────────────
+
 def get_database_container_id(client: NotionClient, data_source_id: str) -> str:
-    """A data_source_id may differ from the database container ID.
-    For PATCH /v1/databases/{id} to work, we need the container ID.
-    The data_source object has a `database_id` field pointing to its container.
+    """Resolve a data_source_id to its parent database container ID.
+
+    In Notion API 2025-09-03, a data_source has `parent.database_id` pointing
+    to the database container. This is needed for relation properties, which
+    link at the database level.
     """
     ds = client.get_data_source(data_source_id)
-    # In API 2025-09-03, the data_source has parent.database_id OR
-    # the data_sources array on the database container.
-    db_id = ds.get("database_id") or ds.get("parent", {}).get("database_id")
+    db_id = ds.get("parent", {}).get("database_id") or ds.get("database_id")
     if not db_id:
-        # Fallback: the data_source itself might be a database under the old API
-        # (Notion returns the same ID for both in some cases)
         db_id = data_source_id
     return db_id
+
+
+def get_data_source_schema(client: NotionClient, data_source_id: str) -> dict:
+    """Fetch the current property schema from a data_source.
+
+    In API 2025-09-03, properties live on the data_source, not the database
+    container. Use this instead of `client.get_database()` when you need to
+    read the current property definitions.
+    """
+    ds = client.get_data_source(data_source_id)
+    return ds.get("properties", {})
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -203,16 +230,15 @@ def get_database_container_id(client: NotionClient, data_source_id: str) -> str:
 
 def add_select_property(
     client: NotionClient,
-    database_container_id: str,
+    data_source_id: str,
     prop_name: str,
     options: list[str],
     prop_type: str = "select",
     description: str = "",
 ) -> dict:
-    """Add a select/multi_select/status property to a Notion database.
+    """Add a select/multi_select/status property to a Notion data_source.
 
-    Uses PATCH /v1/databases/{id} with `properties: {name: {type: ..., ...}}`.
-    Per Notion API docs, this is the way to add properties to a database.
+    Uses PATCH /v1/data_sources/{id} (API 2025-09-03).
     """
     if prop_type not in ("select", "multi_select", "status"):
         raise ValueError(f"add_select_property only supports select/multi_select/status, got {prop_type}")
@@ -225,55 +251,41 @@ def add_select_property(
             }
         }
     }
-    if description:
-        # Notion doesn't support property descriptions via API yet, but we can record it in the body
-        # for future-proofing.
-        body["properties"][prop_name]["description"] = description
 
-    return client.update_database(database_container_id, body)
+    return client.update_data_source(data_source_id, body)
 
 
-def add_rich_text_property(client: NotionClient, database_container_id: str, prop_name: str) -> dict:
+def add_rich_text_property(client: NotionClient, data_source_id: str, prop_name: str) -> dict:
     body = {"properties": {prop_name: {"rich_text": {}}}}
-    return client.update_database(database_container_id, body)
+    return client.update_data_source(data_source_id, body)
 
 
-def add_number_property(client: NotionClient, database_container_id: str, prop_name: str,
+def add_number_property(client: NotionClient, data_source_id: str, prop_name: str,
                          number_format: str = "number") -> dict:
     body = {"properties": {prop_name: {"number": {"format": number_format}}}}
-    return client.update_database(database_container_id, body)
+    return client.update_data_source(data_source_id, body)
 
 
 def add_relation_property(
     client: NotionClient,
-    database_container_id: str,
+    data_source_id: str,
     prop_name: str,
     target_database_id: str,
     dual_property: bool = False,
     dual_property_name: Optional[str] = None,
     single_directional: bool = False,
 ) -> dict:
-    """Add a relation property to a Notion database.
+    """Add a relation property to a Notion data_source.
+
+    In API 2025-09-03, relations are PATCHed on the data_source. The
+    `target_database_id` should be the target DB's DATA_SOURCE ID (Notion
+    will resolve it to the database container internally).
 
     Args:
+        data_source_id: The source DB's data_source ID.
+        target_database_id: The target DB's data_source ID.
         dual_property: If True, create a dual_property (synced) relation.
-                       Notion will auto-create the backlink on the target DB.
-        dual_property_name: Required if dual_property=True — name of the synced backlink
-                             property on the target DB.
-        single_directional: If True, create a single_property directional relation (no backlink).
-
-    For dual_property, the body shape is:
-        {
-            "properties": {
-                "<prop_name>": {
-                    "relation": {
-                        "database_id": "<target>",
-                        "type": "dual_property",
-                        "dual_property": {"name": "<backlink_name>"}
-                    }
-                }
-            }
-        }
+        dual_property_name: Required if dual_property=True.
     """
     rel_config: dict = {"database_id": target_database_id}
     if dual_property:
@@ -286,31 +298,28 @@ def add_relation_property(
         rel_config["single_property"] = {}
 
     body = {"properties": {prop_name: {"relation": rel_config}}}
-    return client.update_database(database_container_id, body)
+    return client.update_data_source(data_source_id, body)
 
 
 def add_select_option_to_existing_property(
     client: NotionClient,
-    database_container_id: str,
+    data_source_id: str,
     prop_name: str,
     new_options: list[str],
     prop_type: str = "select",
 ) -> dict:
-    """Add new select/multi_select options to an EXISTING property.
+    """Add new select/multi_select options to an EXISTING property on a data_source.
 
-    Per Notion API: when you PATCH a database with `properties: {name: {select: {options: [...]}}}`,
-    the provided options list REPLACES the existing options. So we must first fetch
-    the current options, merge, and PATCH back.
-
-    For STATUS properties, Notion does NOT allow adding options via API.
+    In API 2025-09-03, reads current options from the data_source and PATCHes
+    the data_source with the merged options list.
     """
     if prop_type == "status":
         raise ValueError("Cannot add options to a status property via Notion API — must use Notion UI.")
 
-    db_schema = client.get_database(database_container_id)
-    existing_prop = db_schema.get("properties", {}).get(prop_name)
+    ds_schema = get_data_source_schema(client, data_source_id)
+    existing_prop = ds_schema.get(prop_name)
     if not existing_prop:
-        raise ValueError(f"Property '{prop_name}' not found on database {database_container_id}")
+        raise ValueError(f"Property '{prop_name}' not found on data_source {data_source_id}. Available: {list(ds_schema.keys())}")
 
     existing_options = [o.get("name") for o in existing_prop.get(prop_type, {}).get("options", [])]
     merged = list(dict.fromkeys(existing_options + new_options))  # dedupe, preserve order
@@ -322,7 +331,7 @@ def add_select_option_to_existing_property(
             }
         }
     }
-    return client.update_database(database_container_id, body)
+    return client.update_data_source(data_source_id, body)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
