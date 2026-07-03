@@ -22,6 +22,12 @@ pub mod relations;
 pub mod audit;
 pub mod ontology;
 pub mod validate_yaml;
+pub mod relational_gaps;
+pub mod build_context;
+pub mod holonic_synthesis;
+pub mod suggest_categorization;
+pub mod relational_graph;
+pub mod relation_ops;
 
 fn enrich_database_param(schema: &mut Value, param_name: &str, schema_cache: &SchemaCache) {
     let db_keys: Vec<Value> = schema_cache.db_keys().iter().map(|k| Value::String(k.clone())).collect();
@@ -79,6 +85,13 @@ pub async fn get_tool_definitions(config: &LifeOSConfig, _notion: &NotionClient,
         tool_def("derive_type", "Derive the Holon Type (Donor/Acceptor/Sharer/Multivalent/Noble) from a Significator entry's Valence Signature.".to_string(), ontology::schema_derive_type()),
         tool_def("valence_signature", "Generate a Valence Signature YAML template for a Significator entry.".to_string(), ontology::schema_valence_signature()),
         tool_def("validate_yaml", "Validate Notion entries against the v0.9.0 YAML schema hierarchy (universal → per_db → per_entry_type).".to_string(), validate_yaml::schema()),
+        tool_def("relational_gaps", "Surface entries with zero or sparse relations. Shows ontology-expected relations that are missing. Read-only.".to_string(), relational_gaps::schema()),
+        tool_def("build_context", "Assemble complete relational neighborhood for an entry: outgoing + incoming + depth-2 neighborhood + gap analysis. One call replaces 3+.".to_string(), build_context::schema()),
+        tool_def("holonic_synthesis", "Trace currency flow (Catalyst→Experience→Transformation→Choice) across the holonic spiral. Identifies bottlenecks. Read-only.".to_string(), holonic_synthesis::schema()),
+        tool_def("suggest_categorization", "Suggest entry-types for uncategorized entries based on title heuristics. Returns confidence + reasoning. Never writes.".to_string(), suggest_categorization::schema()),
+        tool_def("relational_graph", "High-level relational graph overview: inter-DB hierarchy tree with link counts. Shows the LifeOS relation structure at a glance.".to_string(), relational_graph::schema()),
+        tool_def("unlink", "Remove a single relation between two entries. Deliberate — no auto-population.".to_string(), relation_ops::schema_unlink()),
+        tool_def("batch_link", "Create multiple relations in one call. Each link must be explicitly specified — no auto-population.".to_string(), relation_ops::schema_batch_link()),
     ]
 }
 
@@ -233,6 +246,41 @@ pub async fn call_tool(
             let params: validate_yaml::ValidateYamlParams = serde_json::from_value(args.clone())
                 .map_err(|e| format!("Invalid validate_yaml params: {}", e))?;
             validate_yaml::execute(&params, config, notion, schema_cache).await
+        }
+        "relational_gaps" => {
+            let params: relational_gaps::RelationalGapsParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid relational_gaps params: {}", e))?;
+            relational_gaps::execute(&params, config, notion, schema_cache).await
+        }
+        "build_context" => {
+            let params: build_context::BuildContextParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid build_context params: {}", e))?;
+            build_context::execute(&params, config, notion, schema_cache).await
+        }
+        "holonic_synthesis" => {
+            let params: holonic_synthesis::HolonicSynthesisParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid holonic_synthesis params: {}", e))?;
+            holonic_synthesis::execute(&params, config, notion, schema_cache).await
+        }
+        "suggest_categorization" => {
+            let params: suggest_categorization::SuggestCategorizationParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid suggest_categorization params: {}", e))?;
+            suggest_categorization::execute(&params, config, notion, schema_cache).await
+        }
+        "relational_graph" => {
+            let params: relational_graph::RelationalGraphParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid relational_graph params: {}", e))?;
+            relational_graph::execute(&params, config, notion, schema_cache).await
+        }
+        "unlink" => {
+            let params: relation_ops::UnlinkParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid unlink params: {}", e))?;
+            relation_ops::execute_unlink(&params, config, notion, schema_cache).await
+        }
+        "batch_link" => {
+            let params: relation_ops::BatchLinkParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid batch_link params: {}", e))?;
+            relation_ops::execute_batch_link(&params, config, notion, schema_cache).await
         }
         _ => Err(format!("Unknown tool: {}", name)),
     }
