@@ -19,6 +19,8 @@ incremental/
 # Config with secrets (don't commit actual config)
 lifeos.config.json
 *.config.json
+# ...but DO track the embedded default config (compile-time fallback)
+!lifeos.config.default.json
 
 # OS files
 .DS_Store

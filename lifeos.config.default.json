@@ -1,0 +1,193 @@
+{
+  "apiVersion": "2025-09-03",
+  "rateLimit": {
+    "requestsPerSecond": 3.0,
+    "cacheTtlSeconds": 300
+  },
+  "holonic": {
+    "version": "5.0",
+    "currencies": ["Catalyst", "Experience", "Transformation", "Choice"],
+    "drives": ["Agency", "Communion", "Eros", "Agape"],
+    "cycles": {
+      "lesser": {
+        "reservoirs": ["matrix", "potentiator"],
+        "metric": "G_z"
+      },
+      "greater": {
+        "reservoirs": ["significator", "greatway"],
+        "metric": "P_z"
+      }
+    },
+    "status_progressions": {
+      "matrix": ["Active", "Evolving", "Archived"],
+      "potentiator": ["Raw", "Digesting", "Crystallized"],
+      "significator": ["Draft", "Active", "Evolving", "Archived"],
+      "greatway": ["Future", "Ideation", "Paused", "Active", "Done", "Cancelled"],
+      "nexus": ["Identified", "Activated", "Capitalized", "Archived"]
+    },
+    "transmutation_map": {
+      "catalyst_to_experience": { "source": "matrix", "target": "potentiator" },
+      "experience_to_catalyst": { "source": "potentiator", "target": "matrix" },
+      "transformation_to_choice": { "source": "significator", "target": "greatway" },
+      "choice_to_transformation": { "source": "greatway", "target": "significator" }
+    },
+    "nexus_firing": {
+      "gz_threshold": 35.0,
+      "pz_threshold": 75.0,
+      "pressure_threshold": 110.0
+    },
+    "drive_effects": {
+      "agency": { "lesser": "A_z_lesser", "greater": "A_z_greater" },
+      "communion": { "lesser": "C_z_lesser", "greater": "C_z_greater" },
+      "eros": { "lesser": "P_z_lesser", "greater": "P_z_greater" },
+      "agape": { "lesser": "G_z_lesser", "greater": "G_z_greater" }
+    },
+    "entry_type_descriptions": {
+      "matrix": {
+        "Pattern": "Recurring behavioral or environmental pattern observed in current-state",
+        "Practice": "Active ritual or habit being cultivated",
+        "Inventory": "Asset, resource, or tool available in current-state"
+      },
+      "potentiator": {
+        "Activity": "Discrete activity event with duration and type",
+        "Reflection": "Subjective journal reflection on a lived experience",
+        "Metric": "Quantitative measurement captured over a window"
+      },
+      "significator": {
+        "Vision": "Long-term aspirational identity statement",
+        "Value": "Core principle that governs decision-making",
+        "Person": "Significant person in the holon's relational field"
+      },
+      "greatway": {
+        "Annual Goal": "Year-scale committed outcome",
+        "Quarterly Goal": "Quarter-scale committed outcome",
+        "Project": "Multi-week initiative with deliverables",
+        "Task": "Atomic actionable unit of work",
+        "Campaign": "Outbound push with audience and timeline"
+      },
+      "nexus": {
+        "Opportunity": "Emergent possibility detected at a contact boundary",
+        "Directive": "Strategic instruction issued from nexus analysis",
+        "Risk": "Threat to holonic stability requiring mitigation"
+      }
+    }
+  },
+  "databases": {
+    "matrix": {
+      "name": "Matrix",
+      "data_source_id": "00000000-0000-0000-0000-000000000001",
+      "archetype": "matrix",
+      "scale": "current-stage",
+      "dimension": "intra-holonic",
+      "currency_in": "Catalyst",
+      "currency_out": "Experience",
+      "cycle": "lesser",
+      "entry_type_property": "Entry Type",
+      "entry_type_property_type": "multi_select",
+      "description": "Current-state organizer — ingests Catalyst (perturbation), produces Experience (update).",
+      "properties": {
+        "title": "Name",
+        "entry_type": "Entry Type",
+        "status": "Status",
+        "review_cadence": "Review Cadence"
+      }
+    },
+    "potentiator": {
+      "name": "Potentiator",
+      "data_source_id": "00000000-0000-0000-0000-000000000002",
+      "archetype": "potentiator",
+      "scale": "current-stage",
+      "dimension": "extra-holonic",
+      "currency_in": "Experience",
+      "currency_out": "Catalyst",
+      "cycle": "lesser",
+      "entry_type_property": "Entry Type",
+      "entry_type_property_type": "select",
+      "description": "Latent-state generator — ingests Experience, produces crystallized Catalyst.",
+      "properties": {
+        "title": "Name",
+        "entry_type": "Entry Type",
+        "status": "Digestion Status",
+        "duration": "Duration",
+        "yaml_metadata": "YAML Metadata",
+        "date": "Date"
+      }
+    },
+    "significator": {
+      "name": "Significator",
+      "data_source_id": "00000000-0000-0000-0000-000000000003",
+      "archetype": "significator",
+      "scale": "all-stage",
+      "dimension": "intra-holonic",
+      "currency_in": "Transformation",
+      "currency_out": "Choice",
+      "cycle": "greater",
+      "entry_type_property": "Entry Type",
+      "entry_type_property_type": "select",
+      "description": "Persistent identity-pattern — ingests Transformation, emits Choice.",
+      "properties": {
+        "title": "Name",
+        "entry_type": "Entry Type",
+        "status": "Status",
+        "stage": "Stage"
+      }
+    },
+    "greatway": {
+      "name": "GreatWay",
+      "data_source_id": "00000000-0000-0000-0000-000000000004",
+      "archetype": "greatway",
+      "scale": "all-stage",
+      "dimension": "extra-holonic",
+      "currency_in": "Choice",
+      "currency_out": "Transformation",
+      "cycle": "greater",
+      "entry_type_property": "Item Type",
+      "entry_type_property_type": "select",
+      "description": "Operating environment — ingests Choice, produces Transformation.",
+      "properties": {
+        "title": "Name",
+        "entry_type": "Item Type",
+        "status": "Status",
+        "priority": "Priority"
+      }
+    },
+    "nexus": {
+      "name": "Nexus",
+      "data_source_id": "00000000-0000-0000-0000-000000000005",
+      "archetype": "nexus",
+      "scale": "inter-holonic",
+      "dimension": "both",
+      "currency_in": "all",
+      "currency_out": "all",
+      "cycle": "both",
+      "entry_type_property": "Category",
+      "entry_type_property_type": "select",
+      "description": "Contact-boundary where all 4 currencies transmute.",
+      "properties": {
+        "title": "Name",
+        "entry_type": "Category",
+        "status": "Status"
+      }
+    }
+  },
+  "briefings": {
+    "roles": {
+      "CEO": [
+        { "db": "significator", "intent": "vision alignment", "limit": 5, "date_filter": false },
+        { "db": "greatway", "intent": "active annual goals", "limit": 5, "date_filter": false }
+      ],
+      "COO": [
+        { "db": "greatway", "intent": "active projects", "limit": 10, "date_filter": false },
+        { "db": "matrix", "intent": "active practices", "limit": 10, "date_filter": false }
+      ]
+    },
+    "modules": {
+      "productivity": [
+        { "db": "greatway", "intent": "active tasks", "limit": 20, "date_filter": true }
+      ],
+      "strategic": [
+        { "db": "significator", "intent": "active visions", "limit": 5, "date_filter": false }
+      ]
+    }
+  }
+}

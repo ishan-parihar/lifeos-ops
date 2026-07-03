@@ -75,7 +75,9 @@ pub struct SchemaCache {
     db_keys: Vec<String>,
     /// db_key → Vec<RelationEdge> — which properties link to which databases
     relation_graph: HashMap<String, Vec<RelationEdge>>,
-    /// database_id → config_key (reverse map for resolving relation targets)
+    /// ANY ID (database_id, data_source_id, resolved_data_source_id) → config_key.
+    /// Used to resolve relation targets whose schema may report either form
+    /// under Notion v2025-09-03.
     id_to_key: HashMap<String, String>,
 }
 
@@ -132,10 +134,19 @@ impl SchemaCache {
 
         let results = futures::future::join_all(futures).await;
 
-        // Build reverse map: database_id → config_key
+        // Build reverse map: ANY ID form → config_key.
+        // Under Notion v2025-09-03, `DbConfig.database_id` (serde-renamed to
+        // `data_source_id` in JSON) typically holds a data_source_id, while
+        // relation schemas may report either `database_id` (container) or
+        // `data_source_id` (queryable). Index every form we know so the
+        // relation-graph builder can resolve targets regardless of which
+        // form Notion returns.
         let mut id_to_key: HashMap<String, String> = HashMap::new();
         for (db_key, db_cfg) in &config.databases {
             id_to_key.insert(db_cfg.database_id.clone(), db_key.clone());
+            if let Some(ref ds_id) = db_cfg.resolved_data_source_id {
+                id_to_key.insert(ds_id.clone(), db_key.clone());
+            }
         }
 
         // Collect raw schemas and prop info
@@ -163,9 +174,19 @@ impl SchemaCache {
                 for (prop_name, prop_schema) in &schema.properties {
                     if prop_schema.prop_type == "relation" {
                         if let Some(ref rel_config) = prop_schema.relation {
-                            let target_key = id_to_key.get(&rel_config.database_id)
-                                .cloned()
-                                .unwrap_or_else(|| format!("unknown({})", &rel_config.database_id[..8.min(rel_config.database_id.len())]));
+                            // Under Notion v2025-09-03, prefer `data_source_id`
+                            // (the queryable ID, which matches what we index
+                            // from DbConfig.database_id in id_to_key). Fall back
+                            // to `database_id` (container ID, indexed only if
+                            // the user's config happened to store that form).
+                            let target_id = rel_config.data_source_id.as_deref()
+                                .or(rel_config.database_id.as_deref());
+                            let target_key = match target_id {
+                                Some(id) => id_to_key.get(id)
+                                    .cloned()
+                                    .unwrap_or_else(|| format!("unknown({})", &id[..8.min(id.len())])),
+                                None => "unknown(no-id)".to_string(),
+                            };
                             edges.push(RelationEdge {
                                 prop_name: prop_name.clone(),
                                 target_db: target_key,
@@ -209,7 +230,9 @@ impl SchemaCache {
         &self.relation_graph
     }
 
-    /// Resolve a database_id back to a config key.
+    /// Resolve any ID form (database_id, data_source_id, resolved_data_source_id)
+    /// back to a config key. Used for resolving page parents and relation targets
+    /// whose schema may report either form under Notion v2025-09-03.
     pub fn resolve_db_key_from_id(&self, database_id: &str) -> Option<&str> {
         self.id_to_key.get(database_id).map(|s| s.as_str())
     }
