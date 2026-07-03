@@ -1,105 +1,6 @@
-# Matrix DB — Per-Database Schema
-# =============================================================================
-# Matrix = current-state organizer (HoloOS doc 00.md §2.1)
-# "The structured present configuration that preserves identity, classifies
-# input, and converts perturbation into usable state-update."
-#
-# Cycle: lesser  |  Scale: current-stage  |  Dimension: intra-holonic
-# Currency In:  Catalyst   |  Currency Out: Experience
-# Entry-Type property: "Entry Type" (select)
-#
-# Canonical entry-types (auto-discovered from Notion, plus the relocated
-# candidates flagged in UPGRADE_FLAGS.md Flag 1):
-#   - Pattern       — recurring configurations of current state
-#   - Practice      — repeated state-update procedures (habits, routines)
-#   - Inventory     — current-state asset/health/resource snapshots
-#   - Foundation    — baseline structural state (relocated FROM Nexus per Flag 1)
-#   - Threshold     — Catalyst-trigger markers (per Flag 1: stays in Matrix
-#                     only if explicitly tagged as Matrix-class catalyst;
-#                     otherwise migrated to Nexus as Transformation-kind)
-#
-# Intra-DB hierarchy relations (single_property in v0.8.0):
-#   - Parent            → Matrix     (sub-pattern containment)
-#   - Blocked By        → Matrix     (sequential dependency)
-#   - Accumulates Into  → Significator  (Experience accumulates upward)
-#   - Refines           → Matrix     (sub-pattern refines another sub-pattern)
-#   - Supersedes        → Matrix     (newer version replaces older)
-#   - Rewrites          → Matrix     (Significator-driven rewrite; Significator-side)
-#   - Generated From    → Potentiator  (incoming Catalyst from Potentiator)
-#   - Integrated Into   → Significator  (cross-cycle accumulation)
-#
-# Inter-DB dual_property relations added v0.9.0:
-#   - Accumulates Into  → Significator  ⟷  Significator.Accumulated From
-#   - Generated From    → Potentiator   ⟷  Potentiator.Generates Into
-#   - Rewritten By      ← Nexus         ⟷  Nexus.Rewrites (Matrix)
-#   - Receives Catalyst From ← Nexus    ⟷  Nexus.Sends Catalyst To (Matrix)
-
 schema_version: 0.9.0
 schema_type: per_db
 applies_to_db: matrix
-properties:
-  eta_M:
-    notion_type: number
-    required: false
-    description: 'Matrix consolidation efficiency η_M (HoloOS doc 03.1 §5.1).
-
-      Fraction of ingested Catalyst converted into integrated Experience.
-
-      Range: 0.0–1.0. Below 0.3 → dark-addiction shadow active.
-
-      '
-  matrix_load:
-    notion_type: number
-    required: false
-    description: 'ℓ_M — basin depth (HoloOS doc 08.1 §5). How consolidated the Matrix is.
-
-      Higher = more rigidly stable; lower = more malleable.
-
-      Range: 0.0–10.0.
-
-      '
-  current_configuration:
-    notion_type: rich_text
-    required: false
-    description: 'x_t ∈ X — the active state vector (HoloOS doc 03.1 §2.2).
-
-      Free-form text describing the current configuration of this Matrix entry.
-
-      '
-  dark_shadow_state:
-    notion_type: select
-    required: false
-    description: 'Per-complex Matrix shadow (HoloOS doc 02.1 §4).
-
-      Differentiates from the universal `shadow_pattern` property by isolating
-
-      the Matrix-specific (lesser-cycle, dark-reservoir) shadow.
-
-      '
-    options:
-    - balanced
-    - dark-addiction
-    - dark-allergy
-  homeostatic_basin_depth:
-    notion_type: number
-    required: false
-    description: '‖A_M‖ — magnitude of the Matrix attractor basin (HoloOS doc 08.1 §3.1).
-
-      How strongly this Matrix entry pulls toward its current state.
-
-      Range: 0.0–10.0.
-
-      '
-  agency_drive_score:
-    notion_type: number
-    required: false
-    description: 'A_z — Agency drive score for this Matrix entry (HoloOS doc 02.1 §5, 08.5 §3.1).
-
-      Computed: A_z = 100 · exp(-|ln(Ω_A)|), where Ω_A = (M · η_M)/(|C| + ε).
-
-      Range: 0–100. Failure mode (low A_z) = isolation.
-
-      '
 relations:
 - name: Parent
   target_db: matrix
@@ -173,14 +74,7 @@ inter_db_relations:
 
     '
 entry_types:
-- Pattern
-- Practice
-- Inventory
-- Foundation
 - Threshold
-- Active Project
-- Habit
-- Routine
 default_archetype_mapping:
   Pattern:
     archetype_role: Matrix
