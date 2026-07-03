@@ -41,6 +41,36 @@ curl_auth() {
   fi
 }
 
+# Download a release asset by name. For PRIVATE repos, the browser_download_url
+# (https://github.com/.../releases/download/...) returns 404 even with auth —
+# GitHub requires the API endpoint with Accept: application/octet-stream, which
+# 302-redirects to a short-lived Azure blob URL. For PUBLIC repos, the
+# browser_download_url works directly.
+download_asset() {
+  local repo="$1" version="$2" asset_name="$3" output_path="$4"
+  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+    # Resolve the asset's API ID via the releases API, then download with the
+    # octet-stream Accept header (which triggers the 302 → Azure blob path).
+    local asset_id
+    asset_id="$(curl_auth "https://api.github.com/repos/${repo}/releases/tags/${version}" \
+      | python3 -c "import json,sys; d=json.load(sys.stdin); \
+        print(next(a['id'] for a in d['assets'] if a['name']=='${asset_name}'))" 2>/dev/null || true)"
+    if [[ -n "$asset_id" ]]; then
+      curl_auth -H "Accept: application/octet-stream" \
+        "https://api.github.com/repos/${repo}/releases/assets/${asset_id}" \
+        -o "${output_path}"
+      return $?
+    fi
+    echo "  ✗ could not resolve asset ${asset_name} via API" >&2
+    return 1
+  else
+    # Public repo — direct browser_download_url works.
+    curl_auth "https://github.com/${repo}/releases/download/${version}/${asset_name}" \
+      -o "${output_path}"
+    return $?
+  fi
+}
+
 # Detect platform
 OS="$(uname -s)"
 ARCH="$(uname -m)"
@@ -84,15 +114,14 @@ try_targets+=("$TARGET_GNU")
 
 downloaded=0
 for TARGET in "${try_targets[@]}"; do
-  URL="https://github.com/${REPO}/releases/download/${VERSION}/lifeos-${TARGET}.tar.gz"
+  ASSET_NAME="lifeos-${TARGET}.tar.gz"
   echo "Trying ${TARGET}..."
-  echo "  → ${URL}"
-  if curl_auth -o "${TMP_DIR}/lifeos.tar.gz" "$URL" 2>/dev/null; then
-    echo "  ✓ downloaded"
+  if download_asset "$REPO" "$VERSION" "$ASSET_NAME" "${TMP_DIR}/lifeos.tar.gz"; then
+    echo "  ✓ downloaded ${ASSET_NAME}"
     downloaded=1
     break
   else
-    echo "  ✗ not available"
+    echo "  ✗ ${ASSET_NAME} not available"
   fi
 done
 
@@ -104,6 +133,15 @@ fi
 
 echo "Extracting..."
 tar -xzf "${TMP_DIR}/lifeos.tar.gz" -C "${TMP_DIR}"
+
+# Ensure BIN_DIR exists
+if [[ ! -d "$BIN_DIR" ]]; then
+  if mkdir -p "$BIN_DIR" 2>/dev/null; then
+    : # created
+  else
+    sudo mkdir -p "$BIN_DIR"
+  fi
+fi
 
 # Write to BIN_DIR (sudo if not writable)
 if [[ -w "$BIN_DIR" ]]; then
