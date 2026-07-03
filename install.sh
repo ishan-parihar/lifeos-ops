@@ -161,7 +161,7 @@ else
   sudo install -m 0755 "${TMP_DIR}/lifeos" "${BIN_DIR}/lifeos"
 fi
 
-INSTALLED_PATH="$(command -v lifeos 2>/dev/null || echo "${BIN_DIR}/lifeos")"
+INSTALLED_PATH="${BIN_DIR}/lifeos"
 echo "Installed: ${INSTALLED_PATH}"
 "${INSTALLED_PATH}" --version || true
 echo
