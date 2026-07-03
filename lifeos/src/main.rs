@@ -433,6 +433,52 @@ async fn main() {
                         Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
                     }
                 }
+                Commands::Daily => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    match lifeos_core::tools::workflows::execute_daily(&cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::Dashboard => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    match lifeos_core::tools::workflows::execute_dashboard(&cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::QuickLink { source_db, source_title, target_db, target_title, property } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    // Resolve source title to page ID
+                    let source_result = lifeos_core::util::id_resolver::resolve_target_id(
+                        &notion, &cfg, &source_db, Some(&source_title), None
+                    ).await;
+                    let source_id = match source_result.id {
+                        Some(id) => id,
+                        None => {
+                            tracing::error!("Could not find '{}' in {}", source_title, source_db);
+                            std::process::exit(1);
+                        }
+                    };
+                    // Resolve target title to page ID
+                    let target_result = lifeos_core::util::id_resolver::resolve_target_id(
+                        &notion, &cfg, &target_db, Some(&target_title), None
+                    ).await;
+                    let target_id = match target_result.id {
+                        Some(id) => id,
+                        None => {
+                            tracing::error!("Could not find '{}' in {}", target_title, target_db);
+                            std::process::exit(1);
+                        }
+                    };
+                    // Create the link
+                    let params = lifeos_core::tools::relations::LinkParams {
+                        source_page: source_id.clone(),
+                        target_page: target_id.clone(),
+                        property: property.clone(),
+                    };
+                    match lifeos_core::tools::relations::execute_link(&params, &cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
             }
         }
     }

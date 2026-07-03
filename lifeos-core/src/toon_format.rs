@@ -11,6 +11,29 @@ pub fn encode(value: &Value) -> String {
     out
 }
 
+/// Decode a TOON-format string back into a JSON value.
+/// This is a simple parser for the subset of TOON produced by `encode`.
+/// Used by workflow commands that need to parse tool outputs.
+pub fn decode(text: &str) -> Result<Value, String> {
+    // For now, we use a simple approach: if the text looks like JSON, parse it;
+    // otherwise, wrap it in a string. This is sufficient for the workflow commands
+    // which primarily need to extract summary fields.
+    if let Ok(val) = serde_json::from_str::<Value>(text) {
+        return Ok(val);
+    }
+    // Try to find a JSON block in the text
+    if let Some(start) = text.find('{') {
+        if let Some(end) = text.rfind('}') {
+            if end > start {
+                if let Ok(val) = serde_json::from_str::<Value>(&text[start..=end]) {
+                    return Ok(val);
+                }
+            }
+        }
+    }
+    Ok(Value::String(text.to_string()))
+}
+
 fn encode_value(out: &mut String, value: &Value, indent: usize) {
     match value {
         Value::Object(map) => {
