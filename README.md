@@ -60,7 +60,7 @@ All four drives operate at **both** contact boundaries (Matrix⇌Potentiator AND
 
 ## Installation
 
-### One-line install (recommended)
+### One-line install (recommended, public repo)
 
 Picks the right binary for your platform and drops it at `/usr/local/bin/lifeos`:
 
@@ -68,13 +68,31 @@ Picks the right binary for your platform and drops it at `/usr/local/bin/lifeos`
 curl -fsSL https://raw.githubusercontent.com/ishan-parihar/lifeos-ops/main/install.sh | bash
 ```
 
+### One-line install (private repo — token required)
+
+If the repo is private, set `GITHUB_TOKEN` before invoking the installer —
+it's used for both fetching the script and downloading the release asset:
+
+```bash
+GITHUB_TOKEN=github_pat_xxx \
+  curl -fsSL -H "Authorization: token $GITHUB_TOKEN" \
+  https://raw.githubusercontent.com/ishan-parihar/lifeos-ops/main/install.sh \
+  | GITHUB_TOKEN=github_pat_xxx bash
+```
+
 ### Manual install (curl + tar)
 
 Find the latest release at <https://github.com/ishan-parihar/lifeos-ops/releases/latest>. Pick the asset matching your platform and run:
 
 ```bash
-# Linux x86_64 (glibc)
+# Linux x86_64 (glibc) — public repo
 curl -L https://github.com/ishan-parihar/lifeos-ops/releases/latest/download/lifeos-x86_64-unknown-linux-gnu.tar.gz | tar xz -C /tmp
+sudo install /tmp/lifeos /usr/local/bin/
+
+# Linux x86_64 (glibc) — private repo (add -H auth header)
+curl -L -H "Authorization: token $GITHUB_TOKEN" \
+  https://github.com/ishan-parihar/lifeos-ops/releases/latest/download/lifeos-x86_64-unknown-linux-gnu.tar.gz \
+  | tar xz -C /tmp
 sudo install /tmp/lifeos /usr/local/bin/
 
 # Linux x86_64 (musl — static binary, works on Alpine etc.)
@@ -98,7 +116,7 @@ lifeos --version
 
 ### Update
 
-Re-run the same `curl` command — it always fetches `latest`. The install script also supports an `--version v0.6.1` argument to pin a specific release.
+Re-run the same `curl` command — it always fetches `latest`. The install script also supports a `--version v0.6.1` argument to pin a specific release.
 
 ### Build from source
 
@@ -114,6 +132,7 @@ For a fully static binary:
 
 ```bash
 rustup target add x86_64-unknown-linux-musl
+# musl-tools must be installed on the host (apt-get install musl-tools on Debian/Ubuntu)
 cargo build --release --target x86_64-unknown-linux-musl
 ```
 
