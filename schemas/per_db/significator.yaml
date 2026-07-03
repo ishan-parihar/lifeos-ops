@@ -1,0 +1,249 @@
+# Significator DB — Per-Database Schema
+# =============================================================================
+# Significator = persistent identity-pattern (HoloOS doc 00.md §2.1)
+# "The continuity pattern accumulated from state-updates and exposed to
+# macro-transition pressure."
+#
+# The Significator is the only archetype that lives in BOTH cycles (HoloOS
+# doc 02.2 §6) — it is the bridge. Its intra-DB hierarchy couples both
+# cycles, and most inter-DB relations pass through it.
+#
+# Cycle: greater  |  Scale: all-stage  |  Dimension: intra-holonic
+# Currency In:  Transformation  |  Currency Out: Choice
+# Entry-Type property: "Entry Type" (select)
+#
+# Canonical entry-types (per lifeos.config.default.json):
+#   - Purpose             — teleological identity anchor
+#   - Value               — evaluative identity anchor
+#   - Principle           — behavioral identity anchor
+#   - Identity-Statement  — explicit self-narrative
+#   - Pillar              — load-bearing identity element
+#   - Strategic-Ideal     — aspirational identity configuration
+#   - Person              — (Flag 1: RELOCATED to GreatWay in v0.9.0)
+#   - Group               — (Flag 1: RELOCATED to GreatWay in v0.9.0)
+#
+# v0.9.0 RELOCATIONS OUT of Significator (per user directive):
+#   - Person   → GreatWay  (external holons belong in the Great Way per HoloOS doc 08.5)
+#   - Group    → GreatWay  (external holons belong in the Great Way)
+#   The relocated entries retain their Significator-side bonds via the new
+#   `Coheres With` dual_property relation (Significator ↔ GreatWay.Person/Group).
+#
+# v0.9.0 RELOCATIONS INTO Significator (per Flag 3 review):
+#   - Purpose / Value / Principle are consolidated as `Principle` with a
+#     sub-type property (per Flag 3 — high risk, deferred to manual review,
+#     but the schema supports the consolidation).
+
+schema_version: "0.9.0"
+schema_type: per_db
+applies_to_db: significator
+
+properties:
+  identity_mass:
+    notion_type: number
+    required: false
+    description: |
+      ℓ_S = ‖S_t‖ — identity crystallization (HoloOS doc 08.1 §5).
+      How consolidated/weighted this Significator entry is.
+      Range: 0.0–10.0.
+
+  eta_S:
+    notion_type: number
+    required: false
+    description: |
+      Significator efficiency η_S (HoloOS doc 03.1 §6.1).
+      Fraction of accumulated Experience that survives into the persistent
+      identity-pattern (vs being shed).
+      Range: 0.0–1.0.
+
+  significator_load:
+    notion_type: number
+    required: false
+    description: |
+      ℓ_S — same as identity_mass but tracked separately for stress analysis.
+      Range: 0.0–10.0.
+
+  polarity_disposition_pi:
+    notion_type: number
+    required: false
+    description: |
+      π — polarity disposition (HoloOS doc 08.1 §4, 08.5 §2.2).
+      Computed: sgn(A_M) + sgn(A_P) + sgn(A_G).
+      Range: -3.0 (strong acceptor) to +3.0 (strong donor). 0 = balanced/sharer.
+
+  noble_flag_chi:
+    notion_type: select
+    required: false
+    description: |
+      χ — noble-state disambiguation (HoloOS doc 08.1 §4).
+      A Noble holon-type can be EITHER graduated (ready for next octave)
+      OR sinkhole (depolarized, going nowhere). This flag disambiguates.
+    options:
+      - graduated   # ready to advance to next octave — Choice emitted
+      - sinkhole    # depolarized, stagnating — Choice starved
+      - reopened    # was Noble, now re-polarized (a Transformation fired)
+
+  eros_drive_score:
+    notion_type: number
+    required: false
+    description: |
+      P_z (Eros component) — vertical ascent drive at the Significator
+      (HoloOS doc 02.1 §5, 08.5 §3.2).
+      Range: 0–100. Failure mode (low) = inflation / bypassing.
+
+  attractor_basin_class:
+    notion_type: select
+    required: false
+    description: |
+      Computed class of the Significator's attractor basin (HoloOS doc 00.md §8).
+      Determines which bonding types the Significator can engage in.
+    options:
+      - sharp_basin         # narrow, rigid identity — ionic bonds only
+      - broad_basin         # wide, flexible identity — covalent + metallic
+      - multivalent_basin   # multiple open registers — dative + covalent
+      - noble_basin         # closed — inert unless reopened
+
+  principle_sub_type:
+    notion_type: select
+    required: false
+    description: |
+      For Principle entries only (per Flag 3 — consolidates Purpose/Value/Principle).
+      Replaces the 3 separate entry-types with 1 entry-type + a sub-type discriminator.
+    options:
+      - Purpose    # teleological — "what I'm here to do"
+      - Value      # evaluative — "what I judge as good/bad"
+      - Principle  # behavioral — "how I act"
+
+relations:
+  - name: "Sub-item"
+    target_db: significator
+    direction: dual_property
+    dual_backlink: "Parent item"
+    cardinality: one_to_many
+    description: Fractal sub-identity containment.
+
+  - name: "In Tension With"
+    target_db: significator
+    direction: dual_property
+    dual_backlink: "In Tension With"
+    cardinality: many_to_many
+    description: |
+      Two Significator entries that pull in opposite directions.
+      Per HoloOS doc 03.1 §9: a healthy holon can hold tensions without collapse.
+
+  - name: "Coheres With"
+    target_db: significator
+    direction: dual_property
+    dual_backlink: "Coheres With"
+    cardinality: many_to_many
+    description: |
+      Two Significator entries that mutually reinforce.
+      v0.8.0 had this as single_property — v0.9.0 makes it dual.
+
+inter_db_relations:
+  - name: "Anchored In"
+    target_db: matrix
+    direction: dual_property
+    dual_backlink: "Anchors"
+    cardinality: many_to_many
+    description: |
+      HoloOS doc 08.5 §1.4: The Significator of a sub-holon IS the
+      parent-holon's Matrix. This relation links a Significator entry to the
+      Matrix entry it is anchored in (its substrate).
+
+  - name: "Accumulated From"
+    target_db: matrix
+    direction: dual_property
+    dual_backlink: "Accumulates Into"
+    cardinality: one_to_many
+    description: |
+      HoloOS doc 03.1 §3 stage 7: S_t = S_{t-1} + w_t * e_t.
+      This Significator entry has accumulated Experience FROM the linked
+      Matrix entries.
+
+  - name: "Transforms To"
+    target_db: greatway
+    direction: dual_property
+    dual_backlink: "Transforms From"
+    cardinality: many_to_many
+    description: |
+      HoloOS doc 02.2 §6: The Significator faces Transformation pressure
+      from the Great Way. This relation tracks which GreatWay entry is
+      currently exerting pressure on this Significator.
+
+  - name: "Sub-holon Of"
+    target_db: matrix
+    direction: dual_property
+    dual_backlink: "Contains Significator Of"
+    cardinality: many_to_one
+    description: |
+      HoloOS doc 08.5 §1.4: S of sub-holon = M of parent holon.
+      This Significator is a sub-holon WITHIN the linked Matrix entry.
+
+  - name: "Triggered By"
+    target_db: nexus
+    direction: dual_property
+    dual_backlink: "Fires Transformation On"
+    cardinality: many_to_many
+    description: |
+      HoloOS doc 03.1 §3 stage 8: This Significator entry is being acted on
+      by a Transformation-kind Nexus entry.
+
+  - name: "Triggers"
+    target_db: nexus
+    direction: dual_property
+    dual_backlink: "Triggered By"
+    cardinality: many_to_many
+    description: |
+      HoloOS doc 03.1 §3 stage 8: This Significator entry's threshold-crossing
+      triggered the linked Transformation-kind Nexus entry.
+
+  - name: "Emits Choice To"
+    target_db: nexus
+    direction: dual_property
+    dual_backlink: "Receives Choice From (Significator)"
+    cardinality: many_to_many
+    description: |
+      HoloOS doc 03.1 §3 stage 9: This Significator entry, after Transformation,
+      emits Choice through the linked Nexus (Choice-kind) entry.
+
+  - name: "Receives Catalyst From (Great Way)"
+    target_db: nexus
+    direction: dual_property
+    dual_backlink: "Sends Catalyst To (Significator)"
+    cardinality: many_to_many
+    description: |
+      HoloOS doc 02.2 §2: A Catalyst-kind Nexus entry carries Great-Way-origin
+      Catalyst to this Significator entry.
+
+  - name: "Coheres With (GreatWay)"
+    target_db: greatway
+    direction: dual_property
+    dual_backlink: "Coheres With (Significator)"
+    cardinality: many_to_many
+    description: |
+      HoloOS doc 02.3 §4: Bonding occurs at the Significator⇄Great-Way surface.
+      This relation links a Significator entry to a Person/Community/Group entry
+      in GreatWay that it is bonded with. Used for the relocated Person/Group entries.
+
+entry_types:
+  # ── Existing (kept) ──
+  - Purpose             # sub_type: Purpose
+  - Value               # sub_type: Value
+  - Principle           # sub_type: Principle
+  - Identity-Statement
+  - Pillar
+  - Strategic-Ideal
+  - Archetype           # 22 named archetypes live here as identity configurations
+
+  # ── RELOCATED OUT (Flag 1) ──
+  # Person  → GreatWay (now external holon, bonded via "Coheres With (GreatWay)")
+  # Group   → GreatWay (now external holon, bonded via "Coheres With (GreatWay)")
+
+default_archetype_mapping:
+  Purpose:            { archetype_role: "Significator", complex: "Spirit" }
+  Value:              { archetype_role: "Significator", complex: "Mind" }
+  Principle:          { archetype_role: "Significator", complex: "Mind" }
+  Identity-Statement: { archetype_role: "Significator", complex: "Spirit" }
+  Pillar:             { archetype_role: "Significator", complex: "Spirit" }
+  Strategic-Ideal:    { archetype_role: "Significator", complex: "Spirit" }
+  Archetype:          { archetype_role: "Significator", complex: "Mind" }

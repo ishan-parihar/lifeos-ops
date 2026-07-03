@@ -376,6 +376,29 @@ pub enum Commands {
         #[arg(short, long)]
         format: Option<String>,
     },
+
+    /// Validate Notion entries against the v0.9.0 YAML schema hierarchy
+    ValidateYaml {
+        /// Validate the schema files themselves (no Notion API calls)
+        #[arg(long)]
+        self_test: bool,
+
+        /// Validate all entries in all 5 DBs
+        #[arg(long)]
+        all: bool,
+
+        /// Optional: filter to a specific database
+        #[arg(short, long)]
+        database: Option<String>,
+
+        /// Validate a single Notion page by ID
+        #[arg(short = 'P', long)]
+        page_id: Option<String>,
+
+        /// Max entries per DB (default: 0 = unlimited)
+        #[arg(short, long, default_value = "0")]
+        limit: u32,
+    },
 }
 
 #[derive(clap::Subcommand, Debug)]
