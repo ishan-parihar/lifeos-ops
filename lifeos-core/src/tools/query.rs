@@ -26,6 +26,21 @@ pub struct QueryParams {
     pub entry_type: Option<String>,
     /// Query all reservoirs in a cycle ("lesser" or "greater")
     pub cycle: Option<String>,
+    /// Filter by Archetype Role (Matrix/Potentiator/Catalyst/Experience/Significator/Transformation/Great Way/Choice)
+    #[serde(default)]
+    pub archetype: Option<String>,
+    /// Filter by Complex (Mind/Body/Spirit/None)
+    #[serde(default)]
+    pub complex: Option<String>,
+    /// Filter by Drive Activation (Agency/Communion/Eros/Agape) — multi_select contains
+    #[serde(default)]
+    pub drive: Option<String>,
+    /// Filter by Shadow Pattern (None/Dark-Addiction/Dark-Allergy/Golden-Addiction/Golden-Allergy)
+    #[serde(default)]
+    pub shadow: Option<String>,
+    /// Filter by Digestion Stage (1-9 or full name)
+    #[serde(default)]
+    pub digestion_stage: Option<String>,
 }
 
 /// Tool schema for MCP tools/list — enriched with schema cache context
@@ -96,6 +111,91 @@ pub async fn execute(
 to auto-detect the property name.",
                 params.database
             ));
+        }
+    }
+
+    // ── Semantic typing filters (v0.8+ ontology properties) ──
+    // These are additive AND filters — combined with entry_type/preset filters via "and".
+    let mut semantic_filters: Vec<serde_json::Value> = Vec::new();
+
+    // Archetype Role filter (select equals)
+    if let Some(ref archetype) = params.archetype {
+        if let Some(notion_name) = db.notion_prop("archetype_role").or(db.notion_prop("Archetype Role")) {
+            let resolved = resolve_enum_value(schema_cache, &params.database, "archetype_role", archetype);
+            let resolved = if &resolved == archetype {
+                resolve_enum_value(schema_cache, &params.database, notion_name, archetype)
+            } else { resolved };
+            semantic_filters.push(serde_json::json!({
+                "property": notion_name,
+                "select": { "equals": resolved }
+            }));
+        }
+    }
+
+    // Complex filter (select equals)
+    if let Some(ref complex) = params.complex {
+        if let Some(notion_name) = db.notion_prop("complex").or(db.notion_prop("Complex")) {
+            let resolved = resolve_enum_value(schema_cache, &params.database, "complex", complex);
+            let resolved = if &resolved == complex {
+                resolve_enum_value(schema_cache, &params.database, notion_name, complex)
+            } else { resolved };
+            semantic_filters.push(serde_json::json!({
+                "property": notion_name,
+                "select": { "equals": resolved }
+            }));
+        }
+    }
+
+    // Drive Activation filter (multi_select contains)
+    if let Some(ref drive) = params.drive {
+        if let Some(notion_name) = db.notion_prop("drive_activation").or(db.notion_prop("Drive Activation")) {
+            semantic_filters.push(serde_json::json!({
+                "property": notion_name,
+                "multi_select": { "contains": drive }
+            }));
+        }
+    }
+
+    // Shadow Pattern filter (select equals)
+    if let Some(ref shadow) = params.shadow {
+        if let Some(notion_name) = db.notion_prop("shadow_pattern").or(db.notion_prop("Shadow Pattern")) {
+            let resolved = resolve_enum_value(schema_cache, &params.database, "shadow_pattern", shadow);
+            let resolved = if &resolved == shadow {
+                resolve_enum_value(schema_cache, &params.database, notion_name, shadow)
+            } else { resolved };
+            semantic_filters.push(serde_json::json!({
+                "property": notion_name,
+                "select": { "equals": resolved }
+            }));
+        }
+    }
+
+    // Digestion Stage filter (select equals) — supports stage number or full name
+    if let Some(ref stage) = params.digestion_stage {
+        if let Some(notion_name) = db.notion_prop("digestion_stage").or(db.notion_prop("Digestion Stage")) {
+            // Resolve stage input: "1" → "1 - Latent State", or pass through if already full
+            let resolved_stage = resolve_digestion_stage(stage);
+            semantic_filters.push(serde_json::json!({
+                "property": notion_name,
+                "select": { "equals": resolved_stage }
+            }));
+        }
+    }
+
+    // Combine semantic filters with any existing filter via "and"
+    if !semantic_filters.is_empty() {
+        if let Some(existing) = body.get("filter").cloned() {
+            if semantic_filters.len() == 1 {
+                body["filter"] = serde_json::json!({ "and": [existing, semantic_filters[0]] });
+            } else {
+                let mut all = vec![existing];
+                all.extend(semantic_filters);
+                body["filter"] = serde_json::json!({ "and": all });
+            }
+        } else if semantic_filters.len() == 1 {
+            body["filter"] = semantic_filters[0].clone();
+        } else {
+            body["filter"] = serde_json::json!({ "and": semantic_filters });
         }
     }
 
@@ -272,6 +372,41 @@ fn alpha_only(s: &str) -> String {
         .collect::<String>()
         .trim()
         .to_lowercase()
+}
+
+/// Resolve a digestion stage input ("1", "1 - Latent State", "Latent State") to the
+/// full Notion option name ("1 - Latent State").
+fn resolve_digestion_stage(input: &str) -> String {
+    let stages = [
+        "1 - Latent State",
+        "2 - Boundary Contact",
+        "3 - Matrix Ingestion",
+        "4 - Matrix Digestion",
+        "5 - Potentiator Ingestion",
+        "6 - Potentiator Digestion",
+        "7 - Significator Accumulation",
+        "8 - Transformation Threshold",
+        "9 - Choice & Rewrite",
+    ];
+    // Exact match
+    for s in &stages {
+        if *s == input { return s.to_string(); }
+    }
+    // Match by leading number ("1" → "1 - Latent State")
+    for s in &stages {
+        if s.starts_with(&format!("{} ", input)) || s.starts_with(&format!("{} -", input)) {
+            return s.to_string();
+        }
+    }
+    // Match by substring (case-insensitive)
+    let lower = input.to_lowercase();
+    for s in &stages {
+        if s.to_lowercase().contains(&lower) {
+            return s.to_string();
+        }
+    }
+    // No match — return as-is (Notion will return 0 results, which is the right behavior)
+    input.to_string()
 }
 
 /// Build filter using the Notion property name (already resolved).

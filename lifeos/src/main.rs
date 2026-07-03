@@ -180,12 +180,13 @@ async fn main() {
                     let result = lifeos_core::tools::execute_get_schema(database.as_deref(), &sc, &cfg);
                     println!("{result}");
                 }
-                Commands::Query { database, filter_property, filter_value, filter_type, sort_property, sort_direction, limit, preset, entry_type, cycle } => {
+                Commands::Query { database, filter_property, filter_value, filter_type, sort_property, sort_direction, limit, preset, entry_type, cycle, archetype, complex, drive, shadow, digestion_stage } => {
                     let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
                     let params = lifeos_core::tools::query::QueryParams {
                         database, filter_property, filter_value, filter_type,
                         sort_property, sort_direction, limit: Some(limit),
                         return_properties: None, preset, entry_type, cycle,
+                        archetype, complex, drive, shadow, digestion_stage,
                     };
                     match lifeos_core::tools::query::execute(&params, &cfg, &notion, &sc).await {
                         Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
@@ -294,6 +295,24 @@ async fn main() {
                         source, target, threshold, limit: Some(limit),
                     };
                     match lifeos_core::tools::audit::execute_suggest_links(&params, &cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::ArchetypeIndex => {
+                    let result = lifeos_core::tools::ontology::execute_archetype_index();
+                    println!("{result}");
+                }
+                Commands::DeriveType { page_id } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::ontology::DeriveTypeParams { page_id };
+                    match lifeos_core::tools::ontology::execute_derive_type(&params, &cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::ValenceSignature { page_id, format } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::ontology::ValenceSignatureParams { page_id, format };
+                    match lifeos_core::tools::ontology::execute_valence_signature(&params, &cfg, &notion, &sc).await {
                         Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
                     }
                 }

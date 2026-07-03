@@ -179,6 +179,24 @@ pub async fn execute(
     let ds_id = db.ds_id();
     let properties = &db.properties;
 
+    // ── Nexus Kind ↔ relation constraint validation ──
+    // For Nexus entries, the `Kind` property (Catalyst/Experience/Transformation/Choice)
+    // constrains which relation edges can be populated. This enforces ontological
+    // consistency: a Catalyst-kind entry can only link to Matrix and Potentiator
+    // (the lesser-cycle reservoirs), not to Significator or GreatWay.
+    if params.database == "nexus" {
+        if let Some(ref props) = params.properties {
+            if let Some(val) = props.get("Kind").or_else(|| props.get("kind")) {
+                let kind = val.as_str()
+                    .or_else(|| val.get("select").and_then(|s| s.get("name")).and_then(|n| n.as_str()))
+                    .unwrap_or("");
+                if !kind.is_empty() {
+                    validate_nexus_kind_relations(props, kind)?;
+                }
+            }
+        }
+    }
+
     match params.operation.as_str() {
         "create" => {
             let props = params.properties.as_ref()
@@ -267,4 +285,94 @@ async fn resolve_page_id(
         ));
     }
     result.id.ok_or_else(|| format!("Could not resolve '{}' in {} database", name, params.database))
+}
+
+/// Validate that a Nexus entry's relations are consistent with its `Kind` tag.
+///
+/// Per the HoloOS ontology, the 4 currencies flow through specific reservoirs:
+/// - **Catalyst** flows Potentiator → Matrix (lesser cycle)
+/// - **Experience** flows Matrix → Potentiator (lesser cycle)
+/// - **Transformation** flows GreatWay → Significator (greater cycle)
+/// - **Choice** flows Significator → GreatWay (greater cycle)
+///
+/// A Nexus entry tagged with `Kind: Catalyst` should only link to Matrix and
+/// Potentiator (the lesser-cycle reservoirs), NOT to Significator or GreatWay.
+/// This function enforces that constraint and returns an error if violated.
+///
+/// Allowed relations per Kind:
+/// - **Catalyst**: `Updates` (→Matrix), `Sourced From` (→Potentiator), self-loops
+/// - **Experience**: `Sourced From` (→Potentiator), self-loops
+/// - **Transformation**: `Tension` (→Significator), `Counter-Tension` (→GreatWay), self-loops
+/// - **Choice**: `Counter-Tension` (→GreatWay), self-loops
+fn validate_nexus_kind_relations(props: &serde_json::Value, kind: &str) -> Result<(), String> {
+    let obj = props.as_object().ok_or("properties must be an object")?;
+
+    // Define which relation properties are allowed for each Kind
+    let (allowed, forbidden_reservoirs) = match kind {
+        "Catalyst" => (
+            vec!["Updates", "Sourced From", "Counterpart", "Counter-Synthesis", "Reinforces"],
+            vec!["Tension", "Counter-Tension"],  // Tension→Significator, Counter-Tension→GreatWay
+        ),
+        "Experience" => (
+            vec!["Sourced From", "Counterpart", "Counter-Synthesis", "Reinforces"],
+            vec!["Updates", "Tension", "Counter-Tension"],  // Experience doesn't update Matrix directly
+        ),
+        "Transformation" => (
+            vec!["Tension", "Counter-Tension", "Counterpart", "Counter-Synthesis", "Reinforces"],
+            vec!["Updates", "Sourced From"],  // Transformation is greater-cycle, not lesser
+        ),
+        "Choice" => (
+            vec!["Counter-Tension", "Counterpart", "Counter-Synthesis", "Reinforces"],
+            vec!["Updates", "Sourced From", "Tension"],  // Choice flows S→G only
+        ),
+        _ => return Ok(()),  // Unknown kind — don't block the operation
+    };
+
+    // Check for forbidden relations
+    let mut violations: Vec<String> = Vec::new();
+    for (key, value) in obj {
+        // Skip non-relation properties (only check properties that have relation values)
+        let is_relation = value.as_array().is_some()
+            || value.get("relation").is_some();
+        if !is_relation { continue; }
+
+        // Check if this property is in the forbidden list for this Kind
+        if forbidden_reservoirs.iter().any(|f| f == key) {
+            // Check if the relation is actually populated (non-empty)
+            let is_populated = if let Some(arr) = value.as_array() {
+                !arr.is_empty()
+            } else if let Some(rel) = value.get("relation").and_then(|r| r.as_array()) {
+                !rel.is_empty()
+            } else {
+                false
+            };
+            if is_populated {
+                violations.push(format!(
+                    "Kind '{}' entries cannot have '{}' relations populated \
+(ontological constraint: {} is a {}-class currency and should not flow through this relation)",
+                    kind, key, kind,
+                    match kind {
+                        "Catalyst" => "lesser-cycle",
+                        "Experience" => "lesser-cycle",
+                        "Transformation" => "greater-cycle",
+                        "Choice" => "greater-cycle",
+                        _ => "unknown",
+                    }
+                ));
+            }
+        }
+    }
+
+    if violations.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "Nexus Kind↔relation constraint violation:\n  - {}\n\n\
+Allowed relations for Kind '{}': {}\n\
+See `lifeos archetype-index` for the 22 archetypes and their currency flows.",
+            violations.join("\n  - "),
+            kind,
+            allowed.join(", ")
+        ))
+    }
 }
