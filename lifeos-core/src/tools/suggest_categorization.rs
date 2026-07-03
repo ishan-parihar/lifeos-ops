@@ -4,7 +4,6 @@
 //! Returns confidence + reasoning. NEVER writes — the user must call `mutate`
 //! to apply each suggestion deliberately.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 use serde::Deserialize;
 

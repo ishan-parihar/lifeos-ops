@@ -132,7 +132,7 @@ pub async fn execute(
             output.push_str(&format!("{} → {}\n", prefix, db_display(target_db)));
 
             for (j, (prop_name, count)) in props.iter().enumerate() {
-                let is_last_prop = j == props.len() - 1;
+                let _is_last_prop = j == props.len() - 1;
                 let prop_prefix = if is_last { "        └──" } else { "        ├──" };
                 if show_counts {
                     let indicator = if *count > 0 { "✅" } else { "⬜" };
