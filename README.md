@@ -44,12 +44,62 @@ LifeOS operationalizes the HoloOS holonic architecture into **5 Notion databases
 | **Significator** | Persistent identity-pattern | Greater | Transformation → Choice |
 | **GreatWay** | Operating environment | Greater | Choice → Transformation |
 
+## Installation
+
+### One-line install (recommended)
+
+Picks the right binary for your platform and drops it at `/usr/local/bin/lifeos`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ishan-parihar/lifeos-ops/main/install.sh | bash
+```
+
+### Manual install from releases
+
+Download the latest release binary and install manually:
+
+```bash
+# Download the latest release
+curl -fsSL -o /tmp/lifeos.tar.gz https://github.com/ishan-parihar/lifeos-ops/releases/latest/download/lifeos-x86_64-unknown-linux-gnu.tar.gz
+
+# Extract and install
+tar xzf /tmp/lifeos.tar.gz -C /tmp
+sudo install /tmp/lifeos-x86_64-unknown-linux-gnu /usr/local/bin/lifeos
+
+# Verify
+lifeos --version
+```
+
+### Update an existing installation
+
+The same install commands work for updating — they always fetch `latest`. Re-run either command whenever a new version is released:
+
+```bash
+# Update via the install script
+curl -fsSL https://raw.githubusercontent.com/ishan-parihar/lifeos-ops/main/install.sh | bash
+
+# Or update manually from the latest release
+curl -fsSL -o /tmp/lifeos.tar.gz https://github.com/ishan-parihar/lifeos-ops/releases/latest/download/lifeos-x86_64-unknown-linux-gnu.tar.gz \
+  && tar xzf /tmp/lifeos.tar.gz -C /tmp \
+  && sudo install /tmp/lifeos-x86_64-unknown-linux-gnu /usr/local/bin/lifeos \
+  && lifeos --version
+```
+
+> The install script also supports pinning a specific version: `curl -fsSL ... | bash -s -- --version v0.10.0`
+
+### Build from source
+
+```bash
+git clone https://github.com/ishan-parihar/lifeos-ops.git
+cd lifeos-ops
+cargo build --release
+# Binary at target/release/lifeos (or target/x86_64-unknown-linux-gnu/release/lifeos)
+sudo install target/release/lifeos /usr/local/bin/
+```
+
 ## Quick Start
 
 ```bash
-# Install
-curl -fsSL https://raw.githubusercontent.com/ishan-parihar/lifeos-ops/main/install.sh | bash
-
 # Set your Notion API token
 export NOTION_API_TOKEN=ntn_xxx
 
@@ -162,15 +212,6 @@ lifeos-ops/
 - [AUDIT_ponytail_ontology.md](AUDIT_ponytail_ontology.md) — Architecture audit + integration gaps
 - [schemas/README.md](schemas/README.md) — YAML schema hierarchy reference
 - [AGENTS.md](AGENTS.md) — Guide for AI agents working on this project
-
-## Build from Source
-
-```bash
-git clone https://github.com/ishan-parihar/lifeos-ops.git
-cd lifeos-ops
-cargo build --release
-# Binary at target/release/lifeos (or target/x86_64-unknown-linux-gnu/release/lifeos)
-```
 
 ## Notion API Version
 
