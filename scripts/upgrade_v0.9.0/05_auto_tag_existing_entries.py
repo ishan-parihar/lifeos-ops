@@ -51,6 +51,7 @@ from importlib import import_module
 common = import_module("common")
 
 from common import (NotionClient, discover_db_ids, get_database_container_id,
+                     get_data_source_schema,
                      print_section, print_kv, MigrationLog)
 
 SCHEMAS_DIR = Path(__file__).resolve().parents[2] / "schemas"
@@ -147,6 +148,7 @@ def tag_entry(
     log: MigrationLog,
     dry_run: bool = False,
     skip_already_tagged: bool = True,
+    set_digestion_stage: bool = True,
 ) -> dict:
     """Tag a single entry with default archetype_role + complex + digestion_stage."""
     page_id = page.get("id")
@@ -169,6 +171,9 @@ def tag_entry(
         return op
 
     entry_type = extract_value(et_prop)
+    # Handle multi_select properties (which return a list) — take the first value
+    if isinstance(entry_type, list):
+        entry_type = entry_type[0] if entry_type else None
     if not entry_type:
         op = {"type": "tag_entry", "db": db_key, "page_id": page_id, "title": title,
               "status": "skipped", "reason": f"'{et_prop_name}' is empty."}
@@ -206,14 +211,15 @@ def tag_entry(
     if complex_val and complex_val != existing_cx:
         update_props["Complex"] = {"select": {"name": complex_val}}
 
-    # Set Digestion Stage from Status (heuristic)
-    status_val = extract_value(props.get("Status", {})) or extract_value(props.get("Digestion Status", {}))
-    if status_val:
-        digestion = STATUS_TO_DIGESTION.get(status_val)
-        if digestion:
-            existing_ds = extract_value(props.get("Digestion Stage", {}))
-            if digestion != existing_ds:
-                update_props["Digestion Stage"] = {"select": {"name": digestion}}
+    # Set Digestion Stage from Status (heuristic) — only if the DB has this property
+    if set_digestion_stage:
+        status_val = extract_value(props.get("Status", {})) or extract_value(props.get("Digestion Status", {}))
+        if status_val:
+            digestion = STATUS_TO_DIGESTION.get(status_val)
+            if digestion:
+                existing_ds = extract_value(props.get("Digestion Stage", {}))
+                if digestion != existing_ds:
+                    update_props["Digestion Stage"] = {"select": {"name": digestion}}
 
     if not update_props:
         op = {"type": "tag_entry", "db": db_key, "page_id": page_id, "title": title,
@@ -271,10 +277,20 @@ def tag_db(
         pages = pages[:limit]
     print(f"  Found {len(pages)} entries in {db_key}.")
 
+    # Check which semantic properties exist on this DB's data_source
+    # (v0.8.0 added Archetype Role + Complex to all 5 DBs, but Digestion Stage
+    # only to Potentiator + Nexus)
+    ds_schema = get_data_source_schema(client, ds_id)
+    has_archetype_role = "Archetype Role" in ds_schema
+    has_complex = "Complex" in ds_schema
+    has_digestion_stage = "Digestion Stage" in ds_schema
+    print(f"  Properties on {db_key}: Archetype Role={has_archetype_role}, Complex={has_complex}, Digestion Stage={has_digestion_stage}")
+
     success = 0
     for i, page in enumerate(pages, 1):
         print(f"  [{i:02d}/{len(pages)}] ", end="", flush=True)
-        result = tag_entry(client, db_key, page, mapping, log, dry_run=dry_run)
+        result = tag_entry(client, db_key, page, mapping, log, dry_run=dry_run,
+                           set_digestion_stage=has_digestion_stage)
         status_icon = {"tagged": "✅", "dry_run": "🔍", "skipped": "⏭️",
                        "already_tagged": "⏭️", "nothing_to_update": "⏭️", "error": "❌"}.get(result["status"], "?")
         msg = result.get("message") or result.get("reason") or ""
@@ -282,7 +298,7 @@ def tag_db(
         if result["status"] == "tagged":
             success += 1
         if not dry_run:
-            time.sleep(0.35)
+            time.sleep(0.1)
     print(f"  → Tagged {success}/{len(pages)} entries.")
     return success
 
