@@ -185,7 +185,7 @@ pub fn schema_derive_type() -> serde_json::Value {
 /// ```
 pub async fn execute_derive_type(
     params: &DeriveTypeParams,
-    config: &Arc<LifeOSConfig>,
+    _config: &Arc<LifeOSConfig>,
     notion: &Arc<NotionClient>,
     _schema_cache: &SchemaCache,
 ) -> Result<String, String> {

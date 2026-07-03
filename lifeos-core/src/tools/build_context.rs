@@ -2,7 +2,7 @@
 //!
 //! Read-only. Returns the entry + all outgoing relations + all incoming backlinks
 //! + depth-2 neighborhood + gap analysis. One call replaces 3+ calls.
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use std::sync::Arc;
 use serde::Deserialize;
