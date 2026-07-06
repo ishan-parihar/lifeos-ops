@@ -59,6 +59,9 @@ root:
     - CHANGELOG.md
     # Audit/plan docs (transitional — move to docs/ once consolidated)
     - AUDIT_ponytail_ontology.md
+    - AUDIT_v0.10.1_DB_SCHEMA.md
+    - AUDIT_v0.10.1_ARCHITECTURE.md
+    - AUDIT_v0.10.1_ACTION_TRACKER.md
     - UPGRADE_v0.9.0_PLAN.md
     # Lint config (this file)
     - workspace-lint.yaml
