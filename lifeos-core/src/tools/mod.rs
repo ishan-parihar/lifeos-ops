@@ -103,8 +103,8 @@ pub async fn get_tool_definitions(config: &LifeOSConfig, _notion: &NotionClient,
         tool_def("daily", "Run daily review: relational gaps + holonic synthesis + recent entries in one call.".to_string(), workflows::schema_daily()),
         tool_def("dashboard", "LifeOS dashboard: orphan count per DB, recent entries, top gaps, health metrics in one call.".to_string(), workflows::schema_dashboard()),
 
-        // ── Auto-Enrichment (v0.10.1) ──
-        tool_def("auto_enrich", "Infer Archetype Role / Complex / Drive Activation from entry-type, OR report parent-relation suggestions. Dry-run by default; pass apply=true to write. Solves the 'manual tagging overhead' problem.".to_string(), auto_enrich::schema()),
+        // ── Auto-Enrichment (v0.10.2 — suggestion-only) ──
+        tool_def("auto_enrich", "READ-ONLY advisor. Scans entries missing universal properties (Archetype Role / Complex / Drive Activation) and reports rule-map suggestions. User applies each manually via `mutate`. Modes: tag (property suggestions), link (parent-relation suggestions).".to_string(), auto_enrich::schema()),
     ]
 }
 

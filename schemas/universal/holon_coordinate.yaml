@@ -109,3 +109,16 @@ validation_rules:
               ("Experience","Spirit"),("Significator","Spirit"),
               ("Transformation","Spirit"),("Great Way","Spirit"),
           }
+
+  - id: shadow_pattern_db_consistency
+    description: "v0.10.2 (U-7): Shadow Pattern must match the DB's holonic role. Per HoloOS doc 02.1 §4 + 02.2 §3 + ONTOLOGY.md §6: Dark-Addiction/Dark-Allergy only on State (Matrix surplus/deficit); Golden-Addiction/Golden-Allergy only on Possibility (Potentiator surplus/deficit); Sinkhole of Indifference only on World (Great Way Choice-starvation). None is valid on all DBs."
+    rule: |
+      shadow = entry.shadow_pattern
+      if shadow in ("", "None"):
+          pass  # OK on all DBs
+      elif shadow in ("Dark-Addiction", "Dark-Allergy"):
+          assert entry.db_key == "matrix"
+      elif shadow in ("Golden-Addiction", "Golden-Allergy"):
+          assert entry.db_key == "potentiator"
+      elif shadow == "Sinkhole of Indifference":
+          assert entry.db_key == "greatway"

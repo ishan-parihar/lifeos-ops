@@ -438,7 +438,7 @@ pub fn validate_entry(
 
 /// Hardcoded validation rules — replaces the 500-line mini Python DSL interpreter.
 /// Each rule is a simple match arm that checks the entry's flat property map.
-fn eval_hardcoded_rule(rule_id: &str, entry: &HashMap<String, String>, _db_key: &str) -> Result<(), String> {
+fn eval_hardcoded_rule(rule_id: &str, entry: &HashMap<String, String>, db_key: &str) -> Result<(), String> {
     match rule_id {
         "nexus_kind_consistency" => {
             let kind = entry.get("kind").or_else(|| entry.get("Kind")).map(|s| s.as_str()).unwrap_or("");
@@ -494,6 +494,39 @@ fn eval_hardcoded_rule(rule_id: &str, entry: &HashMap<String, String>, _db_key: 
                 if !valid_pairs.contains(&(role, complex)) {
                     return Err(format!("Invalid (archetype_role='{}', complex='{}') pair — must be one of the 22 named archetypes", role, complex));
                 }
+            }
+            Ok(())
+        }
+        // v0.10.2 (U-7): Shadow Pattern must match the DB's holonic role.
+        // Per HoloOS doc 02.1 §4 + 02.2 §3 + ONTOLOGY.md §6:
+        //   Dark-Addiction / Dark-Allergy → only on State (Matrix surplus/deficit)
+        //   Golden-Addiction / Golden-Allergy → only on Possibility (Potentiator surplus/deficit)
+        //   Sinkhole of Indifference → only on World (Great Way Choice-starvation)
+        //   None → valid on all DBs
+        "shadow_pattern_db_consistency" => {
+            let shadow = entry.get("shadow_pattern")
+                .or_else(|| entry.get("Shadow Pattern"))
+                .map(|s| s.as_str())
+                .unwrap_or("");
+            if shadow.is_empty() || shadow == "None" {
+                return Ok(());
+            }
+            let valid_db = match shadow {
+                "Dark-Addiction" | "Dark-Allergy" => "matrix",
+                "Golden-Addiction" | "Golden-Allergy" => "potentiator",
+                "Sinkhole of Indifference" => "greatway",
+                _ => return Ok(()), // Unknown shadow — don't block
+            };
+            if db_key != valid_db {
+                return Err(format!(
+                    "Shadow Pattern '{}' is only valid on DB '{}' ({}), but entry is in DB '{}'",
+                    shadow, valid_db, match shadow.as_ref() {
+                        "Dark-Addiction" | "Dark-Allergy" => "Matrix surplus/deficit",
+                        "Golden-Addiction" | "Golden-Allergy" => "Potentiator surplus/deficit",
+                        "Sinkhole of Indifference" => "Great Way Choice-starvation",
+                        _ => "ontological constraint",
+                    }, db_key
+                ));
             }
             Ok(())
         }

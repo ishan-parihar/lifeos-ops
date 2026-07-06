@@ -1,16 +1,20 @@
-//! `auto_enrich` tool — infer universal properties + parent links from entry-type.
+//! `auto_enrich` tool — SUGGESTION-ONLY advisor for universal properties + parent links.
 //!
-//! Solves the user's #1 pain: "how the hell can I also log these entries manually
-//! AND do all the other work." Instead of forcing the user to set Archetype Role,
-//! Complex, Drive Activation on every daily-log entry, this tool infers them
-//! from the DB + entry-type using a deterministic rule map.
+//! v0.10.2: Demoted to suggestion-only per user's architectural preference
+//! (no bulk-tagging — universal properties must be manually curated).
+//! The `apply` parameter is now IGNORED for `mode=tag` (always dry-run).
+//! `mode=link` was always dry-run.
+//!
+//! The tool scans entries missing universal properties (Archetype Role /
+//! Complex / Drive Activation) and reports what the rule map SUGGESTS.
+//! The user reviews the suggestions and applies each one manually via
+//! `mutate` or the Notion UI. This aligns with AGENTS.md §6.1: "Tools
+//! surface gaps and suggest connections, but the user must approve each."
 //!
 //! Two modes:
-//!   - `tag`  : set Archetype Role / Complex / Drive Activation on entries missing them.
-//!              Safe, idempotent, never overwrites existing values.
-//!   - `link` : DRY-RUN only — reports which parent relations WOULD be set per entry-type.
-//!              Actual application deferred to v0.11 (requires multi-step resolution
-//!              of "active parent" by status filter, which is risky to auto-apply).
+//!   - `tag`  : report entries missing Archetype Role / Complex / Drive Activation,
+//!              with rule-map suggestions for what to set. READ-ONLY.
+//!   - `link` : report which parent relations WOULD be set per entry-type. READ-ONLY.
 
 use std::sync::Arc;
 use serde::Deserialize;
@@ -34,10 +38,10 @@ pub fn schema() -> Value {
     json!({
         "type": "object",
         "properties": {
-            "mode": { "type": "string", "enum": ["tag", "link"], "description": "tag = set Archetype Role/Complex/Drive Activation; link = report which parent relations WOULD be set" },
+            "mode": { "type": "string", "enum": ["tag", "link"], "description": "tag = suggest Archetype Role/Complex/Drive Activation values for entries missing them; link = suggest parent relations per entry-type. Both modes are READ-ONLY (suggestion-only)." },
             "database": { "type": "string", "description": "Optional DB key to filter. Omit to scan all 5." },
             "limit": { "type": "integer", "minimum": 1, "maximum": 500, "description": "Max entries per DB (default 50)" },
-            "apply": { "type": "boolean", "description": "false (default) = dry-run; true = write changes to Notion (link mode always dry-run)" }
+            "apply": { "type": "boolean", "description": "[DEPRECATED v0.10.2] Ignored — tool is now suggestion-only. Use `mutate` to apply suggestions manually.", "default": false }
         },
         "required": ["mode"]
     })
@@ -159,7 +163,9 @@ pub async fn execute(
     _schema_cache: &SchemaCache,
 ) -> Result<String, String> {
     let limit = params.limit.unwrap_or(50).min(500) as u64;
-    let apply = params.apply && params.mode == "tag"; // link mode always dry-run
+    // v0.10.2: ALWAYS dry-run (suggestion-only). The `apply` parameter is
+    // accepted for backward compat but ignored. User manually curates via `mutate`.
+    let apply = false;
 
     let db_keys: Vec<String> = if let Some(ref db) = params.database {
         if !config.databases.contains_key(db) {
@@ -170,10 +176,14 @@ pub async fn execute(
         config.all_database_keys()
     };
 
-    let mode_label = if apply { "APPLY" } else { "DRY-RUN" };
+    let mode_label = "SUGGESTION-ONLY";
     let mut report = String::new();
     report.push_str(&format!("LifeOS auto_enrich — mode={} {} — limit={}/DB\n\n",
         params.mode, mode_label, limit));
+    if params.apply {
+        report.push_str("⚠ NOTE: `apply=true` is deprecated (v0.10.2). Tool is now suggestion-only.\n");
+        report.push_str("  Use `mutate` to apply suggestions manually. See AGENTS.md §6.1.\n\n");
+    }
 
     let mut total_processed = 0u64;
     let mut total_changed = 0u64;
@@ -299,7 +309,7 @@ pub async fn execute(
 
     report.push_str("── Summary ──\n");
     report.push_str(&format!("  Processed:             {}\n", total_processed));
-    report.push_str(&format!("  {} changes:     {}\n", if apply { "Applied" } else { "Would-apply" }, total_changed));
+    report.push_str(&format!("  Suggestions:          {}\n", total_changed));
     report.push_str(&format!("  Skipped (no rule):     {}\n", total_skipped_no_rule));
     report.push_str(&format!("  Skipped (already set): {}\n", total_skipped_already_set));
     if !errors.is_empty() {
@@ -308,8 +318,9 @@ pub async fn execute(
             report.push_str(&format!("    - {}\n", e));
         }
     }
-    if !apply && total_changed > 0 && params.mode == "tag" {
-        report.push_str("\n  Re-run with apply=true to write these changes to Notion.\n");
+    if total_changed > 0 && params.mode == "tag" {
+        report.push_str("\n  To apply: review each suggestion above, then use `mutate` to set properties manually.\n");
+        report.push_str("  Example: lifeos mutate --operation update --database <db> --page-id <id> --properties '{\"Archetype Role\":\"Matrix\",\"Complex\":\"Body\",\"Drive Activation\":[\"Agency\"]}'\n");
     }
     if params.mode == "link" {
         report.push_str("\n  Link mode is dry-run only in v0.10. Auto-link application deferred to v0.11.\n");
