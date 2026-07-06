@@ -446,17 +446,20 @@ Must exit 0. Warnings are OK; errors are not.
 
 ## 9. Known Issues + Pending Items
 
-(See `/home/z/my-project/worklog.md` for the full pending list. Top items:)
+See [AUDIT_v0.10.1_ACTION_TRACKER.md](AUDIT_v0.10.1_ACTION_TRACKER.md) for the
+full prioritized list of fix / refine / upgrade / refactor / YAGNI items.
 
-1. Mid-tool cancellation support (currently checked at completion only)
-2. `notifications/progress` for long-running tools
-3. Per-relation semantic hints in `link` response
-4. Auto-link apply mode (currently dry-run only)
-5. Move Digestion Stage / Archetype Role / Complex to YAML-schema-only on
-   daily entry-types (auto_enrich makes this less urgent)
-6. Bulk auto-tag the 6,000+ untagged Possibility entries
-7. Manually re-tag the 1 Identity entry using `Complex=Soul` then remove
-   the option via Notion UI
+Top 4 high-priority items for the next sprint:
+
+1. **U-9** — Demote `auto_enrich` to suggestion-only (remove `--apply` for tag mode). Aligns with user's manual-curation preference.
+2. **D-ID-2** — Re-tag the 1 Identity entry using `Complex=Soul`, then remove `Soul` option via Notion UI.
+3. **U-7** — Add `shadow_pattern_db_consistency` validation rule (Sinkhole only on World, Dark-* only on State, Golden-* only on Possibility).
+4. **D-ID-1** — Rename `Identity.Stage` → `Life-Era` + remove `Active/Evolving/Archived` options (conflated with `Status`).
+
+See also:
+- [AUDIT_v0.10.1_DB_SCHEMA.md](AUDIT_v0.10.1_DB_SCHEMA.md) — per-DB schema inventory, relation topology, 14 drift items
+- [AUDIT_v0.10.1_ARCHITECTURE.md](AUDIT_v0.10.1_ARCHITECTURE.md) — code-level audit, 10 YAGNI + 10 upgrade candidates
+- [AUDIT_ponytail_ontology.md](AUDIT_ponytail_ontology.md) — pre-v0.10.1 audit (historical)
 
 ---
 
