@@ -1,0 +1,539 @@
+# Legacy LifeOS — Database Inventory
+# =============================================================================
+# All 26 DBs in the legacy LifeOS structure (21 active + 5 deprecated).
+# Each DB lists: name, system(s), function, key properties, hierarchy position.
+
+version: "1.0"
+
+# ─── Foundational (2nd synthesis pipeline) ────────────────────────────────────
+values_and_principles:
+  name: Values and Principles
+  systems: [foundational]
+  function: The user's enduring value commitments + operating principles.
+  hierarchy:
+    layer: 2nd_synthesis
+    parent_of: [annual_goals]  # Values inform Annual-Goals
+    child_of: none  # Top of the hierarchy
+  properties:
+    - name: Name
+      type: title
+    - name: Description
+      type: rich_text
+    - name: Type
+      type: select  # Value vs Principle
+    - name: Source
+      type: rich_text  # Where the value/principle came from
+    - name: Last Reviewed
+      type: date
+
+vision:
+  name: Vision
+  systems: [foundational]
+  function: Long-term direction. The "where I'm going" layer.
+  hierarchy:
+    layer: 2nd_synthesis
+    parent_of: [annual_goals]
+    child_of: [values_and_principles]  # Vision is informed by Values
+  properties:
+    - name: Name
+      type: title
+    - name: Vision Statement
+      type: rich_text
+    - name: Timeframe
+      type: select  # 1yr / 3yr / 5yr / 10yr / lifetime
+    - name: Status
+      type: status  # Draft / Active / Evolving / Archived
+
+stats:
+  name: Stats
+  systems: [foundational]
+  function: >
+    RPG-game-like status report. Long-term trends condense into traits /
+    observable-facts. Generates the user's overall profile across all
+    dimensions (financial, content-creation, execution, strategic, relational,
+    psychological, health, etc.). Was a new addition to the legacy schema,
+    subject to revision.
+  hierarchy:
+    layer: 2nd_synthesis
+    parent_of: none
+    child_of: [first_synthesis_pipeline]  # Stats is the condensation of all insights
+  properties:
+    - name: Name
+      type: title
+    - name: Category
+      type: select  # financial / health / relational / etc.
+    - name: Definition
+      type: rich_text
+    - name: Unit
+      type: select  # count / percentage / hours / rupees / etc.
+    - name: Frequency
+      type: select  # daily / weekly / monthly / quarterly / annual
+    - name: Change
+      type: formula  # trend direction
+
+# ─── Strategic (1st synthesis pipeline + goal-setting) ────────────────────────
+annual_goals:
+  name: Annual-Goals
+  systems: [strategic, relational, content_creation, financial_system]
+  function: Yearly goals. Cross-cutting — appears in Strategic, Relational, Content, Financial because goals span all systems.
+  hierarchy:
+    layer: goal_setting
+    parent_of: [quarterly_goals]
+    child_of: [values_and_principles, vision]
+  properties:
+    - name: Name
+      type: title
+    - name: Year
+      type: select
+    - name: Status
+      type: status  # Future / Active / Done / Cancelled
+    - name: Pillar
+      type: relation  # → Identity.Pillar (or Values/Principles in legacy)
+    - name: Progress
+      type: number
+    - name: Target
+      type: number
+    - name: Start Date / End Date
+      type: date
+    - name: Quadrant
+      type: select  # UL/UR/LL/LR
+
+quarterly_goals:
+  name: Quarterly-Goals
+  systems: [strategic, relational, content_creation, financial_system]
+  function: Quarterly goals. Cross-cutting like Annual-Goals.
+  hierarchy:
+    layer: goal_setting
+    parent_of: [projects]
+    child_of: [annual_goals]
+  properties:
+    - name: Name
+      type: title
+    - name: Quarter
+      type: select  # Q1/Q2/Q3/Q4 + Year
+    - name: Status
+      type: status
+    - name: Annual Goal
+      type: relation  # → Annual-Goals
+    - name: Progress
+      type: number
+
+opportunities_and_strengths:
+  name: Opportunities-and-Strengths
+  systems: [strategic]
+  function: >
+    1st synthesis pipeline — surfaces positive trajectory signals. Logs
+    synthesize into Opportunities (positive trends to capitalize on) and
+    Strengths (enduring capacities to leverage).
+  hierarchy:
+    layer: 1st_synthesis
+    parent_of: none
+    child_of: [logging_system]  # Receives from logs
+  properties:
+    - name: Name
+      type: title
+    - name: Type
+      type: select  # Opportunity vs Strength
+    - name: Source Logs
+      type: relation  # → 6 logs (multi)
+    - name: Priority
+      type: select  # Critical / High / Medium / Low
+    - name: Status
+      type: status  # Identified / Activated / Capitalized / Archived
+
+directives_and_risks:
+  name: Directives-and-Risks
+  systems: [strategic]
+  function: >
+    1st synthesis pipeline — surfaces negative trajectory signals + corrective
+    actions. Risks are threats to trajectory; Directives are corrective
+    imperatives routed through the Execution-Pipeline as Projects/Tasks.
+  hierarchy:
+    layer: 1st_synthesis
+    parent_of: [projects, tasks]  # Directives can spawn Projects/Tasks
+    child_of: [logging_system]
+  properties:
+    - name: Name
+      type: title
+    - name: Type
+      type: select  # Directive vs Risk
+    - name: Source Logs
+      type: relation  # → 6 logs
+    - name: Priority
+      type: select
+    - name: Status
+      type: status
+    - name: Spawned Projects
+      type: relation  # → Projects (the corrective actions)
+
+notes_management:
+  name: Notes-Management
+  systems: [strategic]
+  function: >
+    1st synthesis pipeline — raw synthesis notes before they condense into
+    Opportunities/Strengths/Directives/Risks. Meeting notes, captures, web
+    clips, voice memos.
+  hierarchy:
+    layer: 1st_synthesis
+    parent_of: [opportunities_and_strengths, directives_and_risks]  # Notes condense into insights
+    child_of: [logging_system]
+  properties:
+    - name: Name
+      type: title
+    - name: Capture Method
+      type: select  # manual / web_clipper / api_ingest / voice_memo / import
+    - name: Source URL
+      type: url
+    - name: Synthesis State
+      type: select  # raw_note / annotated / synthesized / applied
+    - name: Condensed Into
+      type: relation  # → Opportunities/Directives
+
+# ─── Execution ─────────────────────────────────────────────────────────────────
+projects:
+  name: Projects
+  systems: [execution, relational, content_creation, financial_system]
+  function: Organize goals into deliverables. Cross-cutting.
+  hierarchy:
+    layer: execution
+    parent_of: [tasks]
+    child_of: [quarterly_goals, directives_and_risks]
+  properties:
+    - name: Name
+      type: title
+    - name: Status
+      type: status  # Future / Ideation / Paused / Active / Done / Cancelled
+    - name: Quarterly Goal
+      type: relation
+    - name: Pillar
+      type: relation
+    - name: Priority
+      type: select
+    - name: Progress
+      type: number
+    - name: Start Date / End Date
+      type: date
+    - name: People
+      type: relation  # → People
+    - name: Budget
+      type: number
+
+tasks:
+  name: Tasks
+  systems: [execution]
+  function: Atomic units of work.
+  hierarchy:
+    layer: execution
+    parent_of: [activity_log]  # Tasks generate Activity-Log entries
+    child_of: [projects]
+  properties:
+    - name: Name
+      type: title
+    - name: Status
+      type: status  # Todo / In Progress / Done
+    - name: Project
+      type: relation
+    - name: Due Date
+      type: date
+    - name: Priority
+      type: select
+    - name: Blocked By
+      type: relation  # → Tasks (intra-DB)
+
+systemic_journal:
+  name: Systemic-Journal
+  systems: [execution, logging_system]
+  function: >
+    Logging-System member. Captures execution-level systemic reflections —
+    process improvements, system observations, workflow notes.
+  hierarchy:
+    layer: logging
+    parent_of: none
+    child_of: [projects, tasks]  # Logs are generated by executing work
+  properties:
+    - name: Name
+      type: title
+    - name: Date
+      type: date
+    - name: Project
+      type: relation
+    - name: Reflection
+      type: rich_text
+
+activity_log:
+  name: Activity-Log
+  systems: [execution, logging_system]
+  function: >
+    Logging-System member. Daily activity tracking — exercise, work, recovery,
+    mindfulness, social, etc. OBJECTIVE data.
+  hierarchy:
+    layer: logging
+    parent_of: [days]  # deprecated temporal aggregation
+    child_of: [tasks]  # Activity belongs to a Task
+  properties:
+    - name: Name
+      type: title
+    - name: Date
+      type: date
+    - name: Activity Type
+      type: select  # Exercise / Recovery / Nutrition / Work / Mindfulness / Social / Chore / Commute / Entertainment / Learning
+    - name: Duration
+      type: number  # hours
+    - name: Frequency
+      type: select
+    - name: Habit
+      type: checkbox
+    - name: is_health_tracked
+      type: checkbox
+    - name: target_per_week
+      type: number
+    - name: Task
+      type: relation  # → Tasks
+
+diet_log:
+  name: Diet-Log
+  systems: [execution, logging_system]
+  function: >
+    Logging-System member. Daily diet tracking. OBJECTIVE data. Feeds health
+    statistics.
+  hierarchy:
+    layer: logging
+    parent_of: [days]
+    child_of: none  # Diet isn't tied to Tasks; it's a standalone log
+  properties:
+    - name: Name
+      type: title
+    - name: Date
+      type: date
+    - name: Meal
+      type: select  # Breakfast / Lunch / Dinner / Snack
+    - name: Items
+      type: rich_text
+    - name: Calories
+      type: number
+    - name: Macros
+      type: rich_text
+
+# ─── Relational ───────────────────────────────────────────────────────────────
+people:
+  name: People
+  systems: [relational]
+  function: >
+    Rich CRM. 31 properties in legacy — Aspirational Drive, Developmental
+    Altitude, Influence Toolkit (65 options), Networking Profile, Relationship
+    Status, etc.
+  hierarchy:
+    layer: external_holons
+    parent_of: [relational_journal]  # People are the subject of Relational-Journal entries
+    child_of: [communities]  # People belong to Communities
+  properties:
+    # Key properties (full list is 31 — see legacy_db_schemas.json)
+    - name: People
+      type: title
+    - name: Aspirational Drive
+      type: select  # Security/Stability, Connection/Belonging, Status/Recognition, Mastery/Impact, Growth/Understanding
+    - name: Developmental Altitude
+      type: select  # LVL 3-7 (Red/Amber/Orange/Green/Turquoise)
+    - name: Networking Profile
+      type: select  # Key Ally / Active Collaborator / Mentor/Advisor / Protégé/Mentee / Peer/Sounding Board / Inactive / Archive
+    - name: Relationship Status
+      type: select  # Family Member / Mentor / Close Friend / Close Acquaintance / Coworker / Acquaintance
+    - name: Desired Trajectory
+      type: select  # Deepen / Maintain / Activate / Graceful Exit / Inactive
+    - name: Community
+      type: relation  # → Communities
+    - name: Influence Toolkit
+      type: multi_select  # 65 options (curated to 15 in v0.11 proposal)
+    - name: Core Shadow
+      type: select
+    - name: City
+      type: select  # 20 options
+    - name: Timezone
+      type: select
+    - name: last_interaction_sentiment
+      type: select  # Positive / Neutral / Tense / Negative
+
+communities:
+  name: Communities
+  systems: [relational]
+  function: Group/community CRM with strategic value classification.
+  hierarchy:
+    layer: external_holons
+    parent_of: [people]
+    child_of: none
+  properties:
+    - name: Community
+      type: title
+    - name: Type
+      type: select  # Professional / Personal / Spiritual / Creative / Investment / Mastermind
+    - name: Strategic Value
+      type: select  # Core / Supporting / Peripheral
+    - name: Covenant/Shared Purpose
+      type: rich_text
+    - name: People
+      type: relation  # → People
+
+relational_journal:
+  name: Relational-Journal
+  systems: [relational, logging_system]
+  function: >
+    Logging-System member. Captures interaction quality, relational dynamics,
+    emotional context of relationships.
+  hierarchy:
+    layer: logging
+    parent_of: none
+    child_of: [people]  # Logs are about People
+  properties:
+    - name: Name
+      type: title
+    - name: Date
+      type: date
+    - name: Person
+      type: relation  # → People
+    - name: Interaction Type
+      type: select
+    - name: Sentiment
+      type: select  # Positive / Neutral / Tense / Negative
+    - name: Reflection
+      type: rich_text
+
+# ─── Content-Creation ─────────────────────────────────────────────────────────
+campaigns:
+  name: Campaigns
+  systems: [content_creation]
+  function: Marketing campaign organization.
+  hierarchy:
+    layer: production
+    parent_of: [content_pipeline]
+    child_of: [quarterly_goals, projects]
+  properties:
+    - name: Name
+      type: title
+    - name: Status
+      type: status
+    - name: Project
+      type: relation
+    - name: Start Date / End Date
+      type: date
+    - name: Content Pieces
+      type: relation  # → Content-Pipeline
+
+content_pipeline:
+  name: Content-Pipeline
+  systems: [content_creation]
+  function: Individual content pieces from idea to published.
+  hierarchy:
+    layer: production
+    parent_of: none
+    child_of: [campaigns]
+  properties:
+    - name: Name
+      type: title
+    - name: Status
+      type: status  # Idea / Drafting / Editing / Scheduled / Published
+    - name: Campaign
+      type: relation
+    - name: Content Type
+      type: select  # Video / Blog / Social / Podcast / etc.
+    - name: Publish Date
+      type: date
+
+# ─── Financial-System ─────────────────────────────────────────────────────────
+financial_accounts:
+  name: Financial-Accounts
+  systems: [financial_system]
+  function: Current state of financial accounts (bank, investment, credit, etc.).
+  hierarchy:
+    layer: state
+    parent_of: [financial_log]
+    child_of: none
+  properties:
+    - name: Name
+      type: title
+    - name: Account Type
+      type: select  # Checking / Savings / Investment / Credit / etc.
+    - name: Balance
+      type: number
+    - name: Institution
+      type: select
+
+financial_log:
+  name: Financial-Log
+  systems: [financial_system, logging_system]
+  function: >
+    Logging-System member. Transaction log. OBJECTIVE data.
+  hierarchy:
+    layer: logging
+    parent_of: [days]
+    child_of: [financial_accounts]  # Logs belong to accounts
+  properties:
+    - name: Name
+      type: title
+    - name: Date
+      type: date
+    - name: Amount
+      type: number
+    - name: Account
+      type: relation  # → Financial-Accounts
+    - name: Category
+      type: select  # Income / Expense / Transfer / Investment
+    - name: Project
+      type: relation  # → Projects (if expense is project-related)
+
+# ─── Subjective-Journal (Logging-System, cross-cutting) ───────────────────────
+subjective_journal:
+  name: Subjective-Journal
+  systems: [logging_system]
+  function: >
+    Logging-System member. Captures subjective experience — Learning,
+    Spirituality, emotional state, dreams, reflections. NOT objective data —
+    subjective interpretation of experience.
+  hierarchy:
+    layer: logging
+    parent_of: none
+    child_of: none  # Standalone — captures subjective experience
+  properties:
+    - name: Name
+      type: title
+    - name: Date
+      type: date
+    - name: Subjective Type
+      type: select  # Learning / Spiritual / Emotional / Dream / Reflection
+    - name: Content
+      type: rich_text
+
+# ─── Temporal-Aggregation (DEPRECATED) ───────────────────────────────────────
+days:
+  name: Days
+  systems: [temporal_aggregation]
+  function: DEPRECATED. Daily aggregation of 6 logs.
+  status: deprecated
+  replacement: date_range_filters
+
+weeks:
+  name: Weeks
+  systems: [temporal_aggregation]
+  function: DEPRECATED. Weekly aggregation of Days.
+  status: deprecated
+  replacement: date_range_filters
+
+months:
+  name: Months
+  systems: [temporal_aggregation]
+  function: DEPRECATED. Monthly aggregation of Weeks.
+  status: deprecated
+  replacement: date_range_filters
+
+quarters:
+  name: Quarters
+  systems: [temporal_aggregation]
+  function: DEPRECATED. Quarterly aggregation of Months. Related to Quarterly-Goals.
+  status: deprecated
+  replacement: date_range_filters
+
+years:
+  name: Years
+  systems: [temporal_aggregation]
+  function: DEPRECATED. Annual aggregation of Quarters. Related to Annual-Goals/Vision/Values.
+  status: deprecated
+  replacement: date_range_filters
