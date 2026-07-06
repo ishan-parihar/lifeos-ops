@@ -55,13 +55,12 @@ pub async fn execute_unlink(
         .map(|id| serde_json::json!({ "id": id }))
         .collect();
 
-    let update_body = serde_json::json!({
-        "properties": {
-            &params.property: { "relation": new_ids }
-        }
+    // update_page() already wraps in {"properties": ...}, so pass the inner map directly.
+    let update_props = serde_json::json!({
+        &params.property: { "relation": new_ids }
     });
 
-    notion.update_page(&params.source_page, &update_body).await?;
+    notion.update_page(&params.source_page, &update_props).await?;
 
     let source_title = crate::transform::extract_title(&source_page);
     let target_title = notion.get_page(&params.target_page).await
@@ -172,13 +171,12 @@ pub async fn execute_batch_link(
             .collect();
         new_ids.push(serde_json::json!({ "id": &item.target_page }));
 
-        let update_body = serde_json::json!({
-            "properties": {
-                &item.property: { "relation": new_ids }
-            }
+        // update_page() already wraps in {"properties": ...}, so pass the inner map directly.
+        let update_props = serde_json::json!({
+            &item.property: { "relation": new_ids }
         });
 
-        match notion.update_page(&item.source_page, &update_body).await {
+        match notion.update_page(&item.source_page, &update_props).await {
             Ok(_) => {
                 success_count += 1;
                 results.push(serde_json::json!({

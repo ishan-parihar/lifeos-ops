@@ -1,0 +1,160 @@
+# Eval: workspace-lint
+#
+# Minimal eval set for the workspace-lint skill.
+# Tests core functionality: config loading, violation detection, auto-fix.
+
+## Test 1: Clean project passes
+Setup:
+```
+mkdir -p /tmp/test-wlint-clean/src
+touch /tmp/test-wlint-clean/src/app.py
+touch /tmp/test-wlint-clean/README.md
+touch /tmp/test-wlint-clean/.gitignore
+cat > /tmp/test-wlint-clean/workspace-lint.yaml << 'EOF'
+project:
+  name: test
+structure:
+  canonical:
+    - path: src
+root:
+  allowed_root_files:
+    - README.md
+    - .gitignore
+    - workspace-lint.yaml
+  forbidden_files:
+    - "*.log"
+files: {}
+directories:
+  forbidden_patterns: []
+EOF
+```
+Run:
+```
+python scripts/workspace_lint.py --root /tmp/test-wlint-clean
+```
+Expected:
+- Exit code 0
+- No errors in output
+
+---
+
+## Test 2: Build artifacts detected
+Setup:
+```
+mkdir -p /tmp/test-wlint-artifacts/src/__pycache__
+touch /tmp/test-wlint-artifacts/src/__pycache__/app.cpython-311.pyc
+touch /tmp/test-wlint-artifacts/src/app.py
+cat > /tmp/test-wlint-artifacts/workspace-lint.yaml << 'EOF'
+project:
+  name: test
+structure:
+  canonical:
+    - path: src
+root:
+  allowed_root_files: []
+  forbidden_files: []
+files: {}
+directories:
+  forbidden_patterns: []
+EOF
+```
+Run:
+```
+python scripts/workspace_lint.py --root /tmp/test-wlint-artifacts
+```
+Expected:
+- Exit code 1 (errors found)
+- Output contains "artifacts.detected" or "__pycache__"
+
+---
+
+## Test 3: Auto-fix removes artifacts
+Setup: (use same as Test 2)
+Run:
+```
+python scripts/workspace_lint.py --root /tmp/test-wlint-artifacts --fix
+```
+Expected:
+- Exit code 0
+- `__pycache__` directory no longer exists
+- Output contains "[fixed] Removed"
+
+---
+
+## Test 4: Root forbidden file detected
+Setup:
+```
+mkdir -p /tmp/test-wlint-root/src
+touch /tmp/test-wlint-root/src/app.py
+touch /tmp/test-wlint-root/debug.log
+cat > /tmp/test-wlint-root/workspace-lint.yaml << 'EOF'
+project:
+  name: test
+structure:
+  canonical:
+    - path: src
+root:
+  allowed_root_files:
+    - workspace-lint.yaml
+  forbidden_files:
+    - "*.log"
+files: {}
+directories:
+  forbidden_patterns: []
+EOF
+```
+Run:
+```
+python scripts/workspace_lint.py --root /tmp/test-wlint-root
+```
+Expected:
+- Exit code 1
+- Output contains "root.forbidden" or "debug.log"
+
+---
+
+## Test 5: Missing canonical directory
+Setup:
+```
+mkdir -p /tmp/test-wlint-missing/src
+cat > /tmp/test-wlint-missing/workspace-lint.yaml << 'EOF'
+project:
+  name: test
+structure:
+  canonical:
+    - path: src
+    - path: tests
+root:
+  allowed_root_files: []
+  forbidden_files: []
+files: {}
+directories:
+  forbidden_patterns: []
+EOF
+```
+Run:
+```
+python scripts/workspace_lint.py --root /tmp/test-wlint-missing
+```
+Expected:
+- Exit code 1
+- Output contains "tests" and "missing" or "does not exist"
+
+---
+
+## Test 6: JSON output
+Setup: (use Test 1 clean project)
+Run:
+```
+python scripts/workspace_lint.py --root /tmp/test-wlint-clean --json
+```
+Expected:
+- Exit code 0
+- Output is valid JSON array
+
+---
+
+## Teardown
+```
+rm -rf /tmp/test-wlint-*
+```

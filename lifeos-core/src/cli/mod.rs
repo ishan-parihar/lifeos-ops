@@ -137,7 +137,7 @@ pub enum Commands {
         /// Database key (tasks, projects, activity_log, etc.)
         database: String,
         /// Property to filter on
-        #[arg(short, long)]
+        #[arg(long)]
         filter_property: Option<String>,
         /// Filter value
         #[arg(short, long)]
@@ -146,10 +146,10 @@ pub enum Commands {
         #[arg(long)]
         filter_type: Option<String>,
         /// Sort property
-        #[arg(short, long)]
+        #[arg(long)]
         sort_property: Option<String>,
         /// Sort direction (ascending/descending)
-        #[arg(short, long)]
+        #[arg(long)]
         sort_direction: Option<String>,
         /// Max results (default: 50)
         #[arg(short, long, default_value = "50")]
@@ -475,6 +475,23 @@ pub enum Commands {
 
     /// LifeOS dashboard: orphan count per DB, recent entries, top gaps, health metrics
     Dashboard,
+
+    /// Auto-enrich entries: infer Archetype Role / Complex / Drive Activation from entry-type
+    /// (mode=tag), or report parent-relation suggestions (mode=link). Dry-run by default.
+    AutoEnrich {
+        /// "tag" to set universal properties, "link" to report relation suggestions
+        #[arg(short, long)]
+        mode: String,
+        /// Optional DB filter (matrix, potentiator, nexus, significator, greatway)
+        #[arg(short, long)]
+        database: Option<String>,
+        /// Max entries per DB (default 50)
+        #[arg(short, long)]
+        limit: Option<u32>,
+        /// Apply changes (default: dry-run)
+        #[arg(long, default_value_t = false)]
+        apply: bool,
+    },
 
     /// Quick-link two entries by title (resolves titles to page IDs automatically)
     QuickLink {

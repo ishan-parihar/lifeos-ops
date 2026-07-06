@@ -1,0 +1,187 @@
+# LifeOS-Ops Workspace Lint Config
+# =============================================================================
+# Single source of truth for the canonical directory structure of lifeos-ops.
+# Run `python3 skill/workspace-lint/scripts/workspace_lint.py` after every
+# iteration to catch drift. See AGENTS.md → Workflow → Step 6.
+
+project:
+  name: "lifeos-ops"
+  version: "0.10.1"
+  type: "rust-cli-mcp"
+
+ignore_dirs:
+  - .git
+  - __pycache__
+  - target                  # Rust build artifacts
+  - node_modules
+  - .venv
+  - .idea
+  - .vscode
+
+# ─── Canonical structure ──────────────────────────────────────────────────────
+# What SHOULD exist. The validator warns if any of these are missing.
+structure:
+  canonical:
+    - path: lifeos-core
+      description: "Shared library crate — Notion client, config, tools, sync, MCP server"
+      children: [src, Cargo.toml]
+    - path: lifeos-core/src
+      description: "Library source: notion/, util/, tools/, transform/, sync/, vault/"
+      children: [notion, util, tools, transform, sync, vault]
+    - path: lifeos
+      description: "Binary crate — CLI + MCP runner"
+      children: [src, Cargo.toml]
+    - path: schemas
+      description: "3-tier YAML schema hierarchy"
+      children: [universal, per_db, per_entry_type]
+    - path: scripts
+      description: "One-time + reusable Python migration/audit scripts"
+    - path: skill
+      description: "Bundled AI-agent skills (notion-cli + workspace-lint)"
+      children: [notion-cli, workspace-lint]
+    # Note: no docs/ canonical dir — root .md files (README, AGENTS, ONTOLOGY) live at root
+
+# ─── Root file policy ─────────────────────────────────────────────────────────
+root:
+  allowed_root_files:
+    # Code manifests
+    - Cargo.toml
+    - Cargo.lock
+    - .gitignore
+    # Config (gitignored lifeos.config.json + committed default)
+    - lifeos.config.default.json
+    - lifeos.config.json          # gitignored at runtime but lint-allowed
+    - .env                        # gitignored
+    # Top-level docs
+    - README.md
+    - AGENTS.md
+    - ONTOLOGY.md
+    - CHANGELOG.md
+    # Audit/plan docs (transitional — move to docs/ once consolidated)
+    - AUDIT_ponytail_ontology.md
+    - UPGRADE_v0.9.0_PLAN.md
+    # Lint config (this file)
+    - workspace-lint.yaml
+    # Install + build helpers
+    - install.sh
+
+  forbidden_files:
+    - "*.pyc"
+    - "*.pyo"
+    - "*.log"
+    - "*.tmp"
+    - ".DS_Store"
+    - "Thumbs.db"
+    - "*.swp"
+    - "*~"
+    - "*.bak"
+    - "*.orig"
+    # Rust artifacts should never be at root
+    - "*.rlib"
+    - "*.pdb"
+
+# ─── File placement rules ─────────────────────────────────────────────────────
+# Order matters: most-specific patterns first. The validator uses fnmatch
+# against the relative path, so 'lifeos/src/*.rs' is more specific than '*.rs'.
+files:
+  # Skill files — bundled AI-agent skills live ONLY under skill/<name>/
+  "skill/notion-cli/SKILL.md":
+    preferred_dir: skill/notion-cli
+    max_size_kb: 50
+  "skill/workspace-lint/SKILL.md":
+    preferred_dir: skill/workspace-lint
+    max_size_kb: 50
+  "skill/workspace-lint/scripts/*.py":
+    preferred_dir: skill/workspace-lint/scripts
+    max_size_kb: 100
+  "skill/workspace-lint/references/**":
+    preferred_dir: skill/workspace-lint/references
+    max_size_kb: 50
+  "skill/workspace-lint/evals/*":
+    preferred_dir: skill/workspace-lint/evals
+    max_size_kb: 50
+
+  # Rust source — both lifeos-core/src/ and lifeos/src/ are valid crate roots
+  "lifeos-core/src/**/*.rs":
+    preferred_dir: lifeos-core/src
+    max_size_kb: 100
+  "lifeos/src/*.rs":
+    preferred_dir: lifeos/src
+    max_size_kb: 100
+  "*.rs":
+    preferred_dir: lifeos-core/src   # fallback for stragglers
+    max_size_kb: 100
+    description: "Rust source files. lib + binary crates only."
+
+  # Python scripts (migrations, audits) — NOT application code
+  "scripts/**/*.py":
+    preferred_dir: scripts
+    max_size_kb: 100
+  "*.py":
+    preferred_dir: scripts
+    max_size_kb: 100
+    description: "Migration/audit scripts. NOT application code — this is a Rust project."
+
+  # YAML schemas
+  "schemas/**/*.yaml":
+    preferred_dir: schemas
+    max_size_kb: 50
+  "*.yaml":
+    preferred_dir: schemas
+    max_size_kb: 50
+    description: "YAML schemas. Exception: workspace-lint.yaml at root."
+  "*.yml":
+    preferred_dir: schemas
+    max_size_kb: 50
+
+  # Markdown — root .md files are allowed (whitelisted above), others go anywhere
+  "*.md":
+    preferred_dir: .
+    max_size_kb: 200
+  "*.json":
+    preferred_dir: .
+    max_size_kb: 200
+  "*.sh":
+    preferred_dir: scripts
+    max_size_kb: 50
+  "*.lock":
+    preferred_dir: .
+    max_size_kb: 5000                # Cargo.lock can be large
+
+# ─── Directory rules ──────────────────────────────────────────────────────────
+directories:
+  forbidden_patterns:
+    - "^\\s"                         # Leading whitespace in dir name
+    - "\\s$"                         # Trailing whitespace
+    - "__pycache__"                  # Build artifacts
+    - "\\.pyc$"
+    - "node_modules"
+    - "\\.venv$"
+    - "\\.idea$"
+    - "\\.vscode$"
+    - "^target$"                     # Rust build artifacts — gitignored, but never commit
+    - "^[0-9]+\\."                   # No numeric prefixes (e.g. "1. PHANTOM")
+    - "^_"                           # No leading underscore (skill dirs are NOT prefixed)
+
+  # Warn (not error) on these — they're allowed but often indicate drift
+  warn_patterns:
+    - "_backup$"
+    - "_old$"
+    - "_temp$"
+    - "_tmp$"
+    - "_wip$"
+    - "_draft$"
+
+# ─── Skill placement rules ────────────────────────────────────────────────────
+# Skill files live ONLY under skill/<skill-name>/
+skill:
+  root: "skill"
+  structure:
+    - "skill/notion-cli/SKILL.md"
+    - "skill/workspace-lint/SKILL.md"
+    - "skill/workspace-lint/scripts/workspace_lint.py"
+    - "skill/workspace-lint/references/"
+    - "skill/workspace-lint/evals/"
+  forbidden:
+    - "skill/*.md"                   # No loose .md files at skill/ root
+    - "skill/*.py"                   # No loose .py files at skill/ root

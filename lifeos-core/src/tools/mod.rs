@@ -29,6 +29,7 @@ pub mod suggest_categorization;
 pub mod relational_graph;
 pub mod relation_ops;
 pub mod workflows;
+pub mod auto_enrich;
 
 fn enrich_database_param(schema: &mut Value, param_name: &str, schema_cache: &SchemaCache) {
     let db_keys: Vec<Value> = schema_cache.db_keys().iter().map(|k| Value::String(k.clone())).collect();
@@ -101,6 +102,9 @@ pub async fn get_tool_definitions(config: &LifeOSConfig, _notion: &NotionClient,
         // ── Workflow Commands (v0.10.0) ──
         tool_def("daily", "Run daily review: relational gaps + holonic synthesis + recent entries in one call.".to_string(), workflows::schema_daily()),
         tool_def("dashboard", "LifeOS dashboard: orphan count per DB, recent entries, top gaps, health metrics in one call.".to_string(), workflows::schema_dashboard()),
+
+        // ── Auto-Enrichment (v0.10.1) ──
+        tool_def("auto_enrich", "Infer Archetype Role / Complex / Drive Activation from entry-type, OR report parent-relation suggestions. Dry-run by default; pass apply=true to write. Solves the 'manual tagging overhead' problem.".to_string(), auto_enrich::schema()),
     ]
 }
 
@@ -317,6 +321,13 @@ pub async fn call_tool(
         }
         "dashboard" => {
             workflows::execute_dashboard(config, notion, schema_cache).await
+        }
+
+        // ── Auto-Enrichment (v0.10.1) ──
+        "auto_enrich" => {
+            let params: auto_enrich::AutoEnrichParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid auto_enrich params: {}", e))?;
+            auto_enrich::execute(&params, config, notion, schema_cache).await
         }
 
         _ => Err(format!("Unknown tool: {}", name)),

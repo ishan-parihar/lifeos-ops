@@ -563,13 +563,12 @@ pub async fn execute_link(
         new_ids.push(serde_json::json!({ "id": &params.target_page }));
     }
 
-    let update_body = serde_json::json!({
-        "properties": {
-            &params.property: { "relation": new_ids }
-        }
+    // update_page() already wraps in {"properties": ...}, so pass the inner map directly.
+    let update_props = serde_json::json!({
+        &params.property: { "relation": new_ids }
     });
 
-    notion.update_page(&params.source_page, &update_body).await?;
+    notion.update_page(&params.source_page, &update_props).await?;
 
     let source_title = crate::transform::extract_title(&source_page);
     let target_title = notion.get_page(&params.target_page).await

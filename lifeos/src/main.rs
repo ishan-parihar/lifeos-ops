@@ -445,6 +445,15 @@ async fn main() {
                         Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
                     }
                 }
+                Commands::AutoEnrich { mode, database, limit, apply } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::auto_enrich::AutoEnrichParams {
+                        mode, database, limit, apply,
+                    };
+                    match lifeos_core::tools::auto_enrich::execute(&params, &cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
                 Commands::QuickLink { source_db, source_title, target_db, target_title, property } => {
                     let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
                     // Resolve source title to page ID
@@ -730,8 +739,19 @@ async fn cmd_watch(
 }
 
 async fn cmd_discover(mut cfg: LifeOSConfig, token: &str) -> Result<(), String> {
-    let path = config_path()
-        .ok_or_else(|| "Could not find lifeos.config.json. Run from project root or set LIFEOS_CONFIG.".to_string())?;
+    // Bootstrap fix: if no lifeos.config.json exists on disk, write the
+    // embedded default config (the one we already loaded) to ./lifeos.config.json
+    // so subsequent steps can save back to it. This makes `lifeos discover`
+    // work zero-config from a fresh checkout — no manual `cp` required.
+    let path = match config_path() {
+        Some(p) => p,
+        None => {
+            let p = std::path::PathBuf::from("lifeos.config.json");
+            tracing::info!("No lifeos.config.json found — writing embedded default to {}", p.display());
+            save_config(&cfg, &p).map_err(|e| format!("Could not write bootstrap config: {e}"))?;
+            p
+        }
+    };
 
     let notion = NotionClient::new(cfg.clone(), token.to_string());
 
