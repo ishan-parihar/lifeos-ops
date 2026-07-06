@@ -361,6 +361,19 @@ impl SchemaCache {
         &self.db_keys
     }
 
+    /// Get the set of Notion property names for a database (v0.10.3: added for fill_rate tool).
+    /// Returns None if the db_key is unknown. The returned set is the keys of
+    /// the inner HashMap — these are Notion property names (e.g. "Archetype Role",
+    /// "Entry Type"), not config-key aliases.
+    pub fn get_db_property_names(&self, db_key: &str) -> Option<Vec<String>> {
+        self.dbs.get(db_key).map(|props| {
+            let mut names: Vec<String> = props.values().map(|p| p.notion_name.clone()).collect();
+            names.sort();
+            names.dedup();
+            names
+        })
+    }
+
     /// Get outgoing relation edges for a database (which properties link to which databases).
     pub fn get_relation_edges(&self, db_key: &str) -> &[RelationEdge] {
         self.relation_graph.get(db_key).map(|v| v.as_slice()).unwrap_or(&[])

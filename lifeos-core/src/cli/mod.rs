@@ -511,6 +511,18 @@ pub enum Commands {
         #[arg(short, long)]
         property: String,
     },
+
+    /// Audit property fill rates per DB. Flags properties with <5% fill as YAGNI candidates.
+    FillRate {
+        /// Database key to audit (matrix, potentiator, nexus, significator, greatway)
+        database: String,
+        /// Max entries to sample (default 200)
+        #[arg(short, long)]
+        limit: Option<u32>,
+        /// Fill-rate % threshold for YAGNI flagging (default 5.0)
+        #[arg(short, long)]
+        threshold: Option<f32>,
+    },
 }
 
 #[derive(clap::Subcommand, Debug)]

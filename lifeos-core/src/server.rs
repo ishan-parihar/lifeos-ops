@@ -120,6 +120,27 @@ impl ServerHandle {
         self.send(json!({"jsonrpc":"2.0","id":id,"error":{"code":code,"message":message}})).await;
     }
 
+    /// U-4 (v0.10.3): Send a `notifications/progress` message to the client.
+    /// Per MCP spec, progress notifications are sent as notifications (no id
+    /// in the response). The `progress` param is a number (0-100 for percentage,
+    /// or a monotonic counter). `total` is optional. `message` is human-readable.
+    async fn send_progress(&self, request_id: &Value, progress: u64, total: Option<u64>, message: &str) {
+        let mut params = json!({
+            "progressToken": request_id,
+            "progress": progress,
+            "message": message,
+        });
+        if let Some(t) = total {
+            params["total"] = json!(t);
+        }
+        // Progress notifications are sent as notifications (no id field).
+        self.send(json!({
+            "jsonrpc": "2.0",
+            "method": "notifications/progress",
+            "params": params
+        })).await;
+    }
+
     async fn handle_message(&self, raw: &str) {
         // B5: Batch JSON-RPC support — if the payload is an array, dispatch
         // each element as a separate request and reply with an array.
@@ -215,6 +236,7 @@ impl ServerHandle {
                 let tool_name = params["name"].as_str().unwrap_or("").to_string();
                 let args = params.get("arguments").cloned().unwrap_or(json!({}));
                 let req_id_str = id.to_string();
+                let req_id_for_progress = id.clone();
                 tracing::info!("Tool call: {} (req={})", tool_name, req_id_str);
 
                 // Register a cancellation token for this request id.
@@ -223,6 +245,11 @@ impl ServerHandle {
                     let mut map = self.in_flight.lock().await;
                     map.insert(req_id_str.clone(), cancel_token.clone());
                 }
+
+                // U-4 (v0.10.3): Send an initial progress notification so the
+                // client knows the tool has started. Long-running tools (fill_rate
+                // over 6,900 entries, holonic_synthesis, dashboard) benefit most.
+                self.send_progress(&req_id_for_progress, 0, None, &format!("Starting tool: {}", tool_name)).await;
 
                 // Special-case expand and graph_metrics since they're not in
                 // tools::call_tool dispatch.
@@ -251,6 +278,11 @@ impl ServerHandle {
 
                 // Check if cancelled.
                 let was_cancelled = *cancel_token.lock().await;
+
+                // U-4: Send completion progress (100%).
+                if !was_cancelled {
+                    self.send_progress(&req_id_for_progress, 100, Some(100), &format!("Tool {} completed", tool_name)).await;
+                }
 
                 match result {
                     Ok(text) => {

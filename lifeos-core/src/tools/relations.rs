@@ -578,6 +578,10 @@ pub async fn execute_link(
 
     let already_existed = existing_ids.contains(&params.target_page);
 
+    // U-1 (v0.10.3): Append per-relation semantic hint so AI agents learn
+    // what each relation means ontologically without reading the full ontology.
+    let hint = crate::tools::quick_link::relation_semantic_hint(&params.property);
+
     let data = serde_json::json!({
         "link": {
             "source": { "id": &params.source_page, "title": source_title },
@@ -585,10 +589,12 @@ pub async fn execute_link(
             "property": params.property,
             "action": if already_existed { "already_existed" } else { "created" },
             "total_relations": new_ids.len(),
+            "semantic_hint": hint,
         }
     });
 
-    Ok(crate::toon_format::encode(&data))
+    Ok(format!("{}\n── Semantic hint ──\n  Relation '{}': {}\n  See ONTOLOGY.md for full context.",
+        crate::toon_format::encode(&data), params.property, hint))
 }
 
 // ── graph_metrics ─────────────────────────────────────────────────

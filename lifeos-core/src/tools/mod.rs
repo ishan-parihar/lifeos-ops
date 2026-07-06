@@ -30,6 +30,8 @@ pub mod relational_graph;
 pub mod relation_ops;
 pub mod workflows;
 pub mod auto_enrich;
+pub mod fill_rate;
+pub mod quick_link;
 
 fn enrich_database_param(schema: &mut Value, param_name: &str, schema_cache: &SchemaCache) {
     let db_keys: Vec<Value> = schema_cache.db_keys().iter().map(|k| Value::String(k.clone())).collect();
@@ -105,6 +107,12 @@ pub async fn get_tool_definitions(config: &LifeOSConfig, _notion: &NotionClient,
 
         // ── Auto-Enrichment (v0.10.2 — suggestion-only) ──
         tool_def("auto_enrich", "READ-ONLY advisor. Scans entries missing universal properties (Archetype Role / Complex / Drive Activation) and reports rule-map suggestions. User applies each manually via `mutate`. Modes: tag (property suggestions), link (parent-relation suggestions).".to_string(), auto_enrich::schema()),
+
+        // ── Fill-Rate Audit (v0.10.3 — U-8) ──
+        tool_def("fill_rate", "Audit property fill rates per DB. Reports what % of entries have each property populated. Properties with <5% fill are flagged as YAGNI candidates for deletion. Read-only, data-driven cleanup.".to_string(), fill_rate::schema()),
+
+        // ── Quick Link by title (v0.10.3 — parity + U-1 semantic hints) ──
+        tool_def("quick_link", "Link two entries by title (auto-resolves page IDs via fuzzy match). Response includes a per-relation semantic hint explaining what the relation means ontologically. Use this when you know the titles but not the page IDs.".to_string(), quick_link::schema()),
     ]
 }
 
@@ -323,11 +331,25 @@ pub async fn call_tool(
             workflows::execute_dashboard(config, notion, schema_cache).await
         }
 
-        // ── Auto-Enrichment (v0.10.1) ──
+        // ── Auto-Enrichment (v0.10.2) ──
         "auto_enrich" => {
             let params: auto_enrich::AutoEnrichParams = serde_json::from_value(args.clone())
                 .map_err(|e| format!("Invalid auto_enrich params: {}", e))?;
             auto_enrich::execute(&params, config, notion, schema_cache).await
+        }
+
+        // ── Fill-Rate Audit (v0.10.3) ──
+        "fill_rate" => {
+            let params: fill_rate::FillRateParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid fill_rate params: {}", e))?;
+            fill_rate::execute(&params, config, notion, schema_cache).await
+        }
+
+        // ── Quick Link by title (v0.10.3) ──
+        "quick_link" => {
+            let params: quick_link::QuickLinkParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid quick_link params: {}", e))?;
+            quick_link::execute(&params, config, notion, schema_cache).await
         }
 
         _ => Err(format!("Unknown tool: {}", name)),
