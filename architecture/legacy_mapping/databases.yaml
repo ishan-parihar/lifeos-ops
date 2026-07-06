@@ -9,7 +9,9 @@ version: "1.0"
 values_and_principles:
   name: Values and Principles
   systems: [foundational]
-  function: The user's enduring value commitments + operating principles.
+  function: >
+    The user's enduring value commitments + operating principles. ONE combined
+    DB (not separate Values and Principles DBs). The "who I am" layer.
   hierarchy:
     layer: 2nd_synthesis
     parent_of: [annual_goals]  # Values inform Annual-Goals
@@ -20,7 +22,7 @@ values_and_principles:
     - name: Description
       type: rich_text
     - name: Type
-      type: select  # Value vs Principle
+      type: select  # Value vs Principle (discriminator within the single DB)
     - name: Source
       type: rich_text  # Where the value/principle came from
     - name: Last Reviewed

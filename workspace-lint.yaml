@@ -64,7 +64,6 @@ root:
     - AUDIT_v0.10.1_ACTION_TRACKER.md
     - AUDIT_v0.10.2_EXECUTION_REPORT.md
     - AUDIT_v0.10.3_EXECUTION_REPORT.md
-    - ARCHITECTURE_v0.11_IDEAL_DB_SCHEMA.md
     - UPGRADE_v0.9.0_PLAN.md
     # Lint config (this file)
     - workspace-lint.yaml

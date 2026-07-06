@@ -146,6 +146,12 @@ hierarchy_edges:
 
 # ─── Synthesis flow edges (upward only) ───────────────────────────────────────
 # Logs → 1st synthesis pipeline → 2nd synthesis pipeline
+#
+# IMPORTANT: Opportunities-and-Strengths and Directives-and-Risks are POLAR
+# OPPOSITES — they receive from the SAME logs but represent opposite poles:
+#   - Opportunities-and-Strengths = POSITIVE trajectory signals (what's working)
+#   - Directives-and-Risks = NEGATIVE trajectory signals (what needs correction)
+# They are a dialectical pair, not independent DBs.
 synthesis_edges:
   # Logs → 1st synthesis pipeline
   - from: activity_log
