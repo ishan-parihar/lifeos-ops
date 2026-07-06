@@ -457,6 +457,9 @@ Top 4 high-priority items for the next sprint:
 4. **D-ID-1** — Rename `Identity.Stage` → `Life-Era` + remove `Active/Evolving/Archived` options (conflated with `Status`).
 
 See also:
+- [ARCHITECTURE_v0.11_IDEAL_DB_SCHEMA.md](ARCHITECTURE_v0.11_IDEAL_DB_SCHEMA.md) — ideal 5-DB schema design (entry-types + relations absorbing legacy 22-DB functions). **Awaiting user approval.**
+- [AUDIT_v0.10.3_EXECUTION_REPORT.md](AUDIT_v0.10.3_EXECUTION_REPORT.md) — v0.10.3 execution (fill-rate, semantic hints, parity, progress)
+- [AUDIT_v0.10.2_EXECUTION_REPORT.md](AUDIT_v0.10.2_EXECUTION_REPORT.md) — v0.10.2 execution (auto_enrich demotion, validation rule, Stage→Life-Era)
 - [AUDIT_v0.10.1_DB_SCHEMA.md](AUDIT_v0.10.1_DB_SCHEMA.md) — per-DB schema inventory, relation topology, 14 drift items
 - [AUDIT_v0.10.1_ARCHITECTURE.md](AUDIT_v0.10.1_ARCHITECTURE.md) — code-level audit, 10 YAGNI + 10 upgrade candidates
 - [AUDIT_ponytail_ontology.md](AUDIT_ponytail_ontology.md) — pre-v0.10.1 audit (historical)
