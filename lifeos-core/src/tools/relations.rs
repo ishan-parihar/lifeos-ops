@@ -418,12 +418,29 @@ pub async fn execute_ancestors(
             .and_then(|id| schema_cache.resolve_db_key_from_id(id))
             .unwrap_or("unknown");
 
-        chain.push(serde_json::json!({
+        // ponytail: v4.1 layer labels for Trajectory entries. Replaces the
+        // deleted trace_trajectory tool. Reference/Strategic/Execution are
+        // the 3 architectural layers defined in FORMAL_SPEC_v4.1.md §2.1.
+        let entry_type = entry_type_of(&page, config, &db_key);
+        let layer = if db_key == "trajectory" {
+            entry_type.as_deref().map(trajectory_layer).unwrap_or_default()
+        } else {
+            String::new()
+        };
+
+        let mut node = serde_json::json!({
             "id": current_id,
             "title": title,
             "database": db_key,
             "level": level,
-        }));
+        });
+        if let Some(et) = entry_type {
+            node["entry_type"] = serde_json::Value::String(et);
+        }
+        if !layer.is_empty() {
+            node["layer"] = serde_json::Value::String(layer);
+        }
+        chain.push(node);
 
         // Find the best "parent" relation to walk up
         match find_parent_relation(&page, config, schema_cache) {
@@ -784,4 +801,34 @@ fn find_parent_relation(
     }
 
     None
+}
+
+/// Extract the entry-type (select option) for a page using the DB's configured
+/// entry_type_property. Returns None if the property is missing or empty.
+fn entry_type_of(
+    page: &crate::notion::types::NotionPage,
+    config: &crate::config::LifeOSConfig,
+    db_key: &str,
+) -> Option<String> {
+    let et_prop = config.databases.get(db_key)
+        .and_then(|d| d.entry_type_property.clone())?;
+    match page.properties.get(&et_prop)? {
+        PropertyValue::Select { select, .. } => select.as_ref().map(|s| s.name.clone()),
+        PropertyValue::MultiSelect { multi_select, .. } => multi_select.first().map(|s| s.name.clone()),
+        _ => None,
+    }
+}
+
+/// Map a Trajectory entry-type to its v4.1 architectural layer.
+/// Reference: timeless (Purpose/Value/Principle/Vision-Statement/Identity-Statement)
+/// Strategic: temporal (Annual-Goal/Quarterly-Goal/Milestone)
+/// Execution: daily (Project/Task/Campaign/Content)
+/// ponytail: replaces the deleted trace_trajectory tool's layer logic.
+fn trajectory_layer(entry_type: &str) -> String {
+    match entry_type {
+        "Purpose" | "Value" | "Principle" | "Vision-Statement" | "Identity-Statement" => "Reference",
+        "Annual-Goal" | "Quarterly-Goal" | "Milestone" => "Strategic",
+        "Project" | "Task" | "Campaign" | "Content" => "Execution",
+        _ => "",
+    }.to_string()
 }
