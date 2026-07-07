@@ -1,0 +1,787 @@
+{
+  "Trajectory": {
+    "id": "38dc18ce-5aab-80a9-8913-000b1ef8286a",
+    "actual_title": "Trajectory",
+    "property_count": 27,
+    "entry_count": 633,
+    "properties": [
+      {
+        "name": "Archetype Role",
+        "type": "select",
+        "extra": "  [8] Matrix, Potentiator, Catalyst, Experience, Significator, Transformation, Great Way, Choice"
+      },
+      {
+        "name": "Blocks",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (single_property)"
+      },
+      {
+        "name": "Coheres With (Significator)",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (dual_property)  dual=(Related to GreatWay (Coheres With (Significator)))"
+      },
+      {
+        "name": "Complex",
+        "type": "select",
+        "extra": "  [4] Mind, Body, Spirit, None"
+      },
+      {
+        "name": "Drive Activation",
+        "type": "multi_select",
+        "extra": "  [4] Agency, Communion, Eros, Agape"
+      },
+      {
+        "name": "End Date",
+        "type": "date",
+        "extra": ""
+      },
+      {
+        "name": "For",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (dual_property)  dual=(Transforms To)"
+      },
+      {
+        "name": "For Significator",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (dual_property)  dual=(Related to GreatWay (For Significator))"
+      },
+      {
+        "name": "ID",
+        "type": "unique_id",
+        "extra": ""
+      },
+      {
+        "name": "Item Type",
+        "type": "select",
+        "extra": "  [16] Purpose, Value, Principle, Vision-Statement, Identity-Statement, Annual-Goal, Quarterly-Goal, Milestone, Project, Task, Campaign, Content..."
+      },
+      {
+        "name": "Manifests As",
+        "type": "relation",
+        "extra": "  \u2192 GHOST (single_property)"
+      },
+      {
+        "name": "Monitor",
+        "type": "formula",
+        "extra": "  expr=ifs(\n  {{notion:block_property:%40C%3DY:38dc18ce-5aab-80a9-8913-000b1ef8286a:171"
+      },
+      {
+        "name": "Name",
+        "type": "title",
+        "extra": ""
+      },
+      {
+        "name": "Parent item",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (dual_property)  dual=(Sub-item)"
+      },
+      {
+        "name": "Priority",
+        "type": "select",
+        "extra": "  [5] Critical, High, Medium, Low, None"
+      },
+      {
+        "name": "Progress",
+        "type": "number",
+        "extra": ""
+      },
+      {
+        "name": "Quadrant",
+        "type": "select",
+        "extra": "  [4] UL, UR, LL, LR"
+      },
+      {
+        "name": "Related to Nexus (Emits Choice To)",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(2acc18ce) (dual_property)  dual=(Emits Choice To)"
+      },
+      {
+        "name": "Related to Potentiator (People)",
+        "type": "relation",
+        "extra": "  \u2192 GHOST (dual_property)  dual=(People)"
+      },
+      {
+        "name": "Shadow Pattern",
+        "type": "select",
+        "extra": "  [6] None, Dark-Addiction, Dark-Allergy, Golden-Addiction, Golden-Allergy, Sinkhole of Indifference"
+      },
+      {
+        "name": "Sourced From",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(2acc18ce) (single_property)"
+      },
+      {
+        "name": "Start Date",
+        "type": "date",
+        "extra": ""
+      },
+      {
+        "name": "Status",
+        "type": "status",
+        "extra": "  [6] Future, Ideation, Paused, Active, Done, Cancelled"
+      },
+      {
+        "name": "Sub-holon Of",
+        "type": "relation",
+        "extra": "  \u2192 GHOST (dual_property)  dual=(Related to GreatWay (Sub-holon Of))"
+      },
+      {
+        "name": "Sub-item",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (dual_property)  dual=(Parent item)"
+      },
+      {
+        "name": "Target",
+        "type": "number",
+        "extra": ""
+      },
+      {
+        "name": "Tier",
+        "type": "select",
+        "extra": "  [3] Strategic, Operational, Tactical"
+      }
+    ]
+  },
+  "Logbook": {
+    "id": "a1769af1-3ab6-4f77-bbd0-57f920c62311",
+    "actual_title": "Logbook",
+    "property_count": 27,
+    "entry_count": 6911,
+    "properties": [
+      {
+        "name": "Amount",
+        "type": "formula",
+        "extra": "  expr=if({{notion:block_property:SmCL:a1769af1-3ab6-4f77-bbd0-57f920c62311:17158553-ff"
+      },
+      {
+        "name": "Archetype Role",
+        "type": "select",
+        "extra": "  [8] Matrix, Potentiator, Catalyst, Experience, Significator, Transformation, Great Way, Choice"
+      },
+      {
+        "name": "Complex",
+        "type": "select",
+        "extra": "  [4] Mind, Body, Spirit, None"
+      },
+      {
+        "name": "Crystallized To",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(37ec18ce) (single_property)"
+      },
+      {
+        "name": "Crystallizes Into",
+        "type": "relation",
+        "extra": "  \u2192 GHOST (single_property)"
+      },
+      {
+        "name": "Date",
+        "type": "date",
+        "extra": ""
+      },
+      {
+        "name": "Digestion Stage",
+        "type": "select",
+        "extra": "  [9] 1 - Latent State, 2 - Boundary Contact, 3 - Matrix Ingestion, 4 - Matrix Digestion, 5 - Potentiator Ingestion, 6 - Potentiator Digestion, 7 - Significator Accumulation, 8 - Transformation Threshold, 9 - Choice & Rewrite"
+      },
+      {
+        "name": "Digestion Status",
+        "type": "status",
+        "extra": "  [3] Raw, Digesting, Crystallized"
+      },
+      {
+        "name": "Distillation",
+        "type": "rich_text",
+        "extra": ""
+      },
+      {
+        "name": "Documents",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(df692710) (dual_property)  dual=(Activity Log)"
+      },
+      {
+        "name": "Drive Activation",
+        "type": "multi_select",
+        "extra": "  [4] Agency, Communion, Eros, Agape"
+      },
+      {
+        "name": "Duration",
+        "type": "formula",
+        "extra": "  expr=round(dateBetween({{notion:block_property:BzKF:a1769af1-3ab6-4f77-bbd0-57f920c62"
+      },
+      {
+        "name": "Entry Type",
+        "type": "select",
+        "extra": "  [6] Activity, Diet, Financial, Subjective, Relational, Systemic"
+      },
+      {
+        "name": "For",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (single_property)"
+      },
+      {
+        "name": "Harmonized By",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(2acc18ce) (single_property)"
+      },
+      {
+        "name": "ID",
+        "type": "unique_id",
+        "extra": ""
+      },
+      {
+        "name": "Month Label",
+        "type": "formula",
+        "extra": "  expr=formatDate({{notion:block_property:BzKF:a1769af1-3ab6-4f77-bbd0-57f920c62311:171"
+      },
+      {
+        "name": "Name",
+        "type": "title",
+        "extra": ""
+      },
+      {
+        "name": "People",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (dual_property)  dual=(Related to Potentiator (People))"
+      },
+      {
+        "name": "Quarter Label",
+        "type": "formula",
+        "extra": "  expr=formatDate({{notion:block_property:BzKF:a1769af1-3ab6-4f77-bbd0-57f920c62311:171"
+      },
+      {
+        "name": "Related to GreatWay (Sub-holon Of)",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (dual_property)  dual=(Sub-holon Of)"
+      },
+      {
+        "name": "Related to Nexus (Rewrites (Potentiator))",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(2acc18ce) (dual_property)  dual=(Rewrites (Potentiator))"
+      },
+      {
+        "name": "Related to Nexus (Sends Experience To (Potentiator))",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(2acc18ce) (dual_property)  dual=(Sends Experience To (Potentiator))"
+      },
+      {
+        "name": "Reveals",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(37ec18ce) (single_property)"
+      },
+      {
+        "name": "Shadow Pattern",
+        "type": "select",
+        "extra": "  [6] None, Dark-Addiction, Dark-Allergy, Golden-Addiction, Golden-Allergy, Sinkhole of Indifference"
+      },
+      {
+        "name": "Week Label",
+        "type": "formula",
+        "extra": "  expr=formatDate({{notion:block_property:BzKF:a1769af1-3ab6-4f77-bbd0-57f920c62311:171"
+      },
+      {
+        "name": "YAML Metadata",
+        "type": "rich_text",
+        "extra": ""
+      }
+    ]
+  },
+  "Synthesis": {
+    "id": "2acc18ce-5aab-80e8-984d-000b92fd6b9c",
+    "actual_title": "Synthesis",
+    "property_count": 36,
+    "entry_count": 797,
+    "properties": [
+      {
+        "name": "Archetype Role",
+        "type": "select",
+        "extra": "  [8] Matrix, Potentiator, Catalyst, Experience, Significator, Transformation, Great Way, Choice"
+      },
+      {
+        "name": "Capture Method",
+        "type": "select",
+        "extra": "  [5] manual, web_clipper, api_ingest, voice_memo, import"
+      },
+      {
+        "name": "Category",
+        "type": "select",
+        "extra": "  [5] Note, Opportunity, Strength, Directive, Risk"
+      },
+      {
+        "name": "Complex",
+        "type": "select",
+        "extra": "  [4] Mind, Body, Spirit, None"
+      },
+      {
+        "name": "Counter-Synthesis",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(2acc18ce) (single_property)"
+      },
+      {
+        "name": "Counter-Tension",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (single_property)"
+      },
+      {
+        "name": "Counterpart",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(2acc18ce) (single_property)"
+      },
+      {
+        "name": "Date",
+        "type": "date",
+        "extra": ""
+      },
+      {
+        "name": "Digestion Stage",
+        "type": "select",
+        "extra": "  [9] 1 - Latent State, 2 - Boundary Contact, 3 - Matrix Ingestion, 4 - Matrix Digestion, 5 - Potentiator Ingestion, 6 - Potentiator Digestion, 7 - Significator Accumulation, 8 - Transformation Threshold, 9 - Choice & Rewrite"
+      },
+      {
+        "name": "Drive Activation",
+        "type": "multi_select",
+        "extra": "  [4] Agency, Communion, Eros, Agape"
+      },
+      {
+        "name": "Emits Choice To",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (dual_property)  dual=(Related to Nexus (Emits Choice To))"
+      },
+      {
+        "name": "Fires Transformation On",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (dual_property)  dual=(Related to Nexus (Fires Transformation On))"
+      },
+      {
+        "name": "Highlight Count",
+        "type": "number",
+        "extra": ""
+      },
+      {
+        "name": "ID",
+        "type": "unique_id",
+        "extra": ""
+      },
+      {
+        "name": "Kind",
+        "type": "select",
+        "extra": "  [4] Catalyst, Experience, Transformation, Choice"
+      },
+      {
+        "name": "Last Assessed",
+        "type": "date",
+        "extra": ""
+      },
+      {
+        "name": "Name",
+        "type": "title",
+        "extra": ""
+      },
+      {
+        "name": "Polarity",
+        "type": "select",
+        "extra": "  [3] +, \u2212, neutral"
+      },
+      {
+        "name": "Polarity Outcome",
+        "type": "select",
+        "extra": "  [3] Reconciled, Intensified, Crystallized"
+      },
+      {
+        "name": "Priority",
+        "type": "select",
+        "extra": "  [4] Critical, High, Medium, Low"
+      },
+      {
+        "name": "Raw Content",
+        "type": "rich_text",
+        "extra": ""
+      },
+      {
+        "name": "Reinforces",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(2acc18ce) (single_property)"
+      },
+      {
+        "name": "Related to Significator (Emits Choice To)",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (dual_property)  dual=(Emits Choice To)"
+      },
+      {
+        "name": "Rewrites (Matrix)",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(37ec18ce) (dual_property)  dual=(Related to Nexus (Rewrites (Matrix)))"
+      },
+      {
+        "name": "Rewrites (Potentiator)",
+        "type": "relation",
+        "extra": "  \u2192 GHOST (dual_property)  dual=(Related to Nexus (Rewrites (Potentiator)))"
+      },
+      {
+        "name": "Sends Catalyst To (Matrix)",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(37ec18ce) (dual_property)  dual=(Related to Nexus (Sends Catalyst To (Matrix)))"
+      },
+      {
+        "name": "Sends Catalyst To (Significator)",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (dual_property)  dual=(Related to Nexus (Sends Catalyst To (Significator)))"
+      },
+      {
+        "name": "Sends Experience To (Potentiator)",
+        "type": "relation",
+        "extra": "  \u2192 GHOST (dual_property)  dual=(Related to Nexus (Sends Experience To (Potentiator)))"
+      },
+      {
+        "name": "Shadow Pattern",
+        "type": "select",
+        "extra": "  [6] None, Dark-Addiction, Dark-Allergy, Golden-Addiction, Golden-Allergy, Sinkhole of Indifference"
+      },
+      {
+        "name": "Source URL",
+        "type": "url",
+        "extra": ""
+      },
+      {
+        "name": "Sourced From",
+        "type": "relation",
+        "extra": "  \u2192 GHOST (single_property)"
+      },
+      {
+        "name": "Status",
+        "type": "status",
+        "extra": "  [4] \ud83d\udca1 Identified, \u2705 Activated, \ud83c\udfc6 Capitalized, \ud83e\uddca Archived"
+      },
+      {
+        "name": "Synthesis State",
+        "type": "select",
+        "extra": "  [4] raw_note, annotated, synthesized, applied"
+      },
+      {
+        "name": "Tension",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (single_property)"
+      },
+      {
+        "name": "Triggered By",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (dual_property)  dual=(Related to Nexus (Triggered By))"
+      },
+      {
+        "name": "Updates",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(37ec18ce) (single_property)"
+      }
+    ]
+  },
+  "Profile": {
+    "id": "38dc18ce-5aab-8017-a266-000bb4e8dc30",
+    "actual_title": "Profile",
+    "property_count": 36,
+    "entry_count": 130,
+    "properties": [
+      {
+        "name": "Anchored In",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(37ec18ce) (single_property)"
+      },
+      {
+        "name": "Archetype Role",
+        "type": "select",
+        "extra": "  [8] Matrix, Potentiator, Catalyst, Experience, Significator, Transformation, Great Way, Choice"
+      },
+      {
+        "name": "Category",
+        "type": "select",
+        "extra": "  [8] Health, Financial, Relational, Cognitive, Spiritual, Execution, Content, Strategic"
+      },
+      {
+        "name": "Coheres With",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (single_property)"
+      },
+      {
+        "name": "Complex",
+        "type": "select",
+        "extra": "  [4] Mind, Body, Spirit, None"
+      },
+      {
+        "name": "Current Value",
+        "type": "rich_text",
+        "extra": ""
+      },
+      {
+        "name": "Drive Activation",
+        "type": "multi_select",
+        "extra": "  [4] Agency, Communion, Eros, Agape"
+      },
+      {
+        "name": "Emits Choice To",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(2acc18ce) (dual_property)  dual=(Related to Significator (Emits Choice To))"
+      },
+      {
+        "name": "Entry Type",
+        "type": "multi_select",
+        "extra": "  [10] Trait, Metric, Capacity, Asset, Purpose, Value, Principle, Identity-Statement, Pillar, Strategic-Ideal"
+      },
+      {
+        "name": "Frequency",
+        "type": "select",
+        "extra": "  [5] Daily, Weekly, Monthly, Quarterly, Annual"
+      },
+      {
+        "name": "Generated From",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(37ec18ce) (single_property)"
+      },
+      {
+        "name": "Holon Type",
+        "type": "select",
+        "extra": "  [5] Donor, Acceptor, Sharer, Multivalent, Noble"
+      },
+      {
+        "name": "ID",
+        "type": "unique_id",
+        "extra": ""
+      },
+      {
+        "name": "In Tension With",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (single_property)"
+      },
+      {
+        "name": "Last Reviewed",
+        "type": "date",
+        "extra": ""
+      },
+      {
+        "name": "Life-Era",
+        "type": "select",
+        "extra": "  [3] Post-recovery, Trading era, HoloOS era"
+      },
+      {
+        "name": "Name",
+        "type": "title",
+        "extra": ""
+      },
+      {
+        "name": "Next Review",
+        "type": "date",
+        "extra": ""
+      },
+      {
+        "name": "Parent item",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (dual_property)  dual=(Sub-item)"
+      },
+      {
+        "name": "Related to GreatWay (Coheres With (Significator))",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (dual_property)  dual=(Coheres With (Significator))"
+      },
+      {
+        "name": "Related to GreatWay (For Significator)",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (dual_property)  dual=(For Significator)"
+      },
+      {
+        "name": "Related to Nexus (Fires Transformation On)",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(2acc18ce) (dual_property)  dual=(Fires Transformation On)"
+      },
+      {
+        "name": "Related to Nexus (Sends Catalyst To (Significator))",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(2acc18ce) (dual_property)  dual=(Sends Catalyst To (Significator))"
+      },
+      {
+        "name": "Related to Nexus (Triggered By)",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(2acc18ce) (dual_property)  dual=(Triggered By)"
+      },
+      {
+        "name": "Review Cadence",
+        "type": "select",
+        "extra": "  [4] Annual, Bi-Annual, Quarterly, Event-Driven"
+      },
+      {
+        "name": "Rewrites",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(37ec18ce) (single_property)"
+      },
+      {
+        "name": "Shadow Pattern",
+        "type": "select",
+        "extra": "  [6] None, Dark-Addiction, Dark-Allergy, Golden-Addiction, Golden-Allergy, Sinkhole of Indifference"
+      },
+      {
+        "name": "Stage",
+        "type": "select",
+        "extra": "  [3] Post-recovery, Trading era, HoloOS era"
+      },
+      {
+        "name": "Status",
+        "type": "status",
+        "extra": "  [4] Draft, Active, Evolving, Archived"
+      },
+      {
+        "name": "Sub-holon Of",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(37ec18ce) (dual_property)  dual=(Related to Significator (Sub-holon Of))"
+      },
+      {
+        "name": "Sub-item",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (dual_property)  dual=(Parent item)"
+      },
+      {
+        "name": "Target Value",
+        "type": "rich_text",
+        "extra": ""
+      },
+      {
+        "name": "Transforms To",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (dual_property)  dual=(For)"
+      },
+      {
+        "name": "Trend",
+        "type": "select",
+        "extra": "  [3] \u2191, \u2193, \u2192"
+      },
+      {
+        "name": "Unit",
+        "type": "select",
+        "extra": "  [8] count, percentage, hours, minutes, rupees, dollars, level, rating"
+      },
+      {
+        "name": "Valence Signature",
+        "type": "rich_text",
+        "extra": ""
+      }
+    ]
+  },
+  "Context": {
+    "id": "581a7a3f-9068-4c8d-bd80-fce24ca83e21",
+    "actual_title": "Context",
+    "property_count": 23,
+    "entry_count": 83,
+    "properties": [
+      {
+        "name": "Account Type",
+        "type": "select",
+        "extra": "  [5] Checking, Savings, Investment, Credit, Crypto"
+      },
+      {
+        "name": "Aspirational Drive",
+        "type": "select",
+        "extra": "  [5] Security & Stability, Connection & Belonging, Status & Recognition, Mastery & Impact, Growth & Understanding"
+      },
+      {
+        "name": "Balance",
+        "type": "number",
+        "extra": ""
+      },
+      {
+        "name": "City",
+        "type": "select",
+        "extra": "  [10] Noida, Janakpuri, Delhi, Greater Noida, Gurgaon, Ghaziabad, Faridabad, Meerut, Aligarh, Varanasi"
+      },
+      {
+        "name": "Community Type",
+        "type": "select",
+        "extra": "  [6] Professional, Personal, Spiritual, Creative, Investment, Mastermind"
+      },
+      {
+        "name": "Core Shadow",
+        "type": "select",
+        "extra": "  [4] Fear of Insignificance, Fear of Rejection, Fear of Chaos/Uncertainty, Fear of Powerlessness/Domination"
+      },
+      {
+        "name": "Covenant",
+        "type": "rich_text",
+        "extra": ""
+      },
+      {
+        "name": "Desired Trajectory",
+        "type": "select",
+        "extra": "  [5] Deepen, Maintain, Activate, Graceful Exit, Inactive"
+      },
+      {
+        "name": "Developmental Altitude",
+        "type": "select",
+        "extra": "  [5] LVL 3 Red, LVL 4 Amber, LVL 5 Orange, LVL 6 Green, LVL 7 Turquoise"
+      },
+      {
+        "name": "Engagement Blueprint",
+        "type": "rich_text",
+        "extra": ""
+      },
+      {
+        "name": "Influence Toolkit",
+        "type": "multi_select",
+        "extra": "  [10] Strategic Persuasion, Inspirational & Charismatic, Collaborative, Coercive Influence, Elicits Pity/Guilt, Creates Desire, Shared Experience Bonding, Venting/Catharsis, Loyalty in Crisis, Generosity"
+      },
+      {
+        "name": "Institution",
+        "type": "select",
+        "extra": "  [6] HDFC, ICICI, SBI, Axis, Kotak, Other"
+      },
+      {
+        "name": "Key Personal Intel",
+        "type": "rich_text",
+        "extra": ""
+      },
+      {
+        "name": "Last Interaction Sentiment",
+        "type": "select",
+        "extra": "  [4] Positive, Neutral, Tense, Negative"
+      },
+      {
+        "name": "Name",
+        "type": "title",
+        "extra": ""
+      },
+      {
+        "name": "Networking Profile",
+        "type": "select",
+        "extra": "  [7] Key Ally, Active Collaborator, Mentor/Advisor, Prot\u00e9g\u00e9/Mentee, Peer/Sounding Board, Inactive, Archive"
+      },
+      {
+        "name": "Professional Domain",
+        "type": "rich_text",
+        "extra": ""
+      },
+      {
+        "name": "Relationship Status",
+        "type": "select",
+        "extra": "  [6] Family Member, Mentor, Close Friend, Close Acquaintance, Coworker, Acquaintance"
+      },
+      {
+        "name": "Status",
+        "type": "select",
+        "extra": "  [3] Active, Inactive, Archived"
+      },
+      {
+        "name": "Strategic Value",
+        "type": "select",
+        "extra": "  [3] Core, Supporting, Peripheral"
+      },
+      {
+        "name": "Timezone",
+        "type": "select",
+        "extra": "  [5] IST, EST, PST, GMT, GST"
+      },
+      {
+        "name": "Type",
+        "type": "select",
+        "extra": "  [5] Person, Community, Organization, Financial-Account, Place"
+      },
+      {
+        "name": "Value Exchange Balance",
+        "type": "select",
+        "extra": "  [3] I am in Credit, Balanced, I am in Debt"
+      }
+    ]
+  }
+}
