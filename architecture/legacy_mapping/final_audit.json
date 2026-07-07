@@ -2,7 +2,7 @@
   "Trajectory": {
     "id": "38dc18ce-5aab-80a9-8913-000b1ef8286a",
     "actual_title": "Trajectory",
-    "property_count": 21,
+    "property_count": 19,
     "entry_count": 633,
     "properties": [
       {
@@ -71,11 +71,6 @@
         "extra": ""
       },
       {
-        "name": "Quadrant",
-        "type": "select",
-        "extra": "  [4] UL, UR, LL, LR"
-      },
-      {
         "name": "Source",
         "type": "rich_text",
         "extra": ""
@@ -104,18 +99,13 @@
         "name": "Tier",
         "type": "select",
         "extra": "  [3] Strategic, Operational, Tactical"
-      },
-      {
-        "name": "Timeframe",
-        "type": "select",
-        "extra": "  [5] Lifetime, 10yr, 5yr, 3yr, 1yr"
       }
     ]
   },
   "Logbook": {
     "id": "a1769af1-3ab6-4f77-bbd0-57f920c62311",
     "actual_title": "Logbook",
-    "property_count": 10,
+    "property_count": 16,
     "entry_count": 6911,
     "properties": [
       {
@@ -124,13 +114,18 @@
         "extra": "  expr=if({{notion:block_property:SmCL:a1769af1-3ab6-4f77-bbd0-57f920c62311:17158553-ffac-46ed-b0d2-28af8e3"
       },
       {
-        "name": "Date",
-        "type": "date",
+        "name": "Channel",
+        "type": "select",
+        "extra": "  [4] Body, Mind, Resource, Relational"
+      },
+      {
+        "name": "Content",
+        "type": "rich_text",
         "extra": ""
       },
       {
-        "name": "Distillation",
-        "type": "rich_text",
+        "name": "Date",
+        "type": "date",
         "extra": ""
       },
       {
@@ -164,6 +159,31 @@
         "extra": "  expr=formatDate({{notion:block_property:BzKF:a1769af1-3ab6-4f77-bbd0-57f920c62311:17158553-ffac-46ed-b0d2"
       },
       {
+        "name": "Sentiment",
+        "type": "select",
+        "extra": "  [3] Positive, Neutral, Negative"
+      },
+      {
+        "name": "Source Project",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (single_property)"
+      },
+      {
+        "name": "Subject Account",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(a624f4d9) (single_property)"
+      },
+      {
+        "name": "Subject Person",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(a624f4d9) (single_property)"
+      },
+      {
+        "name": "Synthesized Into",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(2acc18ce) (dual_property)  dual=(Related to Logbook (Synthesized Into))"
+      },
+      {
         "name": "Week Label",
         "type": "formula",
         "extra": "  expr=formatDate({{notion:block_property:BzKF:a1769af1-3ab6-4f77-bbd0-57f920c62311:17158553-ffac-46ed-b0d2"
@@ -173,7 +193,7 @@
   "Synthesis": {
     "id": "2acc18ce-5aab-80e8-984d-000b92fd6b9c",
     "actual_title": "Synthesis",
-    "property_count": 11,
+    "property_count": 15,
     "entry_count": 797,
     "properties": [
       {
@@ -185,6 +205,11 @@
         "name": "Category",
         "type": "select",
         "extra": "  [5] Note, Opportunity, Strength, Directive, Risk"
+      },
+      {
+        "name": "Condenses Into",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (dual_property)  dual=(Related to Synthesis (Condenses Into))"
       },
       {
         "name": "Date",
@@ -217,9 +242,24 @@
         "extra": ""
       },
       {
+        "name": "Related to Logbook (Synthesized Into)",
+        "type": "relation",
+        "extra": "  \u2192 GHOST (dual_property)  dual=(Synthesized Into)"
+      },
+      {
+        "name": "Revises",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (single_property)"
+      },
+      {
         "name": "Source URL",
         "type": "url",
         "extra": ""
+      },
+      {
+        "name": "Spawns",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (single_property)"
       },
       {
         "name": "Status",
@@ -236,13 +276,18 @@
   "Profile": {
     "id": "38dc18ce-5aab-8017-a266-000bb4e8dc30",
     "actual_title": "Profile",
-    "property_count": 12,
+    "property_count": 14,
     "entry_count": 130,
     "properties": [
       {
         "name": "Category",
         "type": "select",
         "extra": "  [8] Health, Financial, Relational, Cognitive, Spiritual, Execution, Content, Strategic"
+      },
+      {
+        "name": "Closes Gap For",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(38dc18ce) (single_property)"
       },
       {
         "name": "Current Value",
@@ -252,7 +297,7 @@
       {
         "name": "Entry Type",
         "type": "multi_select",
-        "extra": "  [10] Trait, Metric, Capacity, Asset, Purpose, Value, Principle, Identity-Statement, Pillar, Strategic-Ideal"
+        "extra": "  [4] Trait, Metric, Capacity, Asset"
       },
       {
         "name": "Frequency",
@@ -270,7 +315,7 @@
         "extra": "  \u2192 UNKNOWN(38dc18ce) (single_property)"
       },
       {
-        "name": "Last Reviewed",
+        "name": "Last Updated",
         "type": "date",
         "extra": ""
       },
@@ -278,6 +323,11 @@
         "name": "Name",
         "type": "title",
         "extra": ""
+      },
+      {
+        "name": "Related to Synthesis (Condenses Into)",
+        "type": "relation",
+        "extra": "  \u2192 UNKNOWN(2acc18ce) (dual_property)  dual=(Condenses Into)"
       },
       {
         "name": "Status",
