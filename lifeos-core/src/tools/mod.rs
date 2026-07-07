@@ -319,13 +319,17 @@ pub async fn call_tool(
             morning::execute(config, notion, schema_cache).await
         }
         "capture" => {
-            capture::execute(config, notion, schema_cache).await
+            let params: capture::CaptureParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid capture params: {}", e))?;
+            capture::execute(&params, config, notion, schema_cache).await
         }
         "cycle_health" => {
             cycle_health::execute(config, notion, schema_cache).await
         }
         "trace_trajectory" => {
-            trace_trajectory::execute(config, notion, schema_cache).await
+            let params: trace_trajectory::TraceTrajectoryParams = serde_json::from_value(args.clone())
+                .map_err(|e| format!("Invalid trace_trajectory params: {}", e))?;
+            trace_trajectory::execute(&params, config, notion, schema_cache).await
         }
         "gap_analysis" => {
             gap_analysis::execute(config, notion, schema_cache).await
