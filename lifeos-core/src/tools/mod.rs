@@ -28,11 +28,7 @@ pub mod auto_enrich;
 pub mod fill_rate;
 pub mod quick_link;
 pub mod morning;
-pub mod capture;
 pub mod cycle_health;
-pub mod trace_trajectory;
-pub mod gap_analysis;
-pub mod surface_synthesis;
 
 fn enrich_database_param(schema: &mut Value, param_name: &str, schema_cache: &SchemaCache) {
     let db_keys: Vec<Value> = schema_cache.db_keys().iter().map(|k| Value::String(k.clone())).collect();
@@ -109,12 +105,13 @@ pub async fn get_tool_definitions(config: &LifeOSConfig, _notion: &NotionClient,
         tool_def("quick_link", "Link two entries by title (auto-resolves page IDs via fuzzy match). Response includes a per-relation semantic hint explaining what the relation means ontologically. Use this when you know the titles but not the page IDs.".to_string(), quick_link::schema()),
 
         // ── v4.1 Utility Layer ──
-        tool_def("morning", "Aggregated morning view across all 5 DBs: active goals, today tasks, recent logs, recent synthesis, profile gaps. Primary user UX entry point.".to_string(), morning::schema()),
-        tool_def("capture", "Quick logging with auto-detection. Pass text; tool detects entry type and creates Logbook entry.".to_string(), capture::schema()),
-        tool_def("cycle_health", "Check if the v4.1 causal amplification cycle is running. Reports pull/ground/feedback flow health + recommendations.".to_string(), cycle_health::schema()),
-        tool_def("trace_trajectory", "Walk Trajectory parent/child hierarchy from any entry up to Vision-Statement. Returns full chain with layer labels.".to_string(), trace_trajectory::schema()),
-        tool_def("gap_analysis", "Compare Profile vs Vision to show gaps between current state and ideal-future.".to_string(), gap_analysis::schema()),
-        tool_def("surface_synthesis", "Scan recent Logbook entries for patterns. Suggests Synthesis entries to create. Activates ground-truth flow.".to_string(), surface_synthesis::schema()),
+        // ponytail: 4 YAGNI tools removed (capture, trace_trajectory, gap_analysis, surface_synthesis).
+        //   - capture: thin wrapper around mutate; brittle keyword classifier < LLM judgement.
+        //   - trace_trajectory: duplicates ancestors; layer labels added to ancestors instead.
+        //   - gap_analysis: 1-line query + 1-line compare; trivial for AI agents.
+        //   - surface_synthesis: trivial count + hardcoded suggestions < LLM synthesis.
+        tool_def("morning", "Aggregated morning view across all 5 DBs: active goals, today tasks, recent logs, recent synthesis. Primary AI-agent orient call. One call replaces 4+ queries.".to_string(), morning::schema()),
+        tool_def("cycle_health", "Check if the v4.1 causal amplification cycle is running. Reports pull/ground/feedback flow health + recommendations. Encodes the 3-flow architectural semantics.".to_string(), cycle_health::schema()),
     ]
 }
 
@@ -318,24 +315,8 @@ pub async fn call_tool(
         "morning" => {
             morning::execute(config, notion, schema_cache).await
         }
-        "capture" => {
-            let params: capture::CaptureParams = serde_json::from_value(args.clone())
-                .map_err(|e| format!("Invalid capture params: {}", e))?;
-            capture::execute(&params, config, notion, schema_cache).await
-        }
         "cycle_health" => {
             cycle_health::execute(config, notion, schema_cache).await
-        }
-        "trace_trajectory" => {
-            let params: trace_trajectory::TraceTrajectoryParams = serde_json::from_value(args.clone())
-                .map_err(|e| format!("Invalid trace_trajectory params: {}", e))?;
-            trace_trajectory::execute(&params, config, notion, schema_cache).await
-        }
-        "gap_analysis" => {
-            gap_analysis::execute(config, notion, schema_cache).await
-        }
-        "surface_synthesis" => {
-            surface_synthesis::execute(config, notion, schema_cache).await
         }
 
         _ => Err(format!("Unknown tool: {}", name)),
