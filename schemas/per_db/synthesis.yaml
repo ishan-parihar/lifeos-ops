@@ -1,0 +1,197 @@
+schema_version: 0.9.0
+schema_type: per_db
+applies_to_db: synthesis
+relations:
+- name: Counterpart
+  target_db: synthesis
+  direction: dual_property
+  dual_backlink: Counterpart
+  cardinality: one_to_one
+  description: 'Pairs a Catalyst-kind entry with its resulting Experience-kind entry,
+
+    or a Transformation-kind entry with its resulting Choice-kind entry.
+
+    The dual nature of the contact boundary: every input has an output.
+
+    '
+- name: Counter-Synthesis
+  target_db: synthesis
+  direction: dual_property
+  dual_backlink: Counter-Synthesis
+  cardinality: many_to_many
+  description: 'Antithetical pairing — two Nexus entries that represent opposite
+
+    polarities of the same threshold event.
+
+    '
+- name: Reinforces
+  target_db: synthesis
+  direction: dual_property
+  dual_backlink: Reinforced By
+  cardinality: many_to_many
+  description: 'One Nexus entry amplifies the effect of another (e.g. two Catalysts
+
+    that compound, or two Transformations that fire together).
+
+    '
+- name: Sub-event
+  target_db: synthesis
+  direction: dual_property
+  dual_backlink: Parent-event
+  cardinality: one_to_many
+  description: Fractal nesting of contact-boundary events.
+inter_db_relations:
+- name: Updates
+  target_db: trajectory
+  direction: dual_property
+  dual_backlink: Updated By
+  cardinality: many_to_many
+  description: 'HoloOS doc 02.1 §1: This Nexus entry (Catalyst-kind) is the carrier for
+
+    a Catalyst flowing INTO the linked Matrix entry.
+
+    '
+- name: Sourced From
+  target_db: logbook
+  direction: dual_property
+  dual_backlink: Sources To (Nexus)
+  cardinality: many_to_many
+  description: 'HoloOS doc 02.1 §1: This Nexus entry (Catalyst-kind OR Experience-kind)
+
+    was sourced from the linked Potentiator entry.
+
+    '
+- name: Tension
+  target_db: profile
+  direction: dual_property
+  dual_backlink: Tension Held By
+  cardinality: many_to_many
+  description: 'HoloOS doc 03.1 §3 stage 8: This Nexus entry (Transformation-kind) is the
+
+    threshold-event carrier acting ON the linked Significator entry.
+
+    '
+- name: Counter-Tension
+  target_db: context
+  direction: dual_property
+  dual_backlink: Counter-Tension From
+  cardinality: many_to_many
+  description: 'HoloOS doc 03.1 §3 stage 8: This Nexus entry (Transformation-kind OR
+
+    Choice-kind) is being shaped by pressure from the linked GreatWay entry.
+
+    '
+- name: Rewrites (Matrix)
+  target_db: trajectory
+  direction: dual_property
+  dual_backlink: Rewritten By
+  cardinality: many_to_many
+  description: 'HoloOS doc 03.1 §3 stage 9: After Transformation fires, this Nexus entry
+
+    drives the downward rewrite of the linked Matrix entry.
+
+    '
+- name: Rewrites (Potentiator)
+  target_db: logbook
+  direction: dual_property
+  dual_backlink: Rewritten By
+  cardinality: many_to_many
+  description: 'HoloOS doc 03.1 §3 stage 9: After Transformation fires, this Nexus entry
+
+    drives the downward rewrite of the linked Potentiator entry.
+
+    '
+- name: Sends Catalyst To (Matrix)
+  target_db: trajectory
+  direction: dual_property
+  dual_backlink: Receives Catalyst From
+  cardinality: many_to_many
+  description: 'HoloOS doc 02.1 §1: A Catalyst-kind Nexus entry carries Catalyst to a
+
+    Matrix entry. (This is a more semantically-typed alias for `Updates`.)
+
+    '
+- name: Sends Experience To (Potentiator)
+  target_db: logbook
+  direction: dual_property
+  dual_backlink: Receives Experience From
+  cardinality: many_to_many
+  description: 'HoloOS doc 02.1 §1: An Experience-kind Nexus entry carries Experience
+
+    to a Potentiator entry. (More semantically-typed alias for `Sourced From`.)
+
+    '
+- name: Sends Catalyst To (Significator)
+  target_db: profile
+  direction: dual_property
+  dual_backlink: Receives Catalyst From (Great Way)
+  cardinality: many_to_many
+  description: 'HoloOS doc 02.2 §2: A Catalyst-kind Nexus entry carries Great-Way-origin
+
+    Catalyst to a Significator entry.
+
+    '
+- name: Emits Choice To
+  target_db: context
+  direction: dual_property
+  dual_backlink: Receives Choice From
+  cardinality: many_to_many
+  description: 'HoloOS doc 03.1 §3 stage 9: A Choice-kind Nexus entry carries Choice
+
+    into the Great Way.
+
+    '
+entry_types:
+- Opportunity
+- Insight
+- Reflection
+- Integration
+- Pattern
+- Risk
+- Directive
+- Note
+- Knowledge-Category
+- Knowledge-Atom
+- Decision
+- Crisis
+- Transformation-Event
+default_archetype_mapping:
+  Opportunity:
+    archetype_role: Catalyst
+    complex: Mind
+  Insight:
+    archetype_role: Catalyst
+    complex: Mind
+  Reflection:
+    archetype_role: Experience
+    complex: Mind
+  Integration:
+    archetype_role: Experience
+    complex: Spirit
+  Pattern:
+    archetype_role: Transformation
+    complex: Mind
+  Risk:
+    archetype_role: Catalyst
+    complex: Body
+  Directive:
+    archetype_role: Choice
+    complex: Mind
+  Note:
+    archetype_role: Catalyst
+    complex: Mind
+  Knowledge-Category:
+    archetype_role: Experience
+    complex: Mind
+  Knowledge-Atom:
+    archetype_role: Experience
+    complex: Mind
+  Decision:
+    archetype_role: Choice
+    complex: Mind
+  Crisis:
+    archetype_role: Transformation
+    complex: Body
+  Transformation-Event:
+    archetype_role: Transformation
+    complex: Spirit

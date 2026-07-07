@@ -422,6 +422,44 @@ async fn main() {
                         Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
                     }
                 }
+                Commands::Morning => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    match lifeos_core::tools::morning::execute(&cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::Capture { text, entry_type } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::capture::CaptureParams { text, entry_type };
+                    match lifeos_core::tools::capture::execute(&params, &cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::CycleHealth => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    match lifeos_core::tools::cycle_health::execute(&cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::TraceTrajectory { page_id } => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    let params = lifeos_core::tools::trace_trajectory::TraceTrajectoryParams { page_id };
+                    match lifeos_core::tools::trace_trajectory::execute(&params, &cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::GapAnalysis => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    match lifeos_core::tools::gap_analysis::execute(&cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
+                Commands::SurfaceSynthesis => {
+                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
+                    match lifeos_core::tools::surface_synthesis::execute(&cfg, &notion, &sc).await {
+                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
+                    }
+                }
             }
         }
     }

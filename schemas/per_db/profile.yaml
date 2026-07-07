@@ -1,0 +1,155 @@
+schema_version: 0.9.0
+schema_type: per_db
+applies_to_db: profile
+relations:
+- name: Sub-item
+  target_db: profile
+  direction: dual_property
+  dual_backlink: Parent item
+  cardinality: one_to_many
+  description: Fractal sub-identity containment.
+- name: In Tension With
+  target_db: profile
+  direction: dual_property
+  dual_backlink: In Tension With
+  cardinality: many_to_many
+  description: 'Two Significator entries that pull in opposite directions.
+
+    Per HoloOS doc 03.1 §9: a healthy holon can hold tensions without collapse.
+
+    '
+- name: Coheres With
+  target_db: profile
+  direction: dual_property
+  dual_backlink: Coheres With
+  cardinality: many_to_many
+  description: 'Two Significator entries that mutually reinforce.
+
+    v0.8.0 had this as single_property — v0.9.0 makes it dual.
+
+    '
+inter_db_relations:
+- name: Anchored In
+  target_db: trajectory
+  direction: dual_property
+  dual_backlink: Anchors
+  cardinality: many_to_many
+  description: 'HoloOS doc 08.5 §1.4: The Significator of a sub-holon IS the
+
+    parent-holon''s Matrix. This relation links a Significator entry to the
+
+    Matrix entry it is anchored in (its substrate).
+
+    '
+- name: Accumulated From
+  target_db: trajectory
+  direction: dual_property
+  dual_backlink: Accumulates Into
+  cardinality: one_to_many
+  description: 'HoloOS doc 03.1 §3 stage 7: S_t = S_{t-1} + w_t * e_t.
+
+    This Significator entry has accumulated Experience FROM the linked
+
+    Matrix entries.
+
+    '
+- name: Transforms To
+  target_db: context
+  direction: dual_property
+  dual_backlink: Transforms From
+  cardinality: many_to_many
+  description: 'HoloOS doc 02.2 §6: The Significator faces Transformation pressure
+
+    from the Great Way. This relation tracks which GreatWay entry is
+
+    currently exerting pressure on this Significator.
+
+    '
+- name: Sub-holon Of
+  target_db: trajectory
+  direction: dual_property
+  dual_backlink: Contains Significator Of
+  cardinality: many_to_one
+  description: 'HoloOS doc 08.5 §1.4: S of sub-holon = M of parent holon.
+
+    This Significator is a sub-holon WITHIN the linked Matrix entry.
+
+    '
+- name: Triggered By
+  target_db: synthesis
+  direction: dual_property
+  dual_backlink: Fires Transformation On
+  cardinality: many_to_many
+  description: 'HoloOS doc 03.1 §3 stage 8: This Significator entry is being acted on
+
+    by a Transformation-kind Nexus entry.
+
+    '
+- name: Triggers
+  target_db: synthesis
+  direction: dual_property
+  dual_backlink: Triggered By
+  cardinality: many_to_many
+  description: 'HoloOS doc 03.1 §3 stage 8: This Significator entry''s threshold-crossing
+
+    triggered the linked Transformation-kind Nexus entry.
+
+    '
+- name: Emits Choice To
+  target_db: synthesis
+  direction: dual_property
+  dual_backlink: Receives Choice From (Significator)
+  cardinality: many_to_many
+  description: 'HoloOS doc 03.1 §3 stage 9: This Significator entry, after Transformation,
+
+    emits Choice through the linked Nexus (Choice-kind) entry.
+
+    '
+- name: Receives Catalyst From (Great Way)
+  target_db: synthesis
+  direction: dual_property
+  dual_backlink: Sends Catalyst To (Significator)
+  cardinality: many_to_many
+  description: 'HoloOS doc 02.2 §2: A Catalyst-kind Nexus entry carries Great-Way-origin
+
+    Catalyst to this Significator entry.
+
+    '
+- name: Coheres With (GreatWay)
+  target_db: context
+  direction: dual_property
+  dual_backlink: Coheres With (Significator)
+  cardinality: many_to_many
+  description: 'HoloOS doc 02.3 §4: Bonding occurs at the Significator⇄Great-Way surface.
+
+    This relation links a Significator entry to a Person/Community/Group entry
+
+    in GreatWay that it is bonded with. Used for the relocated Person/Group entries.
+
+    '
+entry_types:
+- Purpose
+- Value
+- Principle
+default_archetype_mapping:
+  Purpose:
+    archetype_role: Significator
+    complex: Spirit
+  Value:
+    archetype_role: Significator
+    complex: Mind
+  Principle:
+    archetype_role: Significator
+    complex: Mind
+  Identity-Statement:
+    archetype_role: Significator
+    complex: Spirit
+  Pillar:
+    archetype_role: Significator
+    complex: Spirit
+  Strategic-Ideal:
+    archetype_role: Significator
+    complex: Spirit
+  Archetype:
+    archetype_role: Significator
+    complex: Mind

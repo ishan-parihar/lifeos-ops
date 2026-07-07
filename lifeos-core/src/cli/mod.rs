@@ -468,6 +468,33 @@ pub enum Commands {
         #[arg(short, long)]
         threshold: Option<f32>,
     },
+
+    /// Morning view: active goals, today's tasks, recent logs, synthesis, profile gaps
+    Morning,
+
+    /// Quick capture: auto-detect entry type and create a Logbook entry
+    Capture {
+        /// The text to capture
+        text: String,
+        /// Optional: override entry type
+        #[arg(long)]
+        entry_type: Option<String>,
+    },
+
+    /// Check if the v4.1 causal amplification cycle is running
+    CycleHealth,
+
+    /// Trace Trajectory hierarchy from an entry up to Vision-Statement
+    TraceTrajectory {
+        /// Page ID to trace from
+        page_id: String,
+    },
+
+    /// Compare Profile vs Vision to show gaps
+    GapAnalysis,
+
+    /// Scan recent logs for patterns + suggest Synthesis entries
+    SurfaceSynthesis,
 }
 
 #[derive(clap::Subcommand, Debug)]

@@ -74,9 +74,9 @@ properties:
     options: [Donor, Acceptor, Sharer, Multivalent, Noble]
 
 validation_rules:
-  - id: nexus_kind_consistency
+  - id: synthesis_kind_consistency
     description: "Nexus entries tagged with Kind=Catalyst may only link to Matrix/Potentiator; Kind=Choice may only link to GreatWay; etc."
-    applies_to_db: nexus
+    applies_to_db: synthesis
     rule: |
       if entry.kind == "Catalyst":
           assert_no_relations(entry, ["Tension", "Counter-Tension"])
@@ -117,8 +117,8 @@ validation_rules:
       if shadow in ("", "None"):
           pass  # OK on all DBs
       elif shadow in ("Dark-Addiction", "Dark-Allergy"):
-          assert entry.db_key == "matrix"
+          assert entry.db_key == "trajectory"
       elif shadow in ("Golden-Addiction", "Golden-Allergy"):
-          assert entry.db_key == "potentiator"
+          assert entry.db_key == "logbook"
       elif shadow == "Sinkhole of Indifference":
-          assert entry.db_key == "greatway"
+          assert entry.db_key == "context"

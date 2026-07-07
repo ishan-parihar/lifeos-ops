@@ -113,25 +113,12 @@ pub fn is_final_stage(reservoir_key: &str, current_status: &str, config: &LifeOS
 /// Determine the transmutation type needed when an entry at the final stage
 /// of one reservoir should generate its out-currency in the target reservoir.
 pub fn get_transmutation_type(
-    source_reservoir: &str,
-    target_reservoir: &str,
-    config: &LifeOSConfig,
+    _source_reservoir: &str,
+    _target_reservoir: &str,
+    _config: &LifeOSConfig,
 ) -> Option<String> {
-    if let Some(ref holonic) = config.holonic {
-        for (tt, def) in &holonic.transmutation_map {
-            if def.source == source_reservoir && def.target == target_reservoir {
-                return Some(tt.clone());
-            }
-        }
-    }
-    // Fallback: infer from archetype pairs
-    match (source_reservoir, target_reservoir) {
-        ("potentiator", "matrix") => Some("catalyst_to_experience".into()),
-        ("matrix", "potentiator") => Some("experience_to_catalyst".into()),
-        ("significator", "greatway") => Some("choice_to_transformation".into()),
-        ("greatway", "significator") => Some("transformation_to_choice".into()),
-        _ => None,
-    }
+    // v4.1: transmutation map is deprecated — return None
+    None
 }
 
 /// Determine the automatic transmutation target for a reservoir at its final stage.

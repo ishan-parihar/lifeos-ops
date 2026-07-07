@@ -1,0 +1,97 @@
+schema_version: 0.9.0
+schema_type: per_db
+applies_to_db: logbook
+relations:
+- name: Crystallizes Into
+  target_db: logbook
+  direction: dual_property
+  dual_backlink: Crystallized From
+  cardinality: many_to_one
+  description: 'A raw latent possibility crystallizes into a more structured latent
+
+    possibility (e.g. an Activity crystallizes into a Subjective pattern).
+
+    v0.8.0 had this as single_property — v0.9.0 makes it dual.
+
+    '
+- name: Sub-item
+  target_db: logbook
+  direction: dual_property
+  dual_backlink: Parent item
+  cardinality: one_to_many
+  description: Fractal sub-holon containment.
+inter_db_relations:
+- name: Generates Into
+  target_db: trajectory
+  direction: dual_property
+  dual_backlink: Generated From
+  cardinality: many_to_many
+  description: 'HoloOS doc 02.1 §3 Loop B: Potentiator returns refined Catalyst to Matrix.
+
+    The refined Catalyst from this Potentiator entry is currently being
+
+    ingested by this Matrix entry.
+
+    '
+- name: Receives Experience From
+  target_db: synthesis
+  direction: dual_property
+  dual_backlink: Sends Experience To (Potentiator)
+  cardinality: many_to_many
+  description: 'HoloOS doc 02.1 §1: Experience flows intra→extra through the contact boundary.
+
+    A Nexus entry tagged `Kind: Experience` is the carrier for this
+
+    Potentiator''s input.
+
+    '
+- name: Rewritten By
+  target_db: synthesis
+  direction: dual_property
+  dual_backlink: Rewrites (Potentiator)
+  cardinality: many_to_many
+  description: 'HoloOS doc 03.1 §3 stage 9: After Transformation fires, the Significator
+
+    executes a downward rewrite that reconfigures the Potentiator.
+
+    This Potentiator entry was last rewritten by this Nexus entry.
+
+    '
+entry_types:
+- Diet
+- Financial
+- Observation
+- Goal
+- Vision
+- Aspiration
+default_archetype_mapping:
+  Activity:
+    archetype_role: Potentiator
+    complex: Body
+  Subjective:
+    archetype_role: Potentiator
+    complex: Mind
+  Relational:
+    archetype_role: Potentiator
+    complex: Spirit
+  Systemic:
+    archetype_role: Potentiator
+    complex: Spirit
+  Diet:
+    archetype_role: Catalyst
+    complex: Body
+  Financial:
+    archetype_role: Catalyst
+    complex: Body
+  Observation:
+    archetype_role: Catalyst
+    complex: Mind
+  Goal:
+    archetype_role: Potentiator
+    complex: Mind
+  Vision:
+    archetype_role: Potentiator
+    complex: Spirit
+  Aspiration:
+    archetype_role: Potentiator
+    complex: Spirit

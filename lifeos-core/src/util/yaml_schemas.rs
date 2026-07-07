@@ -17,14 +17,14 @@ use serde_yaml::Value as YamlValue;
 
 use crate::notion::types::{NotionPage, PropertyValue};
 
-pub const DB_KEYS: &[&str] = &["matrix", "potentiator", "nexus", "significator", "greatway"];
+pub const DB_KEYS: &[&str] = &["trajectory", "logbook", "synthesis", "profile", "context"];
 
 const ENTRY_TYPE_PROP: &[(&str, &str)] = &[
-    ("matrix", "Entry Type"),
-    ("potentiator", "Entry Type"),
-    ("significator", "Entry Type"),
-    ("greatway", "Item Type"),
-    ("nexus", "Category"),
+    ("trajectory", "Entry Type"),
+    ("logbook", "Entry Type"),
+    ("profile", "Entry Type"),
+    ("context", "Item Type"),
+    ("synthesis", "Category"),
 ];
 
 // ── Data structures ─────────────────────────────────────────────────────
@@ -347,7 +347,7 @@ pub fn extract_entry_props(page: &NotionPage, db_key: &str) -> (Option<String>, 
     }
 
     // Normalize Nexus Kind
-    if db_key == "nexus" {
+    if db_key == "synthesis" {
         if let Some(k) = flat.get("Kind").cloned() {
             flat.insert("kind".to_string(), k);
         }
@@ -512,9 +512,9 @@ fn eval_hardcoded_rule(rule_id: &str, entry: &HashMap<String, String>, db_key: &
                 return Ok(());
             }
             let valid_db = match shadow {
-                "Dark-Addiction" | "Dark-Allergy" => "matrix",
-                "Golden-Addiction" | "Golden-Allergy" => "potentiator",
-                "Sinkhole of Indifference" => "greatway",
+                "Dark-Addiction" | "Dark-Allergy" => "trajectory",
+                "Golden-Addiction" | "Golden-Allergy" => "logbook",
+                "Sinkhole of Indifference" => "context",
                 _ => return Ok(()), // Unknown shadow — don't block
             };
             if db_key != valid_db {

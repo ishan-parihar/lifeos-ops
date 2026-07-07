@@ -27,7 +27,7 @@ pub fn schema(_schema_cache: &SchemaCache) -> serde_json::Value {
     let obj = serde_json::json!({
         "type": "object",
         "properties": {
-            "mode": { "type": "string", "enum": ["role", "module", "lesser_cycle", "greater_cycle", "nexus", "drive_balance", "reservoir_health"], "description": "Briefing mode: role/module for config-driven briefings, lesser_cycle/greater_cycle/nexus/drive_balance/reservoir_health for holonic analysis" },
+            "mode": { "type": "string", "enum": ["role", "module", ], "description": "Briefing mode: role/module for config-driven briefings, lesser_cycle/greater_cycle/nexus/drive_balance/reservoir_health for holonic analysis" },
             "role": { "type": "string", "enum": ["CEO", "COO", "CMO", "CRO", "CFO", "CHO"], "description": "Role key when mode=role" },
             "module": { "type": "string", "enum": ["productivity", "health", "strategic", "financial", "content", "journaling"], "description": "Module key when mode=module" },
             "range": { "type": "string", "description": "Date range: today, this_week, this_month, this_quarter or ISO date" },

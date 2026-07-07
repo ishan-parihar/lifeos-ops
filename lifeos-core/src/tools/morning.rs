@@ -170,8 +170,8 @@ async fn query_trajectory_goals(config: &LifeOSConfig, notion: &NotionClient) ->
     let body = json!({
         "page_size": 20,
         "filter": {"or": [
-            {"property": et_prop, "select": {"equals": "Annual-Goal"}},
-            {"property": et_prop, "select": {"equals": "Quarterly-Goal"}},
+            {"property": et_prop, "select": {"equals": "Annual Goal"}},
+            {"property": et_prop, "select": {"equals": "Quarterly Goal"}},
         ]},
         "sorts": [{"property": "Status", "direction": "ascending"}]
     });
