@@ -1,0 +1,245 @@
+
+======================================================================
+DB: State  (key=matrix, id=37ec18ce-5aab-81d6-ac85-000b89ed6052)
+Entry-type property: Entry Type
+Total entries: 39
+Total properties: 25
+======================================================================
+  • Accumulates Into                               relation         → UNKNOWN(38dc18ce) (single_property)
+  • Archetype Role                                 select           [8] Matrix, Potentiator, Catalyst, Experience, Significator, Transformation, Great Way, Choice
+  • Blocked By                                     relation         → UNKNOWN(37ec18ce) (single_property)
+  • Complex                                        select           [4] Mind, Body, Spirit, None
+  • Crystallization Date                           date           
+  • Drive Activation                               multi_select     [4] Agency, Communion, Eros, Agape
+  • Entry Type                                     multi_select     [3] Pattern, Threshold, Foundation
+  • Generated From                                 relation         → GHOST_POTENTIATOR (deleted) (single_property)
+  • ID                                             unique_id      
+  • Integrated Into                                relation         → UNKNOWN(38dc18ce) (single_property)
+  • Integration Weight                             number         
+  • Last Reviewed                                  date           
+  • Name                                           title          
+  • Next Review                                    date           
+  • Parent                                         relation         → UNKNOWN(37ec18ce) (single_property)
+  • Pillar Link                                    relation         → UNKNOWN(38dc18ce) (single_property)
+  • Refines                                        relation         → UNKNOWN(37ec18ce) (single_property)
+  • Related to Nexus (Rewrites (Matrix))           relation         → UNKNOWN(2acc18ce) (dual_property)  dual=(Rewrites (Matrix))
+  • Related to Nexus (Sends Catalyst To (Matrix))  relation         → UNKNOWN(2acc18ce) (dual_property)  dual=(Sends Catalyst To (Matrix))
+  • Related to Significator (Sub-holon Of)         relation         → UNKNOWN(38dc18ce) (dual_property)  dual=(Sub-holon Of)
+  • Review Cadence                                 select           [4] Annual, Bi-Annual, Quarterly, Event-Driven
+  • Shadow Pattern                                 select           [6] None, Dark-Addiction, Dark-Allergy, Golden-Addiction, Golden-Allergy, Sinkhole of Indifference
+  • Status                                         status           [3] Active, Evolving, Archived
+  • Supersedes                                     relation         → UNKNOWN(37ec18ce) (single_property)
+  • YAML Metadata                                  rich_text      
+
+  Entry-type counts:
+    Pattern                       : 5
+    Threshold                     : 0
+    Foundation                    : 0
+
+======================================================================
+DB: Possibility  (key=potentiator, id=a1769af1-3ab6-4f77-bbd0-57f920c62311)
+Entry-type property: Entry Type
+Total entries: 6911
+Total properties: 27
+======================================================================
+  • Amount                                         formula          expr=if({{notion:block_property:SmCL:a1769af1-3ab6-4f77-bbd0-57f920c62311:17158553-ff
+  • Archetype Role                                 select           [8] Matrix, Potentiator, Catalyst, Experience, Significator, Transformation, Great Way, Choice
+  • Complex                                        select           [4] Mind, Body, Spirit, None
+  • Crystallized To                                relation         → UNKNOWN(37ec18ce) (single_property)
+  • Crystallizes Into                              relation         → GHOST_POTENTIATOR (deleted) (single_property)
+  • Date                                           date           
+  • Digestion Stage                                select           [9] 1 - Latent State, 2 - Boundary Contact, 3 - Matrix Ingestion, 4 - Matrix Digestion, 5 - Potentiator Ingestion, 6 - Potentiator Digestion, 7 - Significator Accumulation, 8 - Transformation Threshold, 9 - Choice & Rewrite
+  • Digestion Status                               status           [3] Raw, Digesting, Crystallized
+  • Distillation                                   rich_text      
+  • Documents                                      relation         → UNKNOWN(df692710) (dual_property)  dual=(Activity Log)
+  • Drive Activation                               multi_select     [4] Agency, Communion, Eros, Agape
+  • Duration                                       formula          expr=round(dateBetween({{notion:block_property:BzKF:a1769af1-3ab6-4f77-bbd0-57f920c62
+  • Entry Type                                     select           [10] Activity, Subjective, Relational, Systemic, Diet, Financial, Observation, Goal, Vision, Aspiration
+  • For                                            relation         → UNKNOWN(38dc18ce) (single_property)
+  • Harmonized By                                  relation         → UNKNOWN(2acc18ce) (single_property)
+  • ID                                             unique_id      
+  • Month Label                                    formula          expr=formatDate({{notion:block_property:BzKF:a1769af1-3ab6-4f77-bbd0-57f920c62311:171
+  • Name                                           title          
+  • People                                         relation         → UNKNOWN(38dc18ce) (dual_property)  dual=(Related to Potentiator (People))
+  • Quarter Label                                  formula          expr=formatDate({{notion:block_property:BzKF:a1769af1-3ab6-4f77-bbd0-57f920c62311:171
+  • Related to GreatWay (Sub-holon Of)             relation         → UNKNOWN(38dc18ce) (dual_property)  dual=(Sub-holon Of)
+  • Related to Nexus (Rewrites (Potentiator))      relation         → UNKNOWN(2acc18ce) (dual_property)  dual=(Rewrites (Potentiator))
+  • Related to Nexus (Sends Experience To (Potentiator))  relation         → UNKNOWN(2acc18ce) (dual_property)  dual=(Sends Experience To (Potentiator))
+  • Reveals                                        relation         → UNKNOWN(37ec18ce) (single_property)
+  • Shadow Pattern                                 select           [6] None, Dark-Addiction, Dark-Allergy, Golden-Addiction, Golden-Allergy, Sinkhole of Indifference
+  • Week Label                                     formula          expr=formatDate({{notion:block_property:BzKF:a1769af1-3ab6-4f77-bbd0-57f920c62311:171
+  • YAML Metadata                                  rich_text      
+
+  Entry-type counts:
+    Activity                      : 5594
+    Financial                     : 996
+    Diet                          : 127
+    Relational                    : 83
+    Subjective                    : 75
+    Systemic                      : 34
+    Observation                   : 0
+    Goal                          : 0
+    Vision                        : 0
+    Aspiration                    : 0
+
+======================================================================
+DB: Process  (key=nexus, id=2acc18ce-5aab-80e8-984d-000b92fd6b9c)
+Entry-type property: Category
+Total entries: 797
+Total properties: 35
+======================================================================
+  • Archetype Role                                 select           [8] Matrix, Potentiator, Catalyst, Experience, Significator, Transformation, Great Way, Choice
+  • Capture Method                                 select           [5] manual, web_clipper, api_ingest, voice_memo, import
+  • Category                                       select           [13] Opportunity, Directive, Risk, Insight, Reflection, Integration, Pattern, Note, Knowledge-Category, Knowledge-Atom...
+  • Complex                                        select           [4] Mind, Body, Spirit, None
+  • Counter-Synthesis                              relation         → UNKNOWN(2acc18ce) (single_property)
+  • Counter-Tension                                relation         → UNKNOWN(38dc18ce) (single_property)
+  • Counterpart                                    relation         → UNKNOWN(2acc18ce) (single_property)
+  • Date                                           date           
+  • Digestion Stage                                select           [9] 1 - Latent State, 2 - Boundary Contact, 3 - Matrix Ingestion, 4 - Matrix Digestion, 5 - Potentiator Ingestion, 6 - Potentiator Digestion, 7 - Significator Accumulation, 8 - Transformation Threshold, 9 - Choice & Rewrite
+  • Drive Activation                               multi_select     [4] Agency, Communion, Eros, Agape
+  • Emits Choice To                                relation         → UNKNOWN(38dc18ce) (dual_property)  dual=(Related to Nexus (Emits Choice To))
+  • Fires Transformation On                        relation         → UNKNOWN(38dc18ce) (dual_property)  dual=(Related to Nexus (Fires Transformation On))
+  • Highlight Count                                number         
+  • ID                                             unique_id      
+  • Kind                                           select           [4] Catalyst, Experience, Transformation, Choice
+  • Last Assessed                                  date           
+  • Name                                           title          
+  • Polarity Outcome                               select           [3] Reconciled, Intensified, Crystallized
+  • Priority                                       select           [4] Critical, High, Medium, Low
+  • Raw Content                                    rich_text      
+  • Reinforces                                     relation         → UNKNOWN(2acc18ce) (single_property)
+  • Related to Significator (Emits Choice To)      relation         → UNKNOWN(38dc18ce) (dual_property)  dual=(Emits Choice To)
+  • Rewrites (Matrix)                              relation         → UNKNOWN(37ec18ce) (dual_property)  dual=(Related to Nexus (Rewrites (Matrix)))
+  • Rewrites (Potentiator)                         relation         → GHOST_POTENTIATOR (deleted) (dual_property)  dual=(Related to Nexus (Rewrites (Potentiator)))
+  • Sends Catalyst To (Matrix)                     relation         → UNKNOWN(37ec18ce) (dual_property)  dual=(Related to Nexus (Sends Catalyst To (Matrix)))
+  • Sends Catalyst To (Significator)               relation         → UNKNOWN(38dc18ce) (dual_property)  dual=(Related to Nexus (Sends Catalyst To (Significator)))
+  • Sends Experience To (Potentiator)              relation         → GHOST_POTENTIATOR (deleted) (dual_property)  dual=(Related to Nexus (Sends Experience To (Potentiator)))
+  • Shadow Pattern                                 select           [6] None, Dark-Addiction, Dark-Allergy, Golden-Addiction, Golden-Allergy, Sinkhole of Indifference
+  • Source URL                                     url            
+  • Sourced From                                   relation         → GHOST_POTENTIATOR (deleted) (single_property)
+  • Status                                         status           [4] 💡 Identified, ✅ Activated, 🏆 Capitalized, 🧊 Archived
+  • Synthesis State                                select           [4] raw_note, annotated, synthesized, applied
+  • Tension                                        relation         → UNKNOWN(38dc18ce) (single_property)
+  • Triggered By                                   relation         → UNKNOWN(38dc18ce) (dual_property)  dual=(Related to Nexus (Triggered By))
+  • Updates                                        relation         → UNKNOWN(37ec18ce) (single_property)
+
+  Entry-type counts:
+    Note                          : 794
+    Decision                      : 3
+    Opportunity                   : 0
+    Directive                     : 0
+    Risk                          : 0
+    Insight                       : 0
+    Reflection                    : 0
+    Integration                   : 0
+    Pattern                       : 0
+    Knowledge-Category            : 0
+    Knowledge-Atom                : 0
+    Crisis                        : 0
+    Transformation-Event          : 0
+
+======================================================================
+DB: Identity  (key=significator, id=38dc18ce-5aab-8017-a266-000bb4e8dc30)
+Entry-type property: Entry Type
+Total entries: 92
+Total properties: 30
+======================================================================
+  • Anchored In                                    relation         → UNKNOWN(37ec18ce) (single_property)
+  • Archetype Role                                 select           [8] Matrix, Potentiator, Catalyst, Experience, Significator, Transformation, Great Way, Choice
+  • Coheres With                                   relation         → UNKNOWN(38dc18ce) (single_property)
+  • Complex                                        select           [4] Mind, Body, Spirit, None
+  • Drive Activation                               multi_select     [4] Agency, Communion, Eros, Agape
+  • Emits Choice To                                relation         → UNKNOWN(2acc18ce) (dual_property)  dual=(Related to Significator (Emits Choice To))
+  • Entry Type                                     multi_select     [6] Purpose, Value, Principle, Identity-Statement, Pillar, Strategic-Ideal
+  • Generated From                                 relation         → UNKNOWN(37ec18ce) (single_property)
+  • Holon Type                                     select           [5] Donor, Acceptor, Sharer, Multivalent, Noble
+  • ID                                             unique_id      
+  • In Tension With                                relation         → UNKNOWN(38dc18ce) (single_property)
+  • Last Reviewed                                  date           
+  • Life-Era                                       select           [3] Post-recovery, Trading era, HoloOS era
+  • Name                                           title          
+  • Next Review                                    date           
+  • Parent item                                    relation         → UNKNOWN(38dc18ce) (dual_property)  dual=(Sub-item)
+  • Related to GreatWay (Coheres With (Significator))  relation         → UNKNOWN(38dc18ce) (dual_property)  dual=(Coheres With (Significator))
+  • Related to GreatWay (For Significator)         relation         → UNKNOWN(38dc18ce) (dual_property)  dual=(For Significator)
+  • Related to Nexus (Fires Transformation On)     relation         → UNKNOWN(2acc18ce) (dual_property)  dual=(Fires Transformation On)
+  • Related to Nexus (Sends Catalyst To (Significator))  relation         → UNKNOWN(2acc18ce) (dual_property)  dual=(Sends Catalyst To (Significator))
+  • Related to Nexus (Triggered By)                relation         → UNKNOWN(2acc18ce) (dual_property)  dual=(Triggered By)
+  • Review Cadence                                 select           [4] Annual, Bi-Annual, Quarterly, Event-Driven
+  • Rewrites                                       relation         → UNKNOWN(37ec18ce) (single_property)
+  • Shadow Pattern                                 select           [6] None, Dark-Addiction, Dark-Allergy, Golden-Addiction, Golden-Allergy, Sinkhole of Indifference
+  • Stage                                          select           [3] Post-recovery, Trading era, HoloOS era
+  • Status                                         status           [4] Draft, Active, Evolving, Archived
+  • Sub-holon Of                                   relation         → UNKNOWN(37ec18ce) (dual_property)  dual=(Related to Significator (Sub-holon Of))
+  • Sub-item                                       relation         → UNKNOWN(38dc18ce) (dual_property)  dual=(Parent item)
+  • Transforms To                                  relation         → UNKNOWN(38dc18ce) (dual_property)  dual=(For)
+  • Valence Signature                              rich_text      
+
+  Entry-type counts:
+    Value                         : 10
+    Pillar                        : 10
+    Purpose                       : 1
+    Identity-Statement            : 1
+    Strategic-Ideal               : 1
+    Principle                     : 0
+
+======================================================================
+DB: World  (key=greatway, id=38dc18ce-5aab-80a9-8913-000b1ef8286a)
+Entry-type property: Item Type
+Total entries: 611
+Total properties: 27
+======================================================================
+  • Archetype Role                                 select           [8] Matrix, Potentiator, Catalyst, Experience, Significator, Transformation, Great Way, Choice
+  • Blocks                                         relation         → UNKNOWN(38dc18ce) (single_property)
+  • Coheres With (Significator)                    relation         → UNKNOWN(38dc18ce) (dual_property)  dual=(Related to GreatWay (Coheres With (Significator)))
+  • Complex                                        select           [4] Mind, Body, Spirit, None
+  • Drive Activation                               multi_select     [4] Agency, Communion, Eros, Agape
+  • End Date                                       date           
+  • For                                            relation         → UNKNOWN(38dc18ce) (dual_property)  dual=(Transforms To)
+  • For Significator                               relation         → UNKNOWN(38dc18ce) (dual_property)  dual=(Related to GreatWay (For Significator))
+  • ID                                             unique_id      
+  • Item Type                                      select           [18] Annual Goal, Quarterly Goal, Project, Task, System, Resource, Sprint, Milestone, Budget, Campaign...
+  • Manifests As                                   relation         → GHOST_POTENTIATOR (deleted) (single_property)
+  • Monitor                                        formula          expr=ifs(
+  {{notion:block_property:%40C%3DY:38dc18ce-5aab-80a9-8913-000b1ef8286a:171
+  • Name                                           title          
+  • Parent item                                    relation         → UNKNOWN(38dc18ce) (dual_property)  dual=(Sub-item)
+  • Priority                                       select           [5] Critical, High, Medium, Low, None
+  • Progress                                       number         
+  • Quadrant                                       select           [4] UL, UR, LL, LR
+  • Related to Nexus (Emits Choice To)             relation         → UNKNOWN(2acc18ce) (dual_property)  dual=(Emits Choice To)
+  • Related to Potentiator (People)                relation         → GHOST_POTENTIATOR (deleted) (dual_property)  dual=(People)
+  • Shadow Pattern                                 select           [6] None, Dark-Addiction, Dark-Allergy, Golden-Addiction, Golden-Allergy, Sinkhole of Indifference
+  • Sourced From                                   relation         → UNKNOWN(2acc18ce) (single_property)
+  • Start Date                                     date           
+  • Status                                         status           [6] Future, Ideation, Paused, Active, Done, Cancelled
+  • Sub-holon Of                                   relation         → GHOST_POTENTIATOR (deleted) (dual_property)  dual=(Related to GreatWay (Sub-holon Of))
+  • Sub-item                                       relation         → UNKNOWN(38dc18ce) (dual_property)  dual=(Parent item)
+  • Target                                         number         
+  • Tier                                           select           [3] Strategic, Operational, Tactical
+
+  Entry-type counts:
+    Task                          : 359
+    Person                        : 63
+    Content                       : 59
+    Project                       : 43
+    Annual Goal                   : 36
+    Quarterly Goal                : 20
+    Campaign                      : 16
+    Community                     : 14
+    System                        : 1
+    Resource                      : 0
+    Sprint                        : 0
+    Milestone                     : 0
+    Budget                        : 0
+    Group                         : 0
+    Organization                  : 0
+    Network                       : 0
+    Movement                      : 0
+    Place                         : 0
+
+
+======================================================================
+Grounded audit saved to architecture/legacy_mapping/grounded_audit.json
+Total entries across all 5 DBs: 8450
