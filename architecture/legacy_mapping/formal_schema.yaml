@@ -1,0 +1,408 @@
+# LifeOS v4 — Formal Schema (machine-readable)
+# =============================================================================
+# Machine-readable version of FORMAL_SPEC_v4.md. Used by:
+#   - The Rust lifeos-core config loader (to validate the 7-DB structure)
+#   - Migration scripts (to know where each entry-type goes)
+#   - The Notion API setup scripts (to create the 7 DBs + properties + relations)
+#
+# This file is the single source of truth for the DB structure. If it diverges
+# from FORMAL_SPEC_v4.md, the spec doc is authoritative.
+
+version: "4.0"
+date: "2026-07-06"
+status: "approved_for_implementation"
+
+# ─── The 3 functional layers ─────────────────────────────────────────────────
+layers:
+  - id: a_teleological_pull
+    name: "Teleological Pull"
+    purpose: "Articulate + simulate the drive toward the ideal-future"
+    dbs: [vision, compass]
+
+  - id: b_historical_record
+    name: "Historical Record"
+    purpose: "Keep tabs on history + current-trajectory/trends"
+    dbs: [logbook, synthesis, profile]
+
+  - id: c_action_interface
+    name: "Action Interface"
+    purpose: "Tell the user what to do + how"
+    dbs: [action, context]
+
+# ─── The 7 DBs ───────────────────────────────────────────────────────────────
+dbs:
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # DB 1: Vision (Layer A)
+  # ═══════════════════════════════════════════════════════════════════════
+  vision:
+    name: "Vision"
+    layer: a_teleological_pull
+    purpose: "Articulate the ideal-future. The teleological attractor. Timeless."
+    entry_type_property: "Type"
+    entry_types:
+      - id: purpose
+        name: "Purpose"
+        description: "The deepest why — the user's core reason for being"
+      - id: value
+        name: "Value"
+        description: "An enduring commitment — non-negotiable"
+      - id: principle
+        name: "Principle"
+        description: "An operating rule — how decisions are made"
+      - id: vision_statement
+        name: "Vision-Statement"
+        description: "A time-bound articulation of the ideal-future"
+      - id: identity_statement
+        name: "Identity-Statement"
+        description: "Who the user is becoming"
+    properties:
+      - {name: "Name", type: "title"}
+      - {name: "Description", type: "rich_text"}
+      - {name: "Type", type: "select", options: [Purpose, Value, Principle, Vision-Statement, Identity-Statement]}
+      - {name: "Source", type: "rich_text"}
+      - {name: "Timeframe", type: "select", options: [Lifetime, 10yr, 5yr, 3yr, 1yr]}
+      - {name: "Status", type: "status", options: [Draft, Active, Evolving, Archived]}
+      - {name: "Last Reviewed", type: "date"}
+    relations:
+      - {name: "Pillar", target_db: "vision", target_self: true, cardinality: "many-to-one", hint: "Groups related Values/Principles into a pillar"}
+      - {name: "Decomposes Into", target_db: "compass", cardinality: "one-to-many", flow: "pull", hint: "Which Compass goals this Vision-Statement decomposes into"}
+      - {name: "Constrains", target_db: "action", cardinality: "one-to-many", flow: "pull", hint: "Which Actions this Value/Principle constrains"}
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # DB 2: Compass (Layer A)
+  # ═══════════════════════════════════════════════════════════════════════
+  compass:
+    name: "Compass"
+    layer: a_teleological_pull
+    purpose: "Time-bound trajectory decomposition. How the ideal-future pulls across time."
+    entry_type_property: "Type"
+    entry_types:
+      - id: annual_goal
+        name: "Annual-Goal"
+        description: "A yearly target derived from Vision"
+      - id: quarterly_goal
+        name: "Quarterly-Goal"
+        description: "A quarterly decomposition of an Annual-Goal"
+      - id: milestone
+        name: "Milestone"
+        description: "An event-bound checkpoint (not time-bound)"
+    properties:
+      - {name: "Name", type: "title"}
+      - {name: "Type", type: "select", options: [Annual-Goal, Quarterly-Goal, Milestone]}
+      - {name: "Year", type: "select", options: [2024, 2025, 2026, 2027, 2028, 2029, 2030]}
+      - {name: "Quarter", type: "select", options: [Q1, Q2, Q3, Q4]}
+      - {name: "Status", type: "status", options: [Future, Ideation, Active, Done, Cancelled]}
+      - {name: "Progress", type: "number"}
+      - {name: "Target", type: "number"}
+      - {name: "Start Date", type: "date"}
+      - {name: "End Date", type: "date"}
+    relations:
+      - {name: "Parent Goal", target_db: "compass", target_self: true, cardinality: "many-to-one", hint: "Annual-Goal is parent of Quarterly-Goal"}
+      - {name: "Derives From", target_db: "vision", cardinality: "many-to-one", flow: "pull", hint: "The Vision entry this goal traces to"}
+      - {name: "Serves Value", target_db: "vision", cardinality: "many-to-many", flow: "pull", hint: "Which Values this goal serves"}
+      - {name: "Decomposes Into", target_db: "action", cardinality: "one-to-many", flow: "pull", hint: "Which Projects this goal decomposes into"}
+      - {name: "Measured By", target_db: "profile", cardinality: "many-to-many", flow: "feedback", hint: "Which Profile metrics track this goal's progress"}
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # DB 3: Logbook (Layer B)
+  # ═══════════════════════════════════════════════════════════════════════
+  logbook:
+    name: "Logbook"
+    layer: b_historical_record
+    purpose: "Objective ground-reality capture. ONE DB, 6 entry-types (the 6 channels)."
+    entry_type_property: "Entry Type"
+    entry_types:
+      - {id: activity, name: "Activity", channel: "Body", description: "Physical activity + time use"}
+      - {id: diet, name: "Diet", channel: "Body", description: "Food + nutrition"}
+      - {id: financial, name: "Financial", channel: "Resource", description: "Transactions + money flow"}
+      - {id: subjective, name: "Subjective", channel: "Mind", description: "Subjective experience + learning + spirituality"}
+      - {id: relational, name: "Relational", channel: "Relational", description: "Interactions + relational dynamics"}
+      - {id: systemic, name: "Systemic", channel: "Mind", description: "Process observations + workflow notes"}
+    properties:
+      - {name: "Name", type: "title"}
+      - {name: "Date", type: "date"}
+      - {name: "Entry Type", type: "select", options: [Activity, Diet, Financial, Subjective, Relational, Systemic]}
+      - {name: "Channel", type: "select", options: [Body, Mind, Resource, Relational]}
+      - {name: "Content", type: "rich_text"}
+      - {name: "Amount", type: "number"}
+      - {name: "Duration", type: "number"}
+      - {name: "Sentiment", type: "select", options: [Positive, Neutral, Negative]}
+    relations:
+      - {name: "Source Project", target_db: "action", cardinality: "many-to-one", flow: "ground_reverse", hint: "Which Project this log belongs to"}
+      - {name: "Source Task", target_db: "action", cardinality: "many-to-one", flow: "ground_reverse", hint: "Which Task this log belongs to"}
+      - {name: "Subject Person", target_db: "context", cardinality: "many-to-one", hint: "For Relational logs — who was the interaction with"}
+      - {name: "Subject Account", target_db: "context", cardinality: "many-to-one", hint: "For Financial logs — which account"}
+      - {name: "Synthesized Into", target_db: "synthesis", cardinality: "many-to-many", flow: "ground", hint: "Which Synthesis entries this log fed into"}
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # DB 4: Synthesis (Layer B)
+  # ═══════════════════════════════════════════════════════════════════════
+  synthesis:
+    name: "Synthesis"
+    layer: b_historical_record
+    purpose: "Where logs become insights. The synthesis pipeline. Polar structure (± pair + raw)."
+    entry_type_property: "Type"
+    entry_types:
+      - {id: note, name: "Note", polarity: "neutral", description: "Raw synthesis capture (meeting notes, web clips, voice memos)"}
+      - {id: opportunity, name: "Opportunity", polarity: "+", description: "A positive trajectory signal — capitalize on it"}
+      - {id: strength, name: "Strength", polarity: "+", description: "An enduring capacity revealed — leverage it"}
+      - {id: directive, name: "Directive", polarity: "−", description: "A corrective imperative — what needs fixing"}
+      - {id: risk, name: "Risk", polarity: "−", description: "A negative trajectory signal — what's breaking"}
+    properties:
+      - {name: "Name", type: "title"}
+      - {name: "Date", type: "date"}
+      - {name: "Type", type: "select", options: [Note, Opportunity, Strength, Directive, Risk]}
+      - {name: "Polarity", type: "select", options: ["+", "−", neutral]}
+      - {name: "Priority", type: "select", options: [Critical, High, Medium, Low]}
+      - {name: "Status", type: "select", options: [raw, annotated, synthesized, applied]}
+      - {name: "Capture Method", type: "select", options: [manual, web_clipper, api_ingest, voice_memo, import]}
+      - {name: "Source URL", type: "url"}
+    relations:
+      - {name: "Source Logs", target_db: "logbook", cardinality: "many-to-many", flow: "ground_reverse", hint: "Which Logbook entries this synthesized from"}
+      - {name: "Spawns", target_db: "action", cardinality: "one-to-many", flow: "ground_reverse", hint: "For Directives — which corrective Actions this spawned"}
+      - {name: "Condenses Into", target_db: "profile", cardinality: "many-to-many", flow: "ground", hint: "Which Profile traits this condensed into (long-term)"}
+      - {name: "Revises", target_db: "vision", cardinality: "many-to-many", flow: "feedback", hint: "Which Vision entries this reaffirms or revises (long-term)"}
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # DB 5: Profile (Layer B)
+  # ═══════════════════════════════════════════════════════════════════════
+  profile:
+    name: "Profile"
+    layer: b_historical_record
+    purpose: "The cumulative state mirror. RPG status report across all dimensions. Bridge between history and the pull — shows the GAP."
+    entry_type_property: "Type"
+    entry_types:
+      - {id: trait, name: "Trait", description: "An enduring characteristic condensed from long-term trends"}
+      - {id: metric, name: "Metric", description: "A measurable indicator with current value + trend"}
+      - {id: capacity, name: "Capacity", description: "A skill/capacity level"}
+      - {id: asset, name: "Asset", description: "A foundational asset built"}
+    properties:
+      - {name: "Name", type: "title"}
+      - {name: "Type", type: "select", options: [Trait, Metric, Capacity, Asset]}
+      - {name: "Category", type: "select", options: [Health, Financial, Relational, Cognitive, Spiritual, Execution, Content, Strategic]}
+      - {name: "Current Value", type: "rich_text"}
+      - {name: "Target Value", type: "rich_text"}
+      - {name: "Trend", type: "select", options: ["↑", "↓", "→"]}
+      - {name: "Unit", type: "select", options: [count, percentage, hours, minutes, rupees, dollars, level, rating]}
+      - {name: "Frequency", type: "select", options: [Daily, Weekly, Monthly, Quarterly, Annual]}
+      - {name: "Last Updated", type: "date"}
+    relations:
+      - {name: "Source Synthesis", target_db: "synthesis", cardinality: "many-to-many", flow: "ground_reverse", hint: "Which Synthesis entries condensed into this"}
+      - {name: "Closes Gap For", target_db: "vision", cardinality: "many-to-many", flow: "feedback", hint: "Which Vision entries this Profile shows the gap for"}
+      - {name: "Informs Goal", target_db: "compass", cardinality: "many-to-many", flow: "feedback", hint: "Which Compass goals this Profile informs"}
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # DB 6: Action (Layer C)
+  # ═══════════════════════════════════════════════════════════════════════
+  action:
+    name: "Action"
+    layer: c_action_interface
+    purpose: "The actionable hierarchy. What to do + how. Daily-use, high-churn."
+    entry_type_property: "Type"
+    entry_types:
+      - {id: project, name: "Project", description: "A multi-step deliverable aligned with a Goal"}
+      - {id: task, name: "Task", description: "An atomic unit of work"}
+      - {id: campaign, name: "Campaign", description: "A coordinated multi-content effort"}
+      - {id: content, name: "Content", description: "A single content piece"}
+    properties:
+      - {name: "Name", type: "title"}
+      - {name: "Type", type: "select", options: [Project, Task, Campaign, Content]}
+      - {name: "Status", type: "status", options: [Future, Ideation, Paused, Active, Done, Cancelled]}
+      - {name: "Priority", type: "select", options: [Critical, High, Medium, Low]}
+      - {name: "Progress", type: "number"}
+      - {name: "Start Date", type: "date"}
+      - {name: "End Date", type: "date"}
+    relations:
+      - {name: "Parent Project", target_db: "action", target_self: true, cardinality: "many-to-one", hint: "For Task → Project hierarchy"}
+      - {name: "Parent Goal", target_db: "compass", cardinality: "many-to-one", flow: "pull_reverse", hint: "Which Goal this Action traces to"}
+      - {name: "Spawned By", target_db: "synthesis", cardinality: "many-to-one", flow: "ground_reverse", hint: "Which Directive spawned this Action"}
+      - {name: "Assigned To", target_db: "context", cardinality: "many-to-one", hint: "Who is responsible (Person)"}
+      - {name: "Involves", target_db: "context", cardinality: "many-to-many", hint: "Which People/Communities are involved"}
+      - {name: "Blocked By", target_db: "action", target_self: true, cardinality: "many-to-many", hint: "Dependency"}
+      - {name: "Generates Logs", target_db: "logbook", cardinality: "one-to-many", flow: "ground", hint: "Which Logbook entries executing this generated"}
+      - {name: "Constrains Value", target_db: "vision", cardinality: "many-to-many", flow: "pull_reverse", hint: "Which Values/Principles this Action must not violate"}
+
+  # ═══════════════════════════════════════════════════════════════════════
+  # DB 7: Context (Layer C)
+  # ═══════════════════════════════════════════════════════════════════════
+  context:
+    name: "Context"
+    layer: c_action_interface
+    purpose: "The environment. Who/what is around the user. Persistent (changes slowly)."
+    entry_type_property: "Type"
+    entry_types:
+      - {id: person, name: "Person", description: "A person (rich CRM)"}
+      - {id: community, name: "Community", description: "A group/community"}
+      - {id: organization, name: "Organization", description: "An organization"}
+      - {id: financial_account, name: "Financial-Account", description: "A financial account"}
+      - {id: place, name: "Place", description: "A physical location"}
+    properties:
+      # Common
+      - {name: "Name", type: "title"}
+      - {name: "Type", type: "select", options: [Person, Community, Organization, Financial-Account, Place]}
+      - {name: "Status", type: "select", options: [Active, Inactive, Archived]}
+      # Person-specific
+      - {name: "Aspirational Drive", type: "select", options: ["Security & Stability", "Connection & Belonging", "Status & Recognition", "Mastery & Impact", "Growth & Understanding"], applies_to: [person]}
+      - {name: "Developmental Altitude", type: "select", options: ["LVL 3 Red", "LVL 4 Amber", "LVL 5 Orange", "LVL 6 Green", "LVL 7 Turquoise"], applies_to: [person]}
+      - {name: "Networking Profile", type: "select", options: [Key Ally, Active Collaborator, "Mentor/Advisor", "Protégé/Mentee", "Peer/Sounding Board", Inactive, Archive], applies_to: [person]}
+      - {name: "Relationship Status", type: "select", options: [Family Member, Mentor, Close Friend, Close Acquaintance, Coworker, Acquaintance], applies_to: [person]}
+      - {name: "Desired Trajectory", type: "select", options: [Deepen, Maintain, Activate, "Graceful Exit", Inactive], applies_to: [person]}
+      - {name: "Value Exchange Balance", type: "select", options: ["I am in Credit", Balanced, "I am in Debt"], applies_to: [person]}
+      - {name: "Last Interaction Sentiment", type: "select", options: [Positive, Neutral, Tense, Negative], applies_to: [person]}
+      - {name: "City", type: "select", options: [Noida, Janakpuri, Delhi, "Greater Noida", Gurgaon, Ghaziabad, Faridabad, Meerut, Aligarh, Varanasi], applies_to: [person]}
+      - {name: "Timezone", type: "select", options: [IST, EST, PST, GMT, GST], applies_to: [person]}
+      - {name: "Core Shadow", type: "select", options: ["Fear of Insignificance", "Fear of Rejection", "Fear of Chaos/Uncertainty", "Fear of Powerlessness/Domination"], applies_to: [person]}
+      - {name: "Engagement Blueprint", type: "rich_text", applies_to: [person]}
+      - {name: "Key Personal Intel", type: "rich_text", applies_to: [person]}
+      - {name: "Professional Domain", type: "rich_text", applies_to: [person]}
+      - {name: "Influence Toolkit", type: "multi_select", options: [Strategic Persuasion, "Inspirational & Charismatic", Collaborative, "Coercive Influence", "Elicits Pity/Guilt", "Creates Desire", "Shared Experience Bonding", "Venting/Catharsis", "Loyalty in Crisis", Generosity], applies_to: [person]}
+      # Community-specific
+      - {name: "Community Type", type: "select", options: [Professional, Personal, Spiritual, Creative, Investment, Mastermind], applies_to: [community]}
+      - {name: "Strategic Value", type: "select", options: [Core, Supporting, Peripheral], applies_to: [community]}
+      - {name: "Covenant", type: "rich_text", applies_to: [community]}
+      # Financial-Account-specific
+      - {name: "Account Type", type: "select", options: [Checking, Savings, Investment, Credit, Crypto], applies_to: [financial_account]}
+      - {name: "Balance", type: "number", applies_to: [financial_account]}
+      - {name: "Institution", type: "select", options: [HDFC, ICICI, SBI, Axis, Kotak, Other], applies_to: [financial_account]}
+    relations:
+      - {name: "Involved In", target_db: "action", cardinality: "many-to-many", hint: "Person/Community is involved in these Projects"}
+      - {name: "Subject Of", target_db: "logbook", cardinality: "one-to-many", hint: "Person is subject of Relational logs; Account is subject of Financial logs"}
+      - {name: "Referenced In", target_db: "synthesis", cardinality: "one-to-many", hint: "Person/Account referenced in these Synthesis entries"}
+
+# ─── The 3 flows ─────────────────────────────────────────────────────────────
+flows:
+
+  - id: teleological_pull
+    name: "Teleological Pull"
+    direction: "Layer A → Layer C (downward)"
+    trigger: "User sets or updates a Vision entry → Compass goals update → Action projects align"
+    path:
+      - {from: "vision", to: "compass", relation: "Decomposes Into"}
+      - {from: "compass", to: "action", relation: "Decomposes Into"}
+    what_flows: "The ideal-future shape propagates downward through time-bound goals into daily actions"
+    constraint: "Vision also Constrains Action directly (Values/Principles constrain which Actions are valid)"
+
+  - id: ground_truth
+    name: "Ground-Truth"
+    direction: "Layer C → Layer B (upward)"
+    trigger: "User executes an Action → generates a Logbook entry → Synthesis processes the log → long-term insights condense into Profile"
+    path:
+      - {from: "action", to: "logbook", relation: "Generates Logs"}
+      - {from: "logbook", to: "synthesis", relation: "Synthesized Into"}
+      - {from: "synthesis", to: "profile", relation: "Condenses Into"}
+    what_flows: "Objective ground-reality data — actions produce logs, logs synthesize into insights, insights condense into the cumulative state"
+    polar_structure: "Synthesis has (+) pole (Opportunities/Strengths) and (−) pole (Directives/Risks). Both receive from same logs."
+
+  - id: feedback
+    name: "Feedback"
+    direction: "Layer B → Layer A (loop)"
+    trigger: "Profile shows the GAP between current state and ideal-future → user revises Vision/Goals based on reality"
+    path:
+      - {from: "profile", to: "vision", relation: "Closes Gap For"}
+      - {from: "profile", to: "compass", relation: "Informs Goal"}
+      - {from: "synthesis", to: "vision", relation: "Revises"}
+    what_flows: "The gap signal — Profile shows where the user actually is, which informs the trajectory simulation"
+    effect: "The pull becomes REALISTIC (not fantasy). User revises Vision/Goals based on actual progress."
+
+# ─── The cycle ───────────────────────────────────────────────────────────────
+cycle:
+  name: "Causal Amplification Cycle"
+  path: [vision, compass, action, logbook, synthesis, profile, vision]
+  amplification:
+    - "The pull becomes more precise (Profile informs Vision)"
+    - "The actions become more aligned (Synthesis corrects Action)"
+    - "The history becomes richer (Action generates more Logbook)"
+    - "The self-understanding deepens (Synthesis condenses into Profile)"
+
+# ─── Migration mapping (current 5-DB → new 7-DB) ─────────────────────────────
+migration:
+  principle: "No data loss. Every entry-type has a clear destination. Properties follow. Relations re-point."
+  recommended_approach: "Build 7 new DBs fresh in Notion, then port entries from the 5 old DBs in batches."
+
+  # Current State (matrix) → Profile
+  - from: {db: "State", entry_types: [Pattern, Threshold, Foundation]}
+    to: {db: "Profile", entry_types: [Trait, Trait, Asset]}
+
+  # Current Possibility (potentiator) → Logbook + Vision + Synthesis
+  - from: {db: "Possibility", entry_types: [Activity, Diet, Financial, Subjective, Relational, Systemic]}
+    to: {db: "Logbook", entry_types: [Activity, Diet, Financial, Subjective, Relational, Systemic]}
+  - from: {db: "Possibility", entry_types: [Goal]}
+    to: {db: "Compass", entry_types: [Annual-Goal or Quarterly-Goal]}
+  - from: {db: "Possibility", entry_types: [Vision]}
+    to: {db: "Vision", entry_types: [Vision-Statement]}
+  - from: {db: "Possibility", entry_types: [Aspiration]}
+    to: {db: "Vision", entry_types: [Identity-Statement or Vision-Statement]}
+  - from: {db: "Possibility", entry_types: [Observation]}
+    to: {db: "Synthesis", entry_types: [Note]}
+
+  # Current Process (nexus) → Logbook + Synthesis + Profile + Action
+  - from: {db: "Process", entry_types: [Note]}
+    to: {db: "Synthesis", entry_types: [Note]}
+  - from: {db: "Process", entry_types: [Knowledge-Category, Knowledge-Atom]}
+    to: {db: "Synthesis", entry_types: [Note]}
+  - from: {db: "Process", entry_types: [Opportunity]}
+    to: {db: "Synthesis", entry_types: [Opportunity]}
+  - from: {db: "Process", entry_types: [Insight]}
+    to: {db: "Synthesis", entry_types: [Strength or Note]}
+  - from: {db: "Process", entry_types: [Reflection, Integration]}
+    to: {db: "Synthesis", entry_types: [Note]}
+  - from: {db: "Process", entry_types: [Pattern]}
+    to: {db: "Profile", entry_types: [Trait]}
+  - from: {db: "Process", entry_types: [Risk, Crisis]}
+    to: {db: "Synthesis", entry_types: [Risk]}
+  - from: {db: "Process", entry_types: [Directive]}
+    to: {db: "Synthesis", entry_types: [Directive]}
+  - from: {db: "Process", entry_types: [Decision]}
+    to: {db: "Synthesis or Action", entry_types: [Note or Task]}
+  - from: {db: "Process", entry_types: [Transformation-Event]}
+    to: {db: "Synthesis or Vision", entry_types: [Note or Identity-Statement]}
+
+  # Current Identity (significator) → Vision + Profile
+  - from: {db: "Identity", entry_types: [Purpose]}
+    to: {db: "Vision", entry_types: [Purpose]}
+  - from: {db: "Identity", entry_types: [Value, Principle]}
+    to: {db: "Vision", entry_types: [Value, Principle]}
+  - from: {db: "Identity", entry_types: [Identity-Statement]}
+    to: {db: "Vision", entry_types: [Identity-Statement]}
+  - from: {db: "Identity", entry_types: [Pillar]}
+    to: {db: "Vision", entry_types: [Value or Principle]}
+  - from: {db: "Identity", entry_types: [Strategic-Ideal]}
+    to: {db: "Vision", entry_types: [Vision-Statement]}
+  - from: {db: "Identity", entry_types: [Holon Type, Valence Signature, Life-Era]}
+    to: {db: "Profile", entry_types: [Trait]}
+
+  # Current World (greatway) → Compass + Action + Context
+  - from: {db: "World", entry_types: [Annual Goal, Quarterly Goal]}
+    to: {db: "Compass", entry_types: [Annual-Goal, Quarterly-Goal]}
+  - from: {db: "World", entry_types: [Project, Task]}
+    to: {db: "Action", entry_types: [Project, Task]}
+  - from: {db: "World", entry_types: [System, Resource, Sprint]}
+    to: {db: "Action or Profile", entry_types: [Project or Asset]}
+  - from: {db: "World", entry_types: [Milestone]}
+    to: {db: "Compass", entry_types: [Milestone]}
+  - from: {db: "World", entry_types: [Budget]}
+    to: {db: "Action or Logbook", entry_types: [Project or Financial]}
+  - from: {db: "World", entry_types: [Campaign, Content]}
+    to: {db: "Action", entry_types: [Campaign, Content]}
+  - from: {db: "World", entry_types: [Person]}
+    to: {db: "Context", entry_types: [Person]}
+  - from: {db: "World", entry_types: [Group, Community, Network, Movement]}
+    to: {db: "Context", entry_types: [Community]}
+  - from: {db: "World", entry_types: [Organization]}
+    to: {db: "Context", entry_types: [Organization]}
+  - from: {db: "World", entry_types: [Place]}
+    to: {db: "Context", entry_types: [Place]}
+
+# ─── Implementation order ────────────────────────────────────────────────────
+implementation_order:
+  - {order: 1, db: "Context", reason: "No dependencies. Referenced by everything else."}
+  - {order: 2, db: "Logbook", reason: "Depends on Context. Daily-use, so build early to start capturing."}
+  - {order: 3, db: "Vision", reason: "No dependencies. Build before Compass so Compass can derive from it."}
+  - {order: 4, db: "Compass", reason: "Depends on Vision (Derives From)."}
+  - {order: 5, db: "Action", reason: "Depends on Compass + Context. Synthesis relation added later."}
+  - {order: 6, db: "Synthesis", reason: "Depends on Logbook + Action + Vision. Profile relation added later."}
+  - {order: 7, db: "Profile", reason: "Depends on Synthesis. Built last — it's the condensation of everything."}
+
+estimated_build_time: "2-3 hours in Notion (7 DBs + ~80 properties + ~19 relations)"
+estimated_migration_time: "4-8 hours depending on volume"
