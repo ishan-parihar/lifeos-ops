@@ -370,26 +370,24 @@ impl ServerHandle {
 
         // Pull live DB names from the config (auto-discovered by `lifeos discover`).
         let db_summary: Vec<String> = self.config.databases.iter().map(|(_k, db)| {
-            let cur_in = db.currency_in.as_deref().unwrap_or("?");
-            let cur_out = db.currency_out.as_deref().unwrap_or("?");
-            let cycle = db.cycle.as_deref().unwrap_or("?");
-            format!(
-                "{} ({} cycle, currency: {} → {})",
-                db.name, cycle, cur_in, cur_out
-            )
+            db.name.clone()
         }).collect();
 
         format!(
-            "LifeOS v{} — unified CLI + MCP server for a 5-DB holonic operating system on Notion.\n\n\
-             The 5 databases (auto-discovered from Notion):\n  - {}\n\n\
-             Currency flow: Catalyst → Experience in the lesser cycle (Matrix ⇌ Potentiator); \
-             Transformation → Choice in the greater cycle (Significator ⇌ GreatWay). \
-             Nexus is the shared contact-boundary where all 4 currencies transmute — \
-             each Nexus entry tags its currency via the `Kind` select property.\n\n\
-             Drives: Agency, Communion, Eros, Agape. Health metrics: G_z (balance) × P_z (commitment).\n\n\
+            "LifeOS v{} — Rust CLI + MCP server for a 5-DB consciousness-prosthetic on Notion (v4.1 architecture).\n\n\
+             The 5 databases:\n  - {}\n\n\
+             The causal amplification cycle: Trajectory → Logbook → Synthesis → Profile → Trajectory.\n\
+             - Pull flow: Vision-Statement → Annual-Goal → Quarterly-Goal → Project → Task (within Trajectory, via Parent self-relation).\n\
+             - Ground flow: Trajectory → Logbook → Synthesis → Profile (capture → process → condense).\n\
+             - Feedback flow: Profile + Synthesis → Trajectory (gap informs pull).\n\n\
+             Trajectory has 3 internal layers: Reference (Purpose/Value/Principle/Vision-Statement/Identity-Statement), \
+             Strategic (Annual-Goal/Quarterly-Goal/Milestone), Execution (Project/Task/Campaign/Content). \
+             The `ancestors` tool returns layer labels for Trajectory entries.\n\n\
              {} tools available. Call `get_schema` first to learn each DB's properties and entry-types. \
-             Use `query` with `entry_type` to filter by sub-type. Use `build_context` for one-call \
-             relational neighborhood assembly. Use `daily` and `dashboard` for workflow overviews.\n\n\
+             Use `query` with `entry_type` to filter by sub-type. Use `morning` for the AI-agent orient call \
+             (active goals + today tasks + recent logs + recent synthesis in one call). \
+             Use `cycle_health` to check if the 3 flows are active. \
+             Use `build_context` for one-call relational neighborhood assembly.\n\n\
              Tool list: {}",
             env!("CARGO_PKG_VERSION"),
             db_summary.join("\n  - "),

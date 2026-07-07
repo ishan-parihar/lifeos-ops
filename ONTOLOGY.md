@@ -1,244 +1,249 @@
-# ONTOLOGY.md — LifeOS Native Ontological Foundation
+# ONTOLOGY.md — LifeOS v4.1 Consciousness-Prosthetic Architecture
 
-> **Source:** Distilled from HoloOS `_THEORY/02_Ontology/` (58 docs).
-> **Purpose:** Grounds the LifeOS 5-DB architecture in its ontological theory.
+> **Source:** Evolved from HoloOS ontological theory + v4.1 5-DB merger.
+> **Purpose:** Grounds the LifeOS architecture in its teleological-aim:
+> shaping the causal chain of the user's life toward an ideal-future.
 > Every LifeOS design decision must trace back to a principle documented here.
 
 ---
 
 ## 1. The Core Thesis
 
-Every holon — atom, cell, organism, organization, civilization — runs **one invariant
-systems architecture** with **two symmetrical but inverted metabolic cycles** operating
-through a shared contact-boundary.
+LifeOS is a **consciousness-prosthetic** — an external scaffold that shapes
+the causal chain of the user's life toward an ideal-future. It does this by
+running **one causal amplification cycle** through **5 databases** across
+**3 functional layers**.
 
-LifeOS operationalizes this as **5 databases**: 4 reservoirs + 1 contact-boundary.
+The 3 layers + 3 flows + 1 cycle define the entire architecture:
 
----
-
-## 2. The 8 Functional Roles → 5 LifeOS DBs
-
-| Role | Symbol | LifeOS DB | Definition |
-|------|--------|-----------|------------|
-| Matrix | M | **Matrix** | Current-state organizer — preserves identity, classifies input, converts perturbation into state-update |
-| Potentiator | P | **Potentiator** | Latent-state generator — reachable possibility field that returns refined future input |
-| Catalyst | C | *(currency in Nexus)* | Input perturbation — unprocessed pressure crossing the boundary |
-| Experience | E | *(currency in Nexus)* | Integrated state-update — processed input stored as adaptation |
-| Significator | S | **Significator** | Persistent identity-pattern — continuity reservoir exposed to macro-transition |
-| Transformation | T | **Nexus** | Threshold restructuring event — the contact-boundary itself |
-| Great Way | G | **GreatWay** | Operating environment — context that receives commitments, generates pressure |
-| Choice | Ch | *(currency in Nexus)* | Directional commitment — polarity output emitted into the environment |
-
-**Key design decision:** Catalyst, Experience, and Choice are **currencies** (they flow
-through the contact-boundary), not reservoirs. They live as entry-types within the Nexus DB,
-discriminated by the `Kind` property. This is why LifeOS has 5 DBs, not 8.
-
----
-
-## 3. The Two Cycles
-
-### Lesser Cycle (Matrix ⇌ Potentiator)
-- **Catalyst** flows: extra-holonic → contact-boundary → Matrix (ingestion)
-- **Experience** flows: Matrix → contact-boundary → Potentiator (refinement)
-- Matrix processes C, stores E. Potentiator processes E, stores C.
-- **Boundary:** M⇄P, regulated by Eros↔Agape (vertical drive axis)
-- **Health metric:** G_z (Goldilocks coherence — rewards balance)
-
-### Greater Cycle (Significator ⇌ Great Way)
-- **Transformation** flows: Great Way → contact-boundary → Significator
-- **Choice** flows: Significator → contact-boundary → Great Way
-- **Boundary:** S⇄G, regulated by Agency↔Communion (horizontal drive axis)
-- **Health metric:** P_z (Polarization power — rewards commitment)
-- **Ratcheting:** Transformation fires when pressure + latent pull exceed threshold
-
-### The Shared Contact-Boundary
-The Nexus (Transformation) is **shared** between both cycles. This is structurally
-critical: the same membrane processes Catalyst/Experience (lesser) AND
-Transformation/Choice (greater). The `Kind` property on Nexus entries discriminates
-which currency is currently transmuting.
-
----
-
-## 4. The Fractal Coupling (Inter-DB Hierarchy)
-
-The holonic architecture is fractal — every holon's components are themselves holons.
-This creates the inter-DB parent-child relationships:
-
-| Holon H's component | IS the parent holon's... | LifeOS relation |
-|---------------------|--------------------------|-----------------|
-| Great Way (environment) | parent's **Potentiator** | GreatWay.Sub-holon Of → Potentiator.Contains Great Way Of |
-| Significator (identity) | parent's **Matrix** | Significator.Sub-holon Of → Matrix.Contains Significator Of |
-| Transformation (contact-boundary) | parent's **Catalyst** | Nexus → Matrix (via Updates relation) |
-| Choice (output) | parent's **Experience** | Nexus → Potentiator (via Sourced From relation) |
-
-This is the structural basis for the 13 dual_property inter-DB relations added in v0.9.0.
-
----
-
-## 5. The 4 Drives
-
-All 4 drives operate at BOTH contact boundaries (M⇌P AND S⇌G):
-
-| Drive | Symbol | Axis | Structural Pole | LifeOS Property |
-|-------|--------|------|-----------------|-----------------|
-| Agency | A_z | Horizontal-contractive (boundary preservation) | Matrix | `Drive Activation` multi_select |
-| Communion | C_z | Horizontal-expansive (field coupling) | Potentiator | `Drive Activation` multi_select |
-| Eros | P_z | Vertical-ascendent (scale jumps) | Contact-boundary gradient | `Drive Activation` multi_select |
-| Agape | G_z | Vertical-descendent (stabilization) | Closed cycle efficiency | `Drive Activation` multi_select |
-
-**Formula:** A_z = 100·exp(-|ln(Ω_A)|), where Ω_A = (M·η_M)/(|C|+ε)
-**Failure modes:** Agency→isolation, Communion→confluence, Eros→inflation, Agape→stagnation
-
----
-
-## 6. The 4 Shadows (+ Sinkhole)
-
-| Shadow | Reservoir | Sign | LifeOS `Shadow Pattern` option |
-|--------|-----------|------|-------------------------------|
-| Dark-Addiction | Matrix (surplus) | +1 (donor) | `Dark-Addiction` |
-| Dark-Allergy | Matrix (deficit) | -1 (acceptor) | `Dark-Allergy` |
-| Golden-Addiction | Potentiator (surplus) | +1 (donor) | `Golden-Addiction` |
-| Golden-Allergy | Potentiator (deficit) | -1 (acceptor) | `Golden-Allergy` |
-| Sinkhole of Indifference | Great Way (Choice-starvation) | 0 (depolarized) | `Sinkhole of Indifference` |
-
-**Critical:** A holon can be metabolically efficient (high G_z) yet depolarized (low P_z)
-— the sinkhole. G_z alone doesn't guarantee evolutionary direction; P_z is required.
-
----
-
-## 7. Health Metrics: G_z × P_z
-
-### G_z — Agape (Integrative Coherence)
 ```
-G_z = 100 · (A_z/100 · C_z/100 · B_H · B_V)^(1/4)
+                    ┌─────────────────────────────────────┐
+                    │  Layer A — Teleological Pull        │
+                    │  (Trajectory DB)                    │
+                    │                                     │
+                    │  Purpose → Value → Vision-Statement │
+                    │     → Annual-Goal → Quarterly-Goal  │
+                    │     → Project → Task                │
+                    └────────┬────────────────────────────┘
+                             │ Pull (downward)
+                             ▼
+   ┌─────────────────────────────────────────────────────────┐
+   │  Layer B — Historical Record                            │
+   │                                                         │
+   │  Logbook ──── Ground ───▶ Synthesis ──── Condense ───▶ Profile
+   │  (capture)               (process)                  (state mirror)│
+   └─────────────────────────────────────────────────────────┘
+                             │ Feedback (loop)
+                             ▼
+                    ┌─────────────────────────────────────┐
+                    │  Layer C — Action Interface         │
+                    │  (Context DB)                       │
+                    │  People / Communities / Orgs /      │
+                    │  Financial-Accounts / Places        │
+                    └─────────────────────────────────────┘
 ```
-- B_H = min(A_z, C_z) / max(A_z, C_z) — horizontal balance
-- B_V = min(Eros, Agape) / max(Eros, Agape) — vertical balance
-- **Rewards balance.** Geometric mean → any factor near 0 collapses G_z.
-- Thresholds: <30 severe distortion; 30-70 sub-optimal; >70 dynamic equilibrium
 
-### P_z — Eros (Transcendental Tension)
+---
+
+## 2. The 5 DBs
+
+| # | DB | Layer | Purpose | Entry-types |
+|---|-----|-------|---------|-------------|
+| 1 | **Trajectory** | A (Pull) | The teleological hierarchy — pull IS the parent/child tree | Purpose, Value, Principle, Vision-Statement, Identity-Statement, Annual-Goal, Quarterly-Goal, Milestone, Project, Task, Campaign, Content |
+| 2 | **Logbook** | B (Record) | Objective ground-reality capture — 6 channels | Activity, Diet, Financial, Subjective, Relational, Systemic |
+| 3 | **Synthesis** | B (Record) | Logs → insights (polar ± pair) | Note, Opportunity, Strength, Directive, Risk |
+| 4 | **Profile** | B (Record) | Cumulative state mirror (RPG status) | Trait, Metric, Capacity, Asset |
+| 5 | **Context** | C (Action) | The environment (who/what is around) | Person, Community, Organization, Financial-Account, Place |
+
+**Universal properties (on all 5 DBs):** `Name` (title), `Created Time`, `Last Edited Time` (Notion auto)
+
+---
+
+## 3. The 3 Functional Layers
+
+### Layer A — Teleological Pull (Trajectory DB)
+**Purpose:** Articulate + simulate the drive toward the ideal-future.
+The pull IS the parent/child tree — open one DB, expand the hierarchy,
+see the pull from Purpose to today's Task.
+
+The 3 internal layers of Trajectory:
+| Layer | Entry-types | Churn | Review cadence |
+|-------|-------------|-------|----------------|
+| **Reference** (timeless) | Purpose, Value, Principle, Vision-Statement, Identity-Statement | Years | Annual |
+| **Strategic** (temporal) | Annual-Goal, Quarterly-Goal, Milestone | Quarters | Quarterly |
+| **Execution** (daily) | Project, Task, Campaign, Content | Days | Daily |
+
+### Layer B — Historical Record (Logbook + Synthesis + Profile)
+**Purpose:** Keep tabs on history + current trajectory/trends.
+
+Three sub-systems, each with a distinct role:
+- **Logbook** — Objective ground-reality capture. ONE DB, 6 entry-types
+  (one per channel: Body/Resource/Mind/Relational).
+- **Synthesis** — Where logs become insights. Polar ± pair: positive
+  (Opportunity/Strength), negative (Directive/Risk), neutral (Note).
+- **Profile** — The cumulative state mirror. Bridge between history and
+  the pull. Traits/Metrics/Capacities/Assets with current vs target values.
+
+### Layer C — Action Interface (Context DB)
+**Purpose:** Tell the user what to do + how. The environment the user
+operates within. People, Communities, Organizations, Financial-Accounts,
+Places — the entities the user acts through and on.
+
+---
+
+## 4. The 3 Flows + The Cycle
+
+### Flow 1 — Teleological Pull (downward, within Trajectory)
+**Path:** Vision-Statement → Annual-Goal → Quarterly-Goal → Project → Task
+**What flows:** The ideal-future shape propagates downward through the
+parent/child hierarchy. This is STRUCTURAL — it's the tree shape of the
+DB, not a cross-DB relation.
+**Constraint:** Purpose/Value/Principle constrain the hierarchy via
+`Serves Value` (a self-relation, not a flow).
+
+### Flow 2 — Ground-Truth (Trajectory → Logbook → Synthesis → Profile)
+**Path:** Trajectory (Action executed) → Logbook (capture) → Synthesis
+(process) → Profile (condense)
+**What flows:** Objective ground-reality data — actions produce logs,
+logs synthesize into insights, insights condense into the cumulative state.
+
+### Flow 3 — Feedback (Profile + Synthesis → Trajectory)
+**Path:** Profile (gap) → Trajectory (Vision/Goals revised); Synthesis
+(long-term insights) → Trajectory (Vision reaffirmed/revised)
+**What flows:** The gap signal + long-term insights inform the
+trajectory simulation. Profile's `Closes Gap For` + `Informs Goal`
+relations encode this.
+
+### The Cycle
+
 ```
-P_z = 100 · ∇Ψ · cos(θ_alignment)
+Trajectory → Logbook → Synthesis → Profile → Trajectory
+  (pull +    (capture)  (process)   (condense)  (feedback)
+   action)
 ```
-- ∇Ψ = |P - M| / (P + M + ε) — structural potential gradient
-- cos(θ_alignment) — behavioral output aligned with core Choice
-- **Rewards commitment.** Neutrality is the pathology (sinkhole).
-- Thresholds: <30 depolarized; 30-70 polarizing; >70 committed ascent
 
-### Total Metabolic Health = G_z × P_z
-Both required, neither sufficient alone.
+**4 hops.** Tighter feedback = faster amplification. Each cycle through
+the loop amplifies the user's causal capacity — actions get sharper,
+logs get denser, synthesis gets deeper, profile gets clearer, the pull
+gets more accurate.
 
 ---
 
-## 8. The 9-Stage Digestion Process
+## 5. The 12 Inter-DB Relations
 
-The canonical metabolic cycle (HoloOS doc 03.1 §3). This is the intra-DB flow within
-the Nexus (contact-boundary):
+| # | From DB | Property | To DB | Flow |
+|---|---------|----------|-------|------|
+| 1 | Trajectory | `Generates Logs` | Logbook | Ground |
+| 2 | Trajectory | `Assigned To` / `Involves` | Context | — |
+| 3 | Trajectory | `Spawned By` | Synthesis | Ground (rev) |
+| 4 | Trajectory | `Measured By` | Profile | Feedback |
+| 5 | Logbook | `Source Project` | Trajectory | Ground (rev) |
+| 6 | Logbook | `Subject Person` / `Subject Account` | Context | — |
+| 7 | Logbook | `Synthesized Into` | Synthesis | Ground |
+| 8 | Synthesis | `Spawns` | Trajectory | Ground (rev) |
+| 9 | Synthesis | `Condenses Into` | Profile | Ground |
+| 10 | Synthesis | `Revises` | Trajectory | Feedback |
+| 11 | Profile | `Closes Gap For` | Trajectory | Feedback |
+| 12 | Profile | `Informs Goal` | Trajectory | Feedback |
 
-1. **Latent State** — (M_t, P_t) at rest
-2. **Boundary Contact** — c_in = B(c_env; Ag, Cm) — Catalyst enters
-3. **Matrix Ingestion** — M_t ⊕ c_in
-4. **Matrix Digestion** — e_t = Digest(M_t, c_in; η_M) — Experience generated
-5. **Potentiator Ingestion** — P_t ⊕ e_t
-6. **Potentiator Digestion** — c'_{t+1} = Potentiate(P_t, e_t; η_P, Er, Agp) — refined Catalyst
-7. **Significator Accumulation** — S_t = S_{t-1} + w_t · e_t
-8. **Transformation Threshold** — f(G_t, P_t, S_t) > T_thresh → Trigger T_t
-9. **Choice & Downward Rewrite** — Ch_t = Choice(S_t, T_t; η_S) → rewrites M, P
-
-**LifeOS `Digestion Stage` property** tracks an entry's position in this cycle.
-Nexus entries MUST set this; reservoir entries MAY set it (projected/snapshotted).
-
----
-
-## 9. The 5 Holon Types
-
-Type = the Significator's invariant bonding-disposition toward the Great Way.
-
-| Type | Valence State | Bonding | LifeOS `Holon Type` option |
-|------|--------------|---------|---------------------------|
-| Donor | Open, addiction-side | STO-leaning, radiative | `Donor` |
-| Acceptor | Open, allergy-side | STS-leaning, absorptive | `Acceptor` |
-| Sharer | Balanced (high G_z) | Covalent-capable | `Sharer` |
-| Multivalent | Several open registers | Multi-register | `Multivalent` |
-| Noble | Closed (no deficit) | Inert (graduated OR sinkhole) | `Noble` |
-
-**Type ⊥ Stage** — they are independent. Stage = how full the engine is (dynamic).
-Type = the invariant shape of the valence deficit (stable under excitation).
-
-**Derivation:** `lifeos derive-type --page-id <id>` computes Holon Type from the
-Valence Signature YAML on Significator entries.
+**Plus 4 intra-DB self-relations in Trajectory:**
+`Parent`, `Serves Value`, `Blocked By`, `Linked Milestone`.
 
 ---
 
-## 10. The 22 Named Archetypes
+## 6. The Context YAML Formula
 
-7 functional roles × 3 complexes (Mind/Body/Spirit) + Choice = 22.
+Each DB has ONE formula property that outputs per-entry-type YAML context.
+This replaces redundant self-inferential properties with a single
+computed field that AI agents can parse.
 
-The 8 functional roles are the **operators**; the 22 named archetypes are the
-**operands** (domain-specific elaborations). LifeOS tracks both:
-- `Archetype Role` (select, 8 options) — the functional role
-- `Complex` (select, 4 options: Mind/Body/Spirit/None) — the substrate face
+Example (Trajectory entry of type Task):
+```yaml
+type: Task
+status: Active
+parent: "Implement LifeOS v1.0"
+serves_value: ["Compounding leverage", "Sovereignty"]
+end_date: 2026-09-30
+priority: Critical
+assigned_to: []
+```
 
-The combination (role, complex) identifies which of the 22 archetypes an entry
-instantiates. See `lifeos archetype-index` for the full mapping.
-
----
-
-## 11. LifeOS Design Principles (Derived from Ontology)
-
-1. **5 DBs, not 8** — Currencies (C, E, Ch) flow through the Nexus, they don't have their own reservoirs.
-
-2. **Nexus.Kind discriminates currency** — A Nexus entry tagged `Kind: Catalyst` carries
-   Catalyst; `Kind: Experience` carries Experience; etc. The `mutate` tool enforces
-   that Kind constrains which relations can be populated.
-
-3. **Dual-property relations encode the fractal coupling** — The 13 inter-DB dual_property
-   relations (added v0.9.0) are not arbitrary; they operationalize the parent-child holon
-   relationships from §4.
-
-4. **Every relation is deliberate** — Tools surface gaps (`relational_gaps`) and suggest
-   connections (`suggest_categorization`), but the user must approve each. No auto-population.
-
-5. **G_z × P_z = Total Health** — `health_metrics` computes both. A holon with high G_z
-   but low P_z is in the sinkhole of indifference (efficient but going nowhere).
-
-6. **Type ⊥ Stage** — `Holon Type` and `Digestion Stage` are independent properties.
-   Never collapse them. Type is stable; Stage is dynamic.
-
-7. **The Significator is the bridge** — It lives in BOTH cycles (lesser accumulation +
-   greater transformation). Most inter-DB relations pass through it.
-
-8. **The Great Way holds external holons** — People, communities, groups are external
-   holons in the operating environment. They belong in GreatWay, not Significator.
+The formula reads the entry's other properties and emits structured YAML
+based on entry-type. Five formulas total (one per DB).
 
 ---
 
-## 12. Ontology → Implementation Map
+## 7. LifeOS Design Principles
 
-| Ontology concept | LifeOS implementation | Tool |
-|------------------|----------------------|------|
-| 8 functional roles | `Archetype Role` select property | `archetype-index` |
-| 4 complexes | `Complex` select property | `archetype-index` |
-| 4 drives | `Drive Activation` multi_select | `drive_assessment` |
-| 5 shadows | `Shadow Pattern` select | — |
-| 9 digestion stages | `Digestion Stage` select | `holonic_synthesis` |
-| 5 holon types | `Holon Type` select | `derive_type` |
-| Valence signature | `Valence Signature` rich_text (YAML) | `valence_signature` |
-| G_z / P_z metrics | Computed from entry data | `health_metrics` |
-| Fractal coupling | 13 dual_property inter-DB relations | `relational_graph` |
-| Contact-boundary | Nexus DB (Kind discriminates currency) | `holonic_synthesis` |
-| Relational gaps | Orphaned entries | `relational_gaps` |
-| Context assembly | Relational neighborhood | `build_context` |
+1. **5 DBs, not 22, not 8** — The merger of Vision+Compass+Action into
+   Trajectory eliminated 6 cross-DB relations that are now intra-DB
+   self-relations. The 5-DB structure is the minimum that separates the
+   3 functional layers.
+
+2. **The pull IS the hierarchy** — In v4.1, the teleological pull is not
+   a flow between DBs; it's the parent/child tree within Trajectory. Open
+   one DB → expand the hierarchy → see the pull from Purpose to today's Task.
+
+3. **Every relation is a deliberate choice** — Tools surface gaps
+   (`relational_gaps`) and suggest connections (`suggest_links`,
+   `suggest_categorization`), but the user (or AI agent acting
+   explicitly) must approve each link. NO auto-population. auto_enrich
+   is suggestion-only since v0.10.2.
+
+4. **Synthesis is polar** — Note/Opportunity/Strength/Directive/Risk
+   encode the ± polarity of insight. Polarity is a first-class concept,
+   not a tag.
+
+5. **Profile is the RPG status mirror** — Current Value vs Target Value
+   for every Trait/Metric/Capacity/Asset. The gap between them IS the
+   feedback signal to Trajectory.
+
+6. **The cycle is the unit of health** — `cycle_health` checks whether
+   each of the 3 flows (Pull / Ground / Feedback) has active links. A
+   healthy cycle = active links in all 3 flows. Dormant flow = stuck cycle.
+
+7. **YAGNI aggressively** — Don't add a property "for future use." Don't
+   keep two tools that do the same thing. The v4.1 YAGNI cleanup removed
+   4 redundant utility tools (capture / trace_trajectory / gap_analysis /
+   surface_synthesis) because AI agents compose them from primitives
+   (query / mutate / ancestors).
+
+8. **MCP/CLI tools are for AI agents, not the user** — The user operates
+   via Notion UI directly. Tools exist to give AI agents operational
+   access to the 5 DBs. A dedicated tool is justified ONLY when:
+   (a) it eliminates multiple round-trips, (b) it encodes architectural
+   semantics the agent would miss, (c) it writes state in a specific
+   way the agent shouldn't second-guess.
+
+---
+
+## 8. Tool → Architecture Map
+
+| Architectural concept | LifeOS tool | Notes |
+|----------------------|-------------|-------|
+| Teleological pull (hierarchy walk) | `ancestors` | Walks up Parent self-relation. Returns layer labels (Reference/Strategic/Execution) for Trajectory entries. |
+| Active goals + today's tasks + recent logs | `morning` | AI-agent "orient" call. One round-trip replaces 4+ queries. |
+| Cycle health (3 flows active?) | `cycle_health` | Encodes the 3-flow architectural semantics. |
+| Ground-truth flow | `query` + `mutate` + `link` | Agent composes: capture log → link to project → synthesize → condense. |
+| Feedback flow | `query` Profile + `link` to Trajectory | Agent composes: identify gap → link to Goal/Vision. |
+| Relational neighborhood | `build_context` | One call: outgoing + incoming + depth-2 + gap analysis. |
+| Orphan detection | `orphans`, `relational_gaps` | Read-only audits. |
+| Schema discovery | `get_schema` | First call any agent makes. |
+| Validation | `validate_yaml` | Checks entries against YAML schema hierarchy. |
 
 ---
 
 ## References
 
-- **HoloOS `_THEORY/02_Ontology/00.md`** — The master map + G_z/P_z articulation
-- **HoloOS `_THEORY/02_Ontology/02.1`** — Microcosmic metabolic architecture (lesser cycle)
-- **HoloOS `_THEORY/02_Ontology/02.2`** — Macrocosmic metabolic architecture (greater cycle)
-- **HoloOS `_THEORY/02_Ontology/03.1`** — Universal archetype anatomy (9-stage process)
-- **HoloOS `_THEORY/02_Ontology/03.2`** — 22 named archetypes index
-- **HoloOS `_THEORY/02_Ontology/08.5`** — Extra-holonic deepening (fractal coupling)
-- **HoloOS `_THEORY/01_Epistemology/4_Type_Validation_Protocol.md`** — Type ⊥ Stage independence
+- **architecture/legacy_mapping/FORMAL_SPEC_v4.1.md** — The complete
+  machine-readable DB schema spec (5 DBs, all properties, all relations,
+  3 flows, cycle, migration mapping).
+- **architecture/legacy_mapping/PONYTAIL_AUDIT_v4.1.md** — The 34%
+  dead-weight audit that preceded v4.1.
+- **HoloOS `_THEORY/02_Ontology/`** — The pre-v4.1 ontological theory
+  (Matrix/Potentiator/Nexus/Significator/GreatWay). Superseded by v4.1
+  but referenced for historical context.
+
+---
+
+*v4.1 — the consciousness-prosthetic. The cycle is the unit of health.*

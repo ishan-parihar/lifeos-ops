@@ -1,4 +1,6 @@
-//! LifeOS tool implementations — v0.10.0 consolidated holonic architecture
+//! LifeOS tool implementations — v4.1 consciousness-prosthetic architecture
+//!
+//! 31 tools across 7 categories. See AGENTS.md §7 for the full tool catalog.
 
 use std::sync::Arc;
 use serde_json::Value;
@@ -40,7 +42,7 @@ fn enrich_database_param(schema: &mut Value, param_name: &str, schema_cache: &Sc
 }
 
 /// Get tool definitions in MCP format (JSON Schema per tool)
-/// v0.10.0: Consolidated from 34 → 28 tools (merged duplicates)
+/// v4.1: 31 tools. 4 YAGNI-removed in v4.1 cleanup (capture, trace_trajectory, gap_analysis, surface_synthesis).
 pub async fn get_tool_definitions(config: &LifeOSConfig, _notion: &NotionClient, schema_cache: &SchemaCache) -> Vec<Value> {
     let mut query_schema = query::schema(config, schema_cache);
     enrich_database_param(&mut query_schema, "database", schema_cache);
@@ -350,6 +352,6 @@ pub fn execute_get_schema(database: Option<&str>, schema_cache: &SchemaCache, co
     if output.is_empty() {
         "No database schemas available.".to_string()
     } else {
-        format!("LifeOS v5 — The 5-DB Holonic Architecture:\n\nEach database stores a specific currency in the energy-flow spiral. Entries are discriminated by Entry Type / Item Type / Category properties within each DB.\n\n{}", output)
+        format!("LifeOS v4.1 — The 5-DB Consciousness-Prosthetic Architecture:\n\nTrajectory → Logbook → Synthesis → Profile → Trajectory (causal amplification cycle).\nEach DB has entry-types discriminated by a select property. The teleological pull IS the parent/child tree within Trajectory.\n\n{}", output)
     }
 }
