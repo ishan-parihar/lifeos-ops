@@ -285,29 +285,6 @@ async fn main() {
                         Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
                     }
                 }
-                Commands::EnergyFlow { scope, currency, limit } => {
-                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
-                    let params = lifeos_core::tools::energy_flow::EnergyFlowParams { show_metabolism: None,
-                        scope, currency, entry_id: None, limit,
-                    };
-                    match lifeos_core::tools::energy_flow::execute(&params, &cfg, &notion, &sc).await {
-                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
-                    }
-                }
-                Commands::DriveAssessment { boundary, range } => {
-                    let (cfg, notion, _sc) = resolve_with_schema(None, &notion_token).await;
-                    let params = lifeos_core::tools::drive_assessment::DriveAssessmentParams { boundary, range };
-                    match lifeos_core::tools::drive_assessment::execute(&params, &cfg, &notion).await {
-                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
-                    }
-                }
-                Commands::HealthMetrics { metric, range } => {
-                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
-                    let params = lifeos_core::tools::health_metrics::HealthMetricsParams { metric, range };
-                    match lifeos_core::tools::health_metrics::execute(&params, &cfg, &notion, &sc).await {
-                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
-                    }
-                }
                 Commands::MCP => unreachable!(),
                 Commands::Discover { config: config_path_arg } => {
                     let cfg = resolve_config(config_path_arg.as_deref());
@@ -343,24 +320,6 @@ async fn main() {
                         Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
                     }
                 }
-                Commands::ArchetypeIndex => {
-                    let result = lifeos_core::tools::ontology::execute_archetype_index();
-                    println!("{result}");
-                }
-                Commands::DeriveType { page_id } => {
-                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
-                    let params = lifeos_core::tools::ontology::DeriveTypeParams { page_id };
-                    match lifeos_core::tools::ontology::execute_derive_type(&params, &cfg, &notion, &sc).await {
-                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
-                    }
-                }
-                Commands::ValenceSignature { page_id, format } => {
-                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
-                    let params = lifeos_core::tools::ontology::ValenceSignatureParams { page_id, format };
-                    match lifeos_core::tools::ontology::execute_valence_signature(&params, &cfg, &notion, &sc).await {
-                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
-                    }
-                }
                 Commands::ValidateYaml { self_test: _, all, database, page_id, limit } => {
                     let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
                     let params = lifeos_core::tools::validate_yaml::ValidateYamlParams {
@@ -385,15 +344,6 @@ async fn main() {
                         page_id, depth: Some(depth),
                     };
                     match lifeos_core::tools::build_context::execute(&params, &cfg, &notion, &sc).await {
-                        Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
-                    }
-                }
-                Commands::HolonicSynthesis { page_id, days_back } => {
-                    let (cfg, notion, sc) = resolve_with_schema(None, &notion_token).await;
-                    let params = lifeos_core::tools::holonic_synthesis::HolonicSynthesisParams {
-                        page_id, days_back: Some(days_back),
-                    };
-                    match lifeos_core::tools::holonic_synthesis::execute(&params, &cfg, &notion, &sc).await {
                         Ok(t) => println!("{t}"), Err(e) => { tracing::error!("{e}"); std::process::exit(1); }
                     }
                 }

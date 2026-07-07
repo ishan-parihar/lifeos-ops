@@ -50,35 +50,14 @@ pub async fn execute_daily(
         Err(e) => output.push_str(&format!("  Error: {}\n", e)),
     }
 
-    // 2. Holonic synthesis summary
-    output.push_str("\n── HOLONIC SYNTHESIS ──\n");
-    let synth_params = crate::tools::holonic_synthesis::HolonicSynthesisParams {
-        page_id: None,
-        days_back: Some(1),
-    };
-    match crate::tools::holonic_synthesis::execute(&synth_params, config, notion, schema_cache).await {
-        Ok(result) => {
-            if let Ok(data) = crate::toon_format::decode(&result) {
-                if let Some(synth) = data.get("holonic_synthesis") {
-                    if let Some(recs) = synth.get("recommendations").and_then(|r| r.as_array()) {
-                        if recs.is_empty() {
-                            output.push_str("  No critical bottlenecks detected.\n");
-                        } else {
-                            for (i, rec) in recs.iter().enumerate().take(3) {
-                                output.push_str(&format!("  {}. {}\n", i + 1,
-                                    rec.as_str().unwrap_or("unknown")));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        Err(e) => output.push_str(&format!("  Error: {}\n", e)),
-    }
+    // 2. Synthesis summary (v4.1: simplified — old holonic_synthesis removed)
+    output.push_str("\n── RECENT SYNTHESIS ──\n");
+    output.push_str("  See Synthesis DB for recent insights.
+");
 
     // 3. Recent entries (last 5 across all DBs)
     output.push_str("\n── RECENT ENTRIES (last 5 per DB) ──\n");
-    for db_key in ["matrix", "potentiator", "nexus", "significator", "greatway"] {
+    for db_key in ["trajectory", "logbook", "synthesis", "profile", "context"] {
         let db = match crate::config::resolve_db(config, db_key) {
             Some(db) => db,
             None => continue,
@@ -137,7 +116,7 @@ pub async fn execute_dashboard(
     let mut total_entries = 0usize;
     let mut total_orphans = 0usize;
 
-    for db_key in ["matrix", "potentiator", "nexus", "significator", "greatway"] {
+    for db_key in ["trajectory", "logbook", "synthesis", "profile", "context"] {
         let db = match crate::config::resolve_db(config, db_key) {
             Some(db) => db,
             None => continue,

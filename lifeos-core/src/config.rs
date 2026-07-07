@@ -33,9 +33,12 @@ pub(crate) fn embedded_config() -> LifeOSConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HolonicConfig {
     pub version: String,
+    #[serde(default)]
     pub currencies: Vec<String>,
+    #[serde(default)]
     pub drives: Vec<String>,
-    pub cycles: CycleConfig,
+    #[serde(default)]
+    pub cycles: Option<CycleConfig>,
     /// Status progressions per reservoir: reservoir_key → ordered status stages.
     /// Used by health_metrics + drive_assessment. Optional — if omitted, falls back
     /// to hardcoded defaults per archetype.
@@ -351,13 +354,15 @@ impl LifeOSConfig {
     /// Falls back to iterating databases if holonic config is missing.
     pub fn cycle_reservoirs(&self, cycle: &str) -> Vec<String> {
         if let Some(ref holonic) = self.holonic {
-            let cycle_def = match cycle {
-                "lesser" => Some(&holonic.cycles.lesser),
-                "greater" => Some(&holonic.cycles.greater),
-                _ => None,
-            };
-            if let Some(cdef) = cycle_def {
-                return cdef.reservoirs.clone();
+            if let Some(ref cycles) = holonic.cycles {
+                let cycle_def = match cycle {
+                    "lesser" => Some(&cycles.lesser),
+                    "greater" => Some(&cycles.greater),
+                    _ => None,
+                };
+                if let Some(cdef) = cycle_def {
+                    return cdef.reservoirs.clone();
+                }
             }
         }
         // Fallback: iterate config.databases, filter by cycle attribute

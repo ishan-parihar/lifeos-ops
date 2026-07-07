@@ -5,220 +5,96 @@
     "cacheTtlSeconds": 300
   },
   "holonic": {
-    "version": "5.1",
-    "currencies": [
-      "Catalyst",
-      "Experience",
-      "Transformation",
-      "Choice"
-    ],
-    "drives": [
-      "Agency",
-      "Communion",
-      "Eros",
-      "Agape"
-    ],
-    "cycles": {
-      "lesser": {
-        "reservoirs": [
-          "matrix",
-          "potentiator"
-        ],
-        "metric": "G_z"
+    "version": "4.1",
+    "architecture": "consciousness-prosthetic",
+    "layers": {
+      "teleological_pull": {
+        "dbs": ["trajectory"],
+        "description": "Articulate + simulate the drive toward the ideal-future"
       },
-      "greater": {
-        "reservoirs": [
-          "significator",
-          "greatway"
-        ],
-        "metric": "P_z"
+      "historical_record": {
+        "dbs": ["logbook", "synthesis", "profile"],
+        "description": "Keep tabs on history + current-trajectory/trends"
+      },
+      "action_interface": {
+        "dbs": ["trajectory", "context"],
+        "description": "Tell the user what to do + how"
       }
     },
+    "flows": {
+      "pull": "Trajectory → (parent/child hierarchy) → daily actions",
+      "ground_truth": "Action → Logbook → Synthesis → Profile",
+      "feedback": "Profile → Trajectory (gap informs pull)"
+    },
+    "cycle": "Trajectory → Logbook → Synthesis → Profile → Trajectory",
     "status_progressions": {
-      "matrix": [
-        "Active",
-        "Evolving",
-        "Archived"
-      ],
-      "potentiator": [
-        "Raw",
-        "Digesting",
-        "Crystallized"
-      ],
-      "significator": [
-        "Draft",
-        "Active",
-        "Evolving",
-        "Archived"
-      ],
-      "greatway": [
-        "Future",
-        "Ideation",
-        "Paused",
-        "Active",
-        "Done",
-        "Cancelled"
-      ],
-      "nexus": [
-        "💡 Identified",
-        "✅ Activated",
-        "🏆 Capitalized",
-        "🧊 Archived"
-      ]
-    },
-    "transmutation_map": {
-      "catalyst_to_experience": {
-        "source": "matrix",
-        "target": "potentiator"
-      },
-      "experience_to_catalyst": {
-        "source": "potentiator",
-        "target": "matrix"
-      },
-      "transformation_to_choice": {
-        "source": "significator",
-        "target": "greatway"
-      },
-      "choice_to_transformation": {
-        "source": "greatway",
-        "target": "significator"
-      }
-    },
-    "nexus_firing": {
-      "gz_threshold": 35.0,
-      "pz_threshold": 75.0,
-      "pressure_threshold": 110.0
-    },
-    "drive_effects": {
-      "agency": {
-        "lesser": "A_z_lesser",
-        "greater": "A_z_greater"
-      },
-      "communion": {
-        "lesser": "C_z_lesser",
-        "greater": "C_z_greater"
-      },
-      "eros": {
-        "lesser": "P_z_lesser",
-        "greater": "P_z_greater"
-      },
-      "agape": {
-        "lesser": "G_z_lesser",
-        "greater": "G_z_greater"
-      }
+      "trajectory": ["Future", "Ideation", "Paused", "Active", "Done", "Cancelled"],
+      "logbook": [],
+      "synthesis": ["💡 Identified", "✅ Activated", "🏆 Capitalized", "🧊 Archived"],
+      "profile": ["Draft", "Active", "Evolving", "Archived"],
+      "context": ["Active", "Inactive", "Archived"]
     },
     "yaml_schemas_path": "schemas"
   },
   "databases": {
-    "matrix": {
-      "name": "State",
+    "trajectory": {
+      "name": "Trajectory",
       "data_source_id": "00000000-0000-0000-0000-000000000001",
-      "archetype": "matrix",
-      "scale": "current-stage",
-      "dimension": "intra-holonic",
-      "currency_in": "Catalyst",
-      "currency_out": "Experience",
-      "cycle": "lesser",
-      "entry_type_property": "Entry Type",
-      "description": "Current-state organizer. What you currently are / have / do. Ingests Catalyst (perturbation) from the environment, digests it, produces Experience (state-update). Holds entry-types: Pattern (recurring behavior), Threshold (boundary), Foundation (load-bearing structure). Status: Active → Evolving → Archived. Lesser cycle currency flow: Catalyst in → Experience out."
-    },
-    "potentiator": {
-      "name": "Possibility",
-      "data_source_id": "00000000-0000-0000-0000-000000000002",
-      "archetype": "potentiator",
-      "scale": "current-stage",
-      "dimension": "extra-holonic",
-      "currency_in": "Experience",
-      "currency_out": "Catalyst",
-      "cycle": "lesser",
-      "entry_type_property": "Entry Type",
-      "description": "Latent-state generator. What you could become / are reaching for. Ingests Experience, digests it, produces refined Catalyst (the next question). Daily-logs live here: Activity, Subjective, Relational, Systemic, Diet, Financial, Observation. Future-pull entry-types: Goal, Vision, Aspiration. Status: Raw → Digesting → Crystallized. Lesser cycle currency flow: Experience in → Catalyst out."
-    },
-    "significator": {
-      "name": "Identity",
-      "data_source_id": "00000000-0000-0000-0000-000000000003",
-      "archetype": "significator",
-      "scale": "all-stage",
-      "dimension": "intra-holonic",
-      "currency_in": "Transformation",
-      "currency_out": "Choice",
-      "cycle": "greater",
-      "entry_type_property": "Entry Type",
-      "description": "Persistent identity-pattern. Who you ARE — values, principles, purpose. Lives in BOTH cycles (lesser accumulation + greater transformation). Ingests Transformation (frame-change pressure), emits Choice (directional commitment). Entry-types: Purpose, Value, Principle, Identity-Statement, Pillar, Strategic-Ideal. The `Holon Type` property (Donor/Acceptor/Sharer/Multivalent/Noble) is derived from the Valence Signature YAML. Status: Draft → Active → Evolving → Archived. Greater cycle currency flow: Transformation in → Choice out."
-    },
-    "greatway": {
-      "name": "World",
-      "data_source_id": "00000000-0000-0000-0000-000000000004",
-      "archetype": "greatway",
-      "scale": "all-stage",
-      "dimension": "extra-holonic",
-      "currency_in": "Choice",
-      "currency_out": "Transformation",
-      "cycle": "greater",
+      "archetype": "trajectory",
+      "layer": "teleological_pull",
       "entry_type_property": "Item Type",
-      "description": "Operating environment — your world. People, projects, places, goals. Ingests Choice (committed directionality), produces Transformation (next frame-change pressure). Operational entry-types: Annual Goal, Quarterly Goal, Goal, Project, Task, System, Resource, Sprint, Milestone, Budget, Campaign, Content. External-holon entry-types (other people/orgs in your world): Person, Group, Community, Organization, Network, Movement, Place. Status: Future → Ideation → Paused → Active → Done → Cancelled. Greater cycle currency flow: Choice in → Transformation out."
+      "description": "The teleological hierarchy. The pull IS the parent/child tree. 3 layers: Reference (Purpose/Value/Principle/Vision-Statement/Identity-Statement), Strategic (Annual-Goal/Quarterly-Goal/Milestone), Execution (Project/Task/Campaign/Content/System/Resource/Sprint/Budget)."
     },
-    "nexus": {
-      "name": "Process",
-      "data_source_id": "00000000-0000-0000-0000-000000000005",
-      "archetype": "nexus",
-      "scale": "inter-holonic",
-      "dimension": "both",
-      "currency_in": "all",
-      "currency_out": "all",
-      "cycle": "both",
+    "logbook": {
+      "name": "Logbook",
+      "data_source_id": "00000000-0000-0000-0000-000000000002",
+      "archetype": "logbook",
+      "layer": "historical_record",
+      "entry_type_property": "Entry Type",
+      "description": "Objective ground-reality capture. 6 channels: Activity (Body), Diet (Body), Financial (Resource), Subjective (Mind), Relational (Relational), Systemic (Mind)."
+    },
+    "synthesis": {
+      "name": "Synthesis",
+      "data_source_id": "00000000-0000-0000-0000-000000000003",
+      "archetype": "synthesis",
+      "layer": "historical_record",
       "entry_type_property": "Category",
-      "currency_property": "Kind",
-      "description": "Contact-boundary where all 4 currencies (Catalyst/Experience/Transformation/Choice) transmute. The shared membrane between the lesser and greater cycles. The `Kind` select tags which currency an entry currently carries. Entry-types: Opportunity, Insight, Reflection, Integration, Pattern, Risk, Directive, Decision, Crisis, Transformation-Event, Note (Catalyst-kind), Knowledge-Atom (Experience-kind), Knowledge-Category (Experience-kind). Status: 💡 Identified → ✅ Activated → 🏆 Capitalized → 🧊 Archived."
+      "description": "Where logs become insights. Polar structure: Note (neutral), Opportunity/Strength (+), Directive/Risk (−)."
+    },
+    "profile": {
+      "name": "Profile",
+      "data_source_id": "00000000-0000-0000-0000-000000000004",
+      "archetype": "profile",
+      "layer": "historical_record",
+      "entry_type_property": "Entry Type",
+      "description": "The cumulative state mirror. RPG status report across all dimensions. Trait/Metric/Capacity/Asset. Bridge between history and the pull — shows the GAP."
+    },
+    "context": {
+      "name": "Context",
+      "data_source_id": "00000000-0000-0000-0000-000000000005",
+      "archetype": "context",
+      "layer": "action_interface",
+      "entry_type_property": "Type",
+      "description": "The environment. Person (14 CRM props), Community, Organization, Financial-Account, Place."
     }
   },
   "briefings": {
     "roles": {
       "CEO": [
-        {
-          "db": "significator",
-          "intent": "vision alignment",
-          "limit": 5,
-          "date_filter": false
-        },
-        {
-          "db": "greatway",
-          "intent": "active annual goals",
-          "limit": 5,
-          "date_filter": false
-        }
+        { "db": "trajectory", "intent": "vision alignment", "limit": 5, "date_filter": false },
+        { "db": "trajectory", "intent": "active annual goals", "limit": 5, "date_filter": false }
       ],
       "COO": [
-        {
-          "db": "greatway",
-          "intent": "active projects",
-          "limit": 10,
-          "date_filter": false
-        },
-        {
-          "db": "matrix",
-          "intent": "active practices",
-          "limit": 10,
-          "date_filter": false
-        }
+        { "db": "trajectory", "intent": "active projects", "limit": 10, "date_filter": false },
+        { "db": "profile", "intent": "current traits", "limit": 10, "date_filter": false }
       ]
     },
     "modules": {
       "productivity": [
-        {
-          "db": "greatway",
-          "intent": "active tasks",
-          "limit": 20,
-          "date_filter": true
-        }
+        { "db": "trajectory", "intent": "active tasks", "limit": 20, "date_filter": true }
       ],
       "strategic": [
-        {
-          "db": "significator",
-          "intent": "active visions",
-          "limit": 5,
-          "date_filter": false
-        }
+        { "db": "trajectory", "intent": "active visions", "limit": 5, "date_filter": false }
       ]
     }
   }

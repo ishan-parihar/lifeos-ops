@@ -275,38 +275,8 @@ pub enum Commands {
         campaign_database: Option<String>,
     },
 
-    /// Trace currency flow across the holonic spiral
-    EnergyFlow {
-        /// Scope: lesser_cycle, greater_cycle, full_spiral, or specific reservoir
-        #[arg(short, long)]
-        scope: String,
-        /// Currency to trace: Catalyst, Experience, Transformation, Choice, all
-        #[arg(short, long)]
-        currency: Option<String>,
-        /// Limit per database (default: 10)
-        #[arg(short, long)]
-        limit: Option<u32>,
-    },
 
-    /// Assess 4 drives at lesser/greater boundary
-    DriveAssessment {
-        /// Boundary: lesser, greater, both
-        #[arg(short, long, default_value = "both")]
-        boundary: String,
-        /// Date range
-        #[arg(short, long)]
-        range: Option<String>,
-    },
 
-    /// Holonic health metrics (G_z + P_z)
-    HealthMetrics {
-        /// Metric: lesser, greater, both
-        #[arg(short, long, default_value = "both")]
-        metric: String,
-        /// Date range
-        #[arg(short, long)]
-        range: Option<String>,
-    },
 
     /// Run as MCP server (stdio JSON-RPC)
     MCP,
@@ -358,24 +328,8 @@ pub enum Commands {
     },
 
     /// List all 22 HoloOS archetypes with role, complex, reservoir, and polarity mappings
-    ArchetypeIndex,
 
-    /// Derive the Holon Type (Donor/Acceptor/Sharer/Multivalent/Noble) from a Significator's Valence Signature
-    DeriveType {
-        /// Significator page ID to derive the type for
-        #[arg(short, long)]
-        page_id: String,
-    },
 
-    /// Generate a Valence Signature YAML template for a Significator entry
-    ValenceSignature {
-        /// Significator page ID
-        #[arg(short, long)]
-        page_id: String,
-        /// Output format: template (default) or full
-        #[arg(short, long)]
-        format: Option<String>,
-    },
 
     /// Validate Notion entries against the v0.9.0 YAML schema hierarchy
     ValidateYaml {
@@ -423,15 +377,6 @@ pub enum Commands {
         depth: u32,
     },
 
-    /// Trace currency flow across the holonic spiral
-    HolonicSynthesis {
-        /// Optional: trace from a specific entry
-        #[arg(short = 'P', long)]
-        page_id: Option<String>,
-        /// Days to look back (default: 7)
-        #[arg(short, long, default_value = "7")]
-        days_back: u32,
-    },
 
     /// Suggest entry-types for uncategorized entries (read-only, never writes)
     SuggestCategorization {

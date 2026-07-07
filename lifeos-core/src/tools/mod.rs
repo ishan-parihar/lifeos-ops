@@ -14,17 +14,12 @@ pub mod data_science;
 pub mod review;
 pub mod strategic;
 pub mod sync_note;
-pub mod energy_flow;
-pub mod drive_assessment;
-pub mod health_metrics;
 pub mod shared;
 pub mod relations;
 pub mod audit;
-pub mod ontology;
 pub mod validate_yaml;
 pub mod relational_gaps;
 pub mod build_context;
-pub mod holonic_synthesis;
 pub mod suggest_categorization;
 pub mod relational_graph;
 pub mod relation_ops;
@@ -32,6 +27,12 @@ pub mod workflows;
 pub mod auto_enrich;
 pub mod fill_rate;
 pub mod quick_link;
+pub mod morning;
+pub mod capture;
+pub mod cycle_health;
+pub mod trace_trajectory;
+pub mod gap_analysis;
+pub mod surface_synthesis;
 
 fn enrich_database_param(schema: &mut Value, param_name: &str, schema_cache: &SchemaCache) {
     let db_keys: Vec<Value> = schema_cache.db_keys().iter().map(|k| Value::String(k.clone())).collect();
@@ -73,8 +74,6 @@ pub async fn get_tool_definitions(config: &LifeOSConfig, _notion: &NotionClient,
         tool_def("strategic_simulator", "Cross-DB strategic analysis: OKRs, projects, campaigns.".to_string(), strategic_schema),
         tool_def("sync_note", "Bidirectional Notion ↔ markdown sync.".to_string(), sync_note::schema()),
 
-        // ── Holonic Health (consolidated: drive_assessment + health_metrics + energy_flow) ──
-        tool_def("holonic_synthesis", "Trace currency flow (Catalyst→Experience→Transformation→Choice) across the holonic spiral. Identifies bottlenecks. Also computes G_z/P_z health metrics and drive assessments. Read-only.".to_string(), holonic_synthesis::schema()),
 
         // ── Relational Navigation ──
         tool_def("get_page", "Fetch entry with all relations resolved to titles.".to_string(), relations::schema_get_page()),
@@ -91,15 +90,10 @@ pub async fn get_tool_definitions(config: &LifeOSConfig, _notion: &NotionClient,
 
         // ── Audit & Validation ──
         tool_def("orphans", "List entries with zero populated relations.".to_string(), audit::schema_orphans()),
-        tool_def("relational_gaps", "Surface entries with zero or sparse relations + ontology-expected relations that are missing. Read-only.".to_string(), relational_gaps::schema()),
+        tool_def("relational_gaps", "Surface entries with zero or sparse relations + expected relations that are missing. Read-only.".to_string(), relational_gaps::schema()),
         tool_def("validate_yaml", "Validate entries against the v0.9.0 YAML schema hierarchy. Also checks old Validation formula status.".to_string(), validate_yaml::schema()),
         tool_def("suggest_links", "Suggest likely cross-reservoir links for orphan entries via title similarity.".to_string(), audit::schema_suggest_links()),
         tool_def("suggest_categorization", "Suggest entry-types for uncategorized entries based on title heuristics. Never writes.".to_string(), suggest_categorization::schema()),
-
-        // ── Ontology ──
-        tool_def("archetype_index", "List all 22 HoloOS archetypes with role, complex, reservoir, and polarity mappings.".to_string(), serde_json::json!({"type": "object", "properties": {}})),
-        tool_def("derive_type", "Derive the Holon Type (Donor/Acceptor/Sharer/Multivalent/Noble) from a Significator entry's Valence Signature.".to_string(), ontology::schema_derive_type()),
-        tool_def("valence_signature", "Generate a Valence Signature YAML template for a Significator entry.".to_string(), ontology::schema_valence_signature()),
 
         // ── Workflow Commands (v0.10.0) ──
         tool_def("daily", "Run daily review: relational gaps + holonic synthesis + recent entries in one call.".to_string(), workflows::schema_daily()),
@@ -113,6 +107,14 @@ pub async fn get_tool_definitions(config: &LifeOSConfig, _notion: &NotionClient,
 
         // ── Quick Link by title (v0.10.3 — parity + U-1 semantic hints) ──
         tool_def("quick_link", "Link two entries by title (auto-resolves page IDs via fuzzy match). Response includes a per-relation semantic hint explaining what the relation means ontologically. Use this when you know the titles but not the page IDs.".to_string(), quick_link::schema()),
+
+        // ── v4.1 Utility Layer ──
+        tool_def("morning", "Aggregated morning view across all 5 DBs: active goals, today tasks, recent logs, recent synthesis, profile gaps. Primary user UX entry point.".to_string(), morning::schema()),
+        tool_def("capture", "Quick logging with auto-detection. Pass text; tool detects entry type and creates Logbook entry.".to_string(), capture::schema()),
+        tool_def("cycle_health", "Check if the v4.1 causal amplification cycle is running. Reports pull/ground/feedback flow health + recommendations.".to_string(), cycle_health::schema()),
+        tool_def("trace_trajectory", "Walk Trajectory parent/child hierarchy from any entry up to Vision-Statement. Returns full chain with layer labels.".to_string(), trace_trajectory::schema()),
+        tool_def("gap_analysis", "Compare Profile vs Vision to show gaps between current state and ideal-future.".to_string(), gap_analysis::schema()),
+        tool_def("surface_synthesis", "Scan recent Logbook entries for patterns. Suggests Synthesis entries to create. Activates ground-truth flow.".to_string(), surface_synthesis::schema()),
     ]
 }
 
@@ -191,31 +193,6 @@ pub async fn call_tool(
             let params: sync_note::SyncNoteParams = serde_json::from_value(args.clone())
                 .map_err(|e| format!("Invalid sync_note params: {}", e))?;
             sync_note::execute(&params, config, notion).await
-        }
-
-        // ── Holonic Health (consolidated) ──
-        "holonic_synthesis" => {
-            let params: holonic_synthesis::HolonicSynthesisParams = serde_json::from_value(args.clone())
-                .map_err(|e| format!("Invalid holonic_synthesis params: {}", e))?;
-            holonic_synthesis::execute(&params, config, notion, schema_cache).await
-        }
-        "energy_flow" => {
-            // Backward-compatible alias — delegates to holonic_synthesis
-            let params: energy_flow::EnergyFlowParams = serde_json::from_value(args.clone())
-                .map_err(|e| format!("Invalid energy_flow params: {}", e))?;
-            energy_flow::execute(&params, config, notion, schema_cache).await
-        }
-        "drive_assessment" => {
-            // Backward-compatible alias
-            let params: drive_assessment::DriveAssessmentParams = serde_json::from_value(args.clone())
-                .map_err(|e| format!("Invalid drive_assessment params: {}", e))?;
-            drive_assessment::execute(&params, config, notion).await
-        }
-        "health_metrics" => {
-            // Backward-compatible alias
-            let params: health_metrics::HealthMetricsParams = serde_json::from_value(args.clone())
-                .map_err(|e| format!("Invalid health_metrics params: {}", e))?;
-            health_metrics::execute(&params, config, notion, schema_cache).await
         }
 
         // ── Relational Navigation ──
@@ -308,21 +285,6 @@ pub async fn call_tool(
             suggest_categorization::execute(&params, config, notion, schema_cache).await
         }
 
-        // ── Ontology ──
-        "archetype_index" => {
-            Ok(ontology::execute_archetype_index())
-        }
-        "derive_type" => {
-            let params: ontology::DeriveTypeParams = serde_json::from_value(args.clone())
-                .map_err(|e| format!("Invalid derive_type params: {}", e))?;
-            ontology::execute_derive_type(&params, config, notion, schema_cache).await
-        }
-        "valence_signature" => {
-            let params: ontology::ValenceSignatureParams = serde_json::from_value(args.clone())
-                .map_err(|e| format!("Invalid valence_signature params: {}", e))?;
-            ontology::execute_valence_signature(&params, config, notion, schema_cache).await
-        }
-
         // ── Workflow Commands (v0.10.0) ──
         "daily" => {
             workflows::execute_daily(config, notion, schema_cache).await
@@ -350,6 +312,26 @@ pub async fn call_tool(
             let params: quick_link::QuickLinkParams = serde_json::from_value(args.clone())
                 .map_err(|e| format!("Invalid quick_link params: {}", e))?;
             quick_link::execute(&params, config, notion, schema_cache).await
+        }
+
+        // ── v4.1 Utility Layer ──
+        "morning" => {
+            morning::execute(config, notion, schema_cache).await
+        }
+        "capture" => {
+            capture::execute(config, notion, schema_cache).await
+        }
+        "cycle_health" => {
+            cycle_health::execute(config, notion, schema_cache).await
+        }
+        "trace_trajectory" => {
+            trace_trajectory::execute(config, notion, schema_cache).await
+        }
+        "gap_analysis" => {
+            gap_analysis::execute(config, notion, schema_cache).await
+        }
+        "surface_synthesis" => {
+            surface_synthesis::execute(config, notion, schema_cache).await
         }
 
         _ => Err(format!("Unknown tool: {}", name)),

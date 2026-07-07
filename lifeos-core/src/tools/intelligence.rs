@@ -508,7 +508,7 @@ pub async fn execute(
                                     "currencies_active": config.holonic.as_ref()
                                         .map(|h| serde_json::json!(h.currencies))
                                         .unwrap_or(serde_json::json!(["Catalyst", "Experience", "Transformation", "Choice"])),
-                                    "interpretation": nexus_interpretation(items.len(), &category_dist)
+                                    "interpretation": "v4.1 — synthesis analysis not available"
                                 }
                             });
                         }
@@ -521,37 +521,13 @@ pub async fn execute(
             Ok(crate::toon_format::encode(&data))
         }
         "drive_balance" => {
-            crate::tools::drive_assessment::execute(
-                &crate::tools::drive_assessment::DriveAssessmentParams {
-                    boundary: "both".to_string(),
-                    range: Some(range.to_string()),
-                },
-                config, notion,
-            ).await
+            // drive_balance mode removed in v4.1 — old holonic concept
+            Ok("drive_balance not available in v4.1".to_string())
         }
-        "reservoir_health" => {
-            crate::tools::health_metrics::execute(
-                &crate::tools::health_metrics::HealthMetricsParams {
-                    metric: "all".to_string(),
-                    range: Some(range.to_string()),
-                },
-                config, notion, schema_cache,
-            ).await
-        }
-        _ => Err(format!("Unknown mode: {}", params.mode)),
+        _ => Err(format!("Unknown briefing mode: {}", params.mode)),
     }
 }
 
-fn nexus_interpretation(count: usize, categories: &std::collections::HashMap<String, i64>) -> String {
-    if count == 0 {
-        "No nexus entries in range — contact-boundary is dormant".to_string()
-    } else if count > 20 {
-        format!("High nexus activity ({count} entries) — active transmutation across all currencies")
-    } else {
-        let dominant = categories.iter()
-            .max_by_key(|(_, v)| *v)
-            .map(|(k, v)| format!("{} ({})", k, v))
-            .unwrap_or_else(|| "unknown".to_string());
-        format!("Moderate nexus activity ({count} entries) — dominant category: {}", dominant)
-    }
+fn nexus_interpretation(_count: usize, _dist: &std::collections::HashMap<String, i64>) -> String {
+    "Synthesis analysis not available in v4.1".to_string()
 }
