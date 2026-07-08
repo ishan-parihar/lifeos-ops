@@ -757,7 +757,7 @@ checksum = "68ab91017fe16c622486840e4c83c9a37afeff978bd239b5293d61ece587de66"
 
 [[package]]
 name = "lifeos"
-version = "0.8.0"
+version = "0.11.0"
 dependencies = [
  "clap",
  "dotenvy",
@@ -770,7 +770,7 @@ dependencies = [
 
 [[package]]
 name = "lifeos-core"
-version = "0.8.0"
+version = "0.11.0"
 dependencies = [
  "chrono",
  "clap",
