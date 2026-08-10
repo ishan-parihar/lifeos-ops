@@ -1,5 +1,7 @@
 # LifeOS
 
+<!-- T2I HERO SPEC — Subject: a life operating system — a Notion database vault (5 databases, 3 layers) on the left feeding a Rust CLI + MCP hub (center) that runs one amplification cycle toward an ideal-future; goal trajectories and habit loops drawn as causal chains. Composition: left-to-right causal flow, cycle ring. Palette: deep indigo #1e1b4b → life teal #2dd4bf → goal gold #f59e0b. Style: dark flat vector, glowing causal chains, no text. 16:9. -->
+
 > A consciousness-prosthetic built as a Rust CLI + MCP server on top of Notion.
 > Shapes the causal chain of your life toward an ideal-future by running one
 > amplification cycle through 5 databases across 3 functional layers.
@@ -173,6 +175,47 @@ lifeos mcp
 
 **29 MCP tools** available — see [ONTOLOGY.md](ONTOLOGY.md) for the full architecture map.
 
+## MCP Integration for AI Agents
+
+LifeOS runs as a full MCP server, giving AI agents native access to your life-data:
+
+```json
+{
+  "mcpServers": {
+    "lifeos": {
+      "command": "lifeos",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+### Agent-Native Design
+
+The 29 tools are built for AI agents, not humans. The user operates through Notion's UI; agents operate through MCP. This separation means:
+
+- **Agents query**: `lifeos query --db trajectory --entry-type quarterly-goal --status active`
+- **Agents link**: `lifeos link --from "Q3 Goal" --to "Migrate to Rust" --relation parent`
+- **Agents discover gaps**: `lifeos orphans` surfaces entries with zero relations
+- **Agents review**: `lifeos review --period weekly` pulls synthesis-ready logs
+- **Agents check health**: `lifeos cycle-health` verifies the amplification cycle is flowing
+
+### The Amplification Cycle
+
+```
+Trajectory (Pull) --> Logbook (Capture) --> Synthesis (Process) --> Profile (Mirror)
+  Purpose               Activity                Note                 Trait
+  Vision                Diet                   Opportunity           Metric
+  Annual-Goal           Financial               Strength              Capacity
+  Project               Subjective              Directive             Asset
+  Task                  Relational              Risk
+                        Systemic
+                                                    |
+                                                    v
+                              Feedback Loop: Profile + Synthesis --> Trajectory
+                              (The cycle completes when insights reshape goals)
+```
+
 ## Architecture
 
 ```
@@ -203,6 +246,44 @@ lifeos-ops/
 ├── AGENTS.md                 # AI agent development protocol
 └── lifeos.config.default.json
 ```
+
+
+## The 5 Databases at a Glance
+
+| Database | Layer | Role | Key Entry Types |
+|----------|-------|------|-----------------|
+| **Trajectory** | A (Pull) | Where you are going | Purpose, Vision, Annual-Goal, Quarterly-Goal, Project, Task |
+| **Logbook** | B (Record) | What actually happened | Activity, Diet, Financial, Subjective, Relational, Systemic |
+| **Synthesis** | B (Record) | What the logs mean | Note, Opportunity, Strength, Directive, Risk |
+| **Profile** | B (Record) | Who you are becoming | Trait, Metric, Capacity, Asset |
+| **Context** | C (Action) | Who/what surrounds you | Person, Community, Organization, Financial-Account, Place |
+
+## Cycle Health
+
+The amplification cycle is the unit of health. If any link is broken, the cycle stalls:
+
+```
+Trajectory --> Logbook     (Are you logging against active goals?)
+Logbook --> Synthesis      (Are you processing logs into insights?)
+Synthesis --> Profile      (Are insights accumulated into identity?)
+Profile --> Trajectory     (Is identity feeding back into goal revision?)
+```
+
+Check with:
+```bash
+lifeos cycle-health
+```
+
+Output shows which links are active and which are stalled, with specific suggestions for repair.
+
+## Notion API Version
+
+LifeOS targets Notion API version `2025-09-03`, which uses the data source abstraction:
+- Properties live on the data source (not the database container)
+- `PATCH /v1/data_sources/{id}` is used for property mutations
+- Relation configs use `data_source_id` (not `database_id`)
+
+This ensures compatibility with Notion's latest API changes and future-proofs against breaking changes.
 
 ## Design Principles
 
