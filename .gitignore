@@ -53,3 +53,7 @@ logs/
 .memsearch/
 .contexty/
 .sisyphus/
+
+# tool-state (never commit)
+.cortexkit/
+.contexty/
