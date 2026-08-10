@@ -106,7 +106,7 @@ lifeos daily             # Daily review
 lifeos morning           # Active goals + today's tasks + recent logs
 ```
 
-## CLI Commands (29 tools)
+## CLI Commands (31 tools)
 
 ### Schema & Query
 | Command | Purpose |
@@ -173,7 +173,7 @@ LifeOS runs as an MCP server for AI agent integration (Claude Desktop, Cursor, e
 lifeos mcp
 ```
 
-**29 MCP tools** available — see [ONTOLOGY.md](ONTOLOGY.md) for the full architecture map.
+**31 MCP tools** available — see [ONTOLOGY.md](ONTOLOGY.md) for the full architecture map.
 
 ## MCP Integration for AI Agents
 
@@ -192,7 +192,7 @@ LifeOS runs as a full MCP server, giving AI agents native access to your life-da
 
 ### Agent-Native Design
 
-The 29 tools are built for AI agents, not humans. The user operates through Notion's UI; agents operate through MCP. This separation means:
+The 31 tools are built for AI agents, not humans. The user operates through Notion's UI; agents operate through MCP. This separation means:
 
 - **Agents query**: `lifeos query --db trajectory --entry-type quarterly-goal --status active`
 - **Agents link**: `lifeos link --from "Q3 Goal" --to "Migrate to Rust" --relation parent`
@@ -229,7 +229,7 @@ lifeos-ops/
 │       │   ├── yaml_schemas.rs    # 3-tier YAML schema validator
 │       │   ├── id_resolver.rs     # Fuzzy title → page ID
 │       │   └── date_filter.rs     # Date-range filter construction
-│       ├── tools/            # 29 MCP/CLI tools (mod.rs = registry)
+│       ├── tools/            # 31 MCP/CLI tools (mod.rs = registry)
 │       ├── transform/        # Notion blocks ↔ markdown
 │       ├── sync/             # Bidirectional Notion ↔ vault
 │       ├── vault/            # Local markdown vault index
