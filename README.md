@@ -7,6 +7,7 @@
 > amplification cycle through 5 databases across 3 functional layers.
 
 [![Release](https://img.shields.io/github/v/release/ishan-parihar/lifeos-ops)](https://github.com/ishan-parihar/lifeos-ops/releases/latest)
+![LOC](https://img.shields.io/badge/LOC-17.6K-informational?style=flat-square)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org/)
 
@@ -310,3 +311,14 @@ LifeOS targets **Notion API version `2025-09-03`**, which uses the **data source
 ## License
 
 MIT — Developed by [Ishan Parihar](https://github.com/ishan-parihar)
+
+---
+
+## ☕ Support & Sponsorship
+
+If you find this project useful, consider supporting ongoing development:
+
+[![Sponsor](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-ea4aaa?style=flat-square&logo=github)](https://github.com/sponsors/ishan-parihar)
+[![Donate](https://img.shields.io/badge/Donate-Razorpay-3395FF?style=flat-square)](https://rzp.io/rzp/ishan-parihar)
+
+Your support funds new features, releases, and infrastructure for the whole ecosystem.
