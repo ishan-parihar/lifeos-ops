@@ -8,6 +8,8 @@
 
 [![Release](https://img.shields.io/github/v/release/ishan-parihar/lifeos-ops)](https://github.com/ishan-parihar/lifeos-ops/releases/latest)
 ![LOC](https://img.shields.io/badge/LOC-17.6K-informational?style=flat-square)
+[![CI](https://github.com/ishan-parihar/lifeos-ops/actions/workflows/release.yml/badge.svg)](https://github.com/ishan-parihar/lifeos-ops/actions/workflows/release.yml)
+![Status](https://img.shields.io/badge/Status-Active-brightgreen)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org/)
 
