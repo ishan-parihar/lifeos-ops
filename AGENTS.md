@@ -455,7 +455,7 @@ ntn pages get <page-id>                               # Get a page as markdown
 
 ### "I need to add a new MCP tool"
 1. **YAGNI check first** — can an AI agent compose this from `query` + `mutate` + `link` + `ancestors` in ≤3 calls? If yes, don't add the tool.
-2. Create `lifeos-core/src/tools/my_tool.rs` with:
+2. Create a new module in `lifeos-core/src/tools/` with:
    - `pub struct MyToolParams { ... }` (derive `Deserialize`)
    - `pub fn schema() -> serde_json::Value { ... }`
    - `pub async fn execute(params, config, notion, schema_cache) -> Result<String, String>`
