@@ -57,3 +57,4 @@ logs/
 # tool-state (never commit)
 .cortexkit/
 .contexty/
+.claude/
