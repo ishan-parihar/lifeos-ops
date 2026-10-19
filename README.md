@@ -176,7 +176,7 @@ LifeOS runs as an MCP server for AI agent integration (Claude Desktop, Cursor, e
 lifeos mcp
 ```
 
-**31 MCP tools** available — see [ONTOLOGY.md](ONTOLOGY.md) for the full architecture map.
+**31 MCP tools** available — see [ONTOLOGY.md](docs/ONTOLOGY.md) for the full architecture map.
 
 ## MCP Integration for AI Agents
 
@@ -299,7 +299,7 @@ This ensures compatibility with Notion's latest API changes and future-proofs ag
 
 ## Documentation
 
-- [ONTOLOGY.md](ONTOLOGY.md) — Architectural foundation (the 3 layers, 3 flows, 1 cycle)
+- [ONTOLOGY.md](docs/ONTOLOGY.md) — Architectural foundation (the 3 layers, 3 flows, 1 cycle)
 - [AGENTS.md](AGENTS.md) — AI agent development protocol
 - [schemas/](schemas/) — YAML schema hierarchy reference
 

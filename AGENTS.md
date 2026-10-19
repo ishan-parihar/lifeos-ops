@@ -59,7 +59,7 @@ Trajectory → Logbook → Synthesis → Profile → Trajectory
   (pull)      (capture)  (process)   (condense) (feedback)
 ```
 
-Read [ONTOLOGY.md](ONTOLOGY.md) for the distilled architectural foundation.
+Read [ONTOLOGY.md](docs/ONTOLOGY.md) for the distilled architectural foundation.
 Read [architecture/legacy_mapping/FORMAL_SPEC_v4.1.md](architecture/legacy_mapping/FORMAL_SPEC_v4.1.md)
 for the machine-readable DB schema spec.
 
