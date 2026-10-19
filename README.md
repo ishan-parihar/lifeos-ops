@@ -1,27 +1,22 @@
 # LifeOS
 
+
+
+Every document in `docs/` is listed with the question it answers in [docs/PAGE-INDEX.md](docs/PAGE-INDEX.md).
 <!-- T2I HERO SPEC — Subject: a life operating system — a Notion database vault (5 databases, 3 layers) on the left feeding a Rust CLI + MCP hub (center) that runs one amplification cycle toward an ideal-future; goal trajectories and habit loops drawn as causal chains. Composition: left-to-right causal flow, cycle ring. Palette: deep indigo #1e1b4b → life teal #2dd4bf → goal gold #f59e0b. Style: dark flat vector, glowing causal chains, no text. 16:9. -->
 
 > A consciousness-prosthetic built as a Rust CLI + MCP server on top of Notion.
-> Shapes the causal chain of your life toward an ideal-future by running one
-> amplification cycle through 5 databases across 3 functional layers.
+> Shapes the causal chain of your life toward an ideal-future by running one > amplification cycle through 5 databases across 3 functional layers.
 
-[![Release](https://img.shields.io/github/v/release/ishan-parihar/lifeos-ops)](https://github.com/ishan-parihar/lifeos-ops/releases/latest)
-![LOC](https://img.shields.io/badge/LOC-17.6K-informational?style=flat-square)
-[![CI](https://github.com/ishan-parihar/lifeos-ops/actions/workflows/release.yml/badge.svg)](https://github.com/ishan-parihar/lifeos-ops/actions/workflows/release.yml)
-![Status](https://img.shields.io/badge/Status-Active-brightgreen)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org/)
-
----
+[![Release](https://img.shields.io/github/v/release/ishan-parihar/lifeos-ops)](https://github.com/ishan-parihar/lifeos-ops/releases/latest) ![LOC](https://img.shields.io/badge/LOC-17.6K-informational?style=flat-square) [![CI](https://github.com/ishan-parihar/lifeos-ops/actions/workflows/release.yml/badge.svg)](https://github.com/ishan-parihar/lifeos-ops/actions/workflows/release.yml) ![Status](https://img.shields.io/badge/Status-Active-brightgreen)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org/) ---
 
 ## What is LifeOS?
 
 Every entry — a task, a note, a person, a goal — finds its place in one of 5 Notion databases organized across 3 functional layers. The cycle is the unit of health:
 
 ```
-Trajectory → Logbook → Synthesis → Profile → Trajectory
-  (pull)      (capture)  (process)   (condense) (feedback)
+Trajectory → Logbook → Synthesis → Profile → Trajectory (pull)      (capture)  (process)   (condense) (feedback)
 ```
 
 **4 hops.** Tighter feedback = faster amplification.
@@ -39,29 +34,12 @@ Trajectory → Logbook → Synthesis → Profile → Trajectory
 ## The 3 Functional Layers
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  Layer A — Teleological Pull (Trajectory DB)        │
-│                                                     │
-│  Purpose → Value → Vision-Statement                 │
-│    → Annual-Goal → Quarterly-Goal                   │
-│    → Project → Task                                 │
-└──────────────────────┬──────────────────────────────┘
-                       │ Pull (downward)
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  Layer B — Historical Record                        │
-│                                                     │
-│  Logbook ──── Ground ───▶ Synthesis ───▶ Profile    │
-│  (capture)               (process)         (mirror) │
-└──────────────────────┬──────────────────────────────┘
-                       │ Feedback (loop)
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  Layer C — Action Interface (Context DB)            │
-│                                                     │
-│  People / Communities / Orgs /                      │
-│  Financial-Accounts / Places                        │
-└─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐ │  Layer A — Teleological Pull (Trajectory DB)        │ │                                                     │ │  Purpose → Value → Vision-Statement                 │
+│    → Annual-Goal → Quarterly-Goal                   │ │    → Project → Task                                 │ └──────────────────────┬──────────────────────────────┘ │ Pull (downward)
+                       ▼ ┌─────────────────────────────────────────────────────┐ │  Layer B — Historical Record                        │ │                                                     │
+│  Logbook ──── Ground ───▶ Synthesis ───▶ Profile    │ │  (capture)               (process)         (mirror) │ └──────────────────────┬──────────────────────────────┘ │ Feedback (loop)
+                       ▼ ┌─────────────────────────────────────────────────────┐ │  Layer C — Action Interface (Context DB)            │ │                                                     │
+│  People / Communities / Orgs /                      │ │  Financial-Accounts / Places                        │ └─────────────────────────────────────────────────────┘
 ```
 
 ## The 3 Flows
@@ -83,29 +61,19 @@ curl -fsSL https://raw.githubusercontent.com/ishan-parihar/lifeos-ops/main/insta
 ### Manual install from releases
 
 ```bash
-curl -fsSL -o /tmp/lifeos.tar.gz https://github.com/ishan-parihar/lifeos-ops/releases/latest/download/lifeos-x86_64-unknown-linux-gnu.tar.gz
-tar xzf /tmp/lifeos.tar.gz -C /tmp
-sudo install /tmp/lifeos-x86_64-unknown-linux-gnu /usr/local/bin/lifeos
-lifeos --version
+curl -fsSL -o /tmp/lifeos.tar.gz https://github.com/ishan-parihar/lifeos-ops/releases/latest/download/lifeos-x86_64-unknown-linux-gnu.tar.gz tar xzf /tmp/lifeos.tar.gz -C /tmp sudo install /tmp/lifeos-x86_64-unknown-linux-gnu /usr/local/bin/lifeos lifeos --version
 ```
 
 ### Build from source
 
 ```bash
-git clone https://github.com/ishan-parihar/lifeos-ops.git
-cd lifeos-ops
-cargo build --release
-sudo install target/release/lifeos /usr/local/bin/
+git clone https://github.com/ishan-parihar/lifeos-ops.git cd lifeos-ops cargo build --release sudo install target/release/lifeos /usr/local/bin/
 ```
 
 ## Quick Start
 
 ```bash
-export NOTION_API_TOKEN=ntn_xxx
-
-lifeos discover          # Resolve your 5 DBs
-lifeos dashboard         # Overview: orphans, gaps, health
-lifeos daily             # Daily review
+export NOTION_API_TOKEN=ntn_xxx lifeos discover          # Resolve your 5 DBs lifeos dashboard         # Overview: orphans, gaps, health lifeos daily             # Daily review
 lifeos morning           # Active goals + today's tasks + recent logs
 ```
 
@@ -176,78 +144,42 @@ LifeOS runs as an MCP server for AI agent integration (Claude Desktop, Cursor, e
 lifeos mcp
 ```
 
-**31 MCP tools** available — see [ONTOLOGY.md](docs/ONTOLOGY.md) for the full architecture map.
 
 ## MCP Integration for AI Agents
 
 LifeOS runs as a full MCP server, giving AI agents native access to your life-data:
 
 ```json
-{
-  "mcpServers": {
-    "lifeos": {
-      "command": "lifeos",
-      "args": ["mcp"]
-    }
-  }
-}
+{ "mcpServers": { "lifeos": { "command": "lifeos",
+      "args": ["mcp"] } } }
 ```
 
 ### Agent-Native Design
 
 The 31 tools are built for AI agents, not humans. The user operates through Notion's UI; agents operate through MCP. This separation means:
 
-- **Agents query**: `lifeos query --db trajectory --entry-type quarterly-goal --status active`
-- **Agents link**: `lifeos link --from "Q3 Goal" --to "Migrate to Rust" --relation parent`
-- **Agents discover gaps**: `lifeos orphans` surfaces entries with zero relations
-- **Agents review**: `lifeos review --period weekly` pulls synthesis-ready logs
+- **Agents query**: `lifeos query --db trajectory --entry-type quarterly-goal --status active` - **Agents link**: `lifeos link --from "Q3 Goal" --to "Migrate to Rust" --relation parent` - **Agents discover gaps**: `lifeos orphans` surfaces entries with zero relations - **Agents review**: `lifeos review --period weekly` pulls synthesis-ready logs
 - **Agents check health**: `lifeos cycle-health` verifies the amplification cycle is flowing
 
 ### The Amplification Cycle
 
 ```
-Trajectory (Pull) --> Logbook (Capture) --> Synthesis (Process) --> Profile (Mirror)
-  Purpose               Activity                Note                 Trait
-  Vision                Diet                   Opportunity           Metric
-  Annual-Goal           Financial               Strength              Capacity
-  Project               Subjective              Directive             Asset
-  Task                  Relational              Risk
-                        Systemic
+Trajectory (Pull) --> Logbook (Capture) --> Synthesis (Process) --> Profile (Mirror) Purpose               Activity                Note                 Trait Vision                Diet                   Opportunity           Metric Annual-Goal           Financial               Strength              Capacity
+  Project               Subjective              Directive             Asset Task                  Relational              Risk Systemic
                                                     |
-                                                    v
-                              Feedback Loop: Profile + Synthesis --> Trajectory
-                              (The cycle completes when insights reshape goals)
+                                                    v Feedback Loop: Profile + Synthesis --> Trajectory (The cycle completes when insights reshape goals)
 ```
 
 ## Architecture
 
 ```
-lifeos-ops/
-├── lifeos-core/              # Shared library
-│   └── src/
-│       ├── notion/           # Notion API client (v2025-09-03)
-│       ├── config.rs         # LifeOSConfig, DbConfig
-│       ├── util/
-│       │   ├── schema_engine.rs   # Auto-discovering schema cache
-│       │   ├── yaml_schemas.rs    # 3-tier YAML schema validator
-│       │   ├── id_resolver.rs     # Fuzzy title → page ID
-│       │   └── date_filter.rs     # Date-range filter construction
-│       ├── tools/            # 31 MCP/CLI tools (mod.rs = registry)
-│       ├── transform/        # Notion blocks ↔ markdown
-│       ├── sync/             # Bidirectional Notion ↔ vault
-│       ├── vault/            # Local markdown vault index
-│       └── server.rs         # MCP JSON-RPC server
-├── lifeos/                   # Binary crate (CLI + MCP runner)
-├── schemas/                  # 3-tier YAML schema hierarchy
-│   ├── universal/            # Properties + validation rules
-│   ├── per_db/               # Per-DB relations + entry-types
-│   └── per_entry_type/       # Per-entry-type specializations
-├── skill/                    # Bundled AI-agent skills
-│   ├── notion-cli/           # Notion CLI (ntn) reference
-│   └── workspace-lint/       # Directory structure validator
-├── ONTOLOGY.md               # Architectural foundation
-├── AGENTS.md                 # AI agent development protocol
-└── lifeos.config.default.json
+lifeos-ops/ ├── lifeos-core/              # Shared library │   └── src/ │       ├── notion/           # Notion API client (v2025-09-03)
+│       ├── config.rs         # LifeOSConfig, DbConfig │       ├── util/ │       │   ├── schema_engine.rs   # Auto-discovering schema cache │       │   ├── yaml_schemas.rs    # 3-tier YAML schema validator
+│       │   ├── id_resolver.rs     # Fuzzy title → page ID │       │   └── date_filter.rs     # Date-range filter construction │       ├── tools/            # 31 MCP/CLI tools (mod.rs = registry) │       ├── transform/        # Notion blocks ↔ markdown
+│       ├── sync/             # Bidirectional Notion ↔ vault │       ├── vault/            # Local markdown vault index │       └── server.rs         # MCP JSON-RPC server ├── lifeos/                   # Binary crate (CLI + MCP runner)
+├── schemas/                  # 3-tier YAML schema hierarchy │   ├── universal/            # Properties + validation rules │   ├── per_db/               # Per-DB relations + entry-types │   └── per_entry_type/       # Per-entry-type specializations
+├── skill/                    # Bundled AI-agent skills │   ├── notion-cli/           # Notion CLI (ntn) reference │   └── workspace-lint/       # Directory structure validator ├── ONTOLOGY.md               # Architectural foundation
+├── AGENTS.md                 # AI agent development protocol └── lifeos.config.default.json
 ```
 
 
@@ -266,10 +198,7 @@ lifeos-ops/
 The amplification cycle is the unit of health. If any link is broken, the cycle stalls:
 
 ```
-Trajectory --> Logbook     (Are you logging against active goals?)
-Logbook --> Synthesis      (Are you processing logs into insights?)
-Synthesis --> Profile      (Are insights accumulated into identity?)
-Profile --> Trajectory     (Is identity feeding back into goal revision?)
+Trajectory --> Logbook     (Are you logging against active goals?) Logbook --> Synthesis      (Are you processing logs into insights?) Synthesis --> Profile      (Are insights accumulated into identity?) Profile --> Trajectory     (Is identity feeding back into goal revision?)
 ```
 
 Check with:
@@ -282,11 +211,7 @@ Output shows which links are active and which are stalled, with specific suggest
 ## Notion API Version
 
 LifeOS targets Notion API version `2025-09-03`, which uses the data source abstraction:
-- Properties live on the data source (not the database container)
-- `PATCH /v1/data_sources/{id}` is used for property mutations
-- Relation configs use `data_source_id` (not `database_id`)
-
-This ensures compatibility with Notion's latest API changes and future-proofs against breaking changes.
+- Properties live on the data source (not the database container) - `PATCH /v1/data_sources/{id}` is used for property mutations - Relation configs use `data_source_id` (not `database_id`) This ensures compatibility with Notion's latest API changes and future-proofs against breaking changes.
 
 ## Design Principles
 
@@ -299,28 +224,19 @@ This ensures compatibility with Notion's latest API changes and future-proofs ag
 
 ## Documentation
 
-- [ONTOLOGY.md](docs/ONTOLOGY.md) — Architectural foundation (the 3 layers, 3 flows, 1 cycle)
-- [AGENTS.md](AGENTS.md) — AI agent development protocol
-- [schemas/](schemas/) — YAML schema hierarchy reference
+- [ONTOLOGY.md](docs/ONTOLOGY.md) — Architectural foundation (the 3 layers, 3 flows, 1 cycle) - [AGENTS.md](AGENTS.md) — AI agent development protocol - [schemas/](schemas/) — YAML schema hierarchy reference
 
 ## Notion API Version
 
 LifeOS targets **Notion API version `2025-09-03`**, which uses the **data source** abstraction:
-- Properties live on the **data source** (not the database container)
-- `PATCH /v1/data_sources/{id}` is used for property mutations
-- Relation configs use `data_source_id` (not `database_id`)
+- Properties live on the **data source** (not the database container) - `PATCH /v1/data_sources/{id}` is used for property mutations - Relation configs use `data_source_id` (not `database_id`)
 
 ## License
 
-MIT — Developed by [Ishan Parihar](https://github.com/ishan-parihar)
-
----
+MIT — Developed by [Ishan Parihar](https://github.com/ishan-parihar) ---
 
 ## ☕ Support & Sponsorship
 
 If you find this project useful, consider supporting ongoing development:
 
-[![Sponsor](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-ea4aaa?style=flat-square&logo=github)](https://github.com/sponsors/ishan-parihar)
-[![Donate](https://img.shields.io/badge/Donate-Razorpay-3395FF?style=flat-square)](https://rzp.io/rzp/ishan-parihar)
-
-Your support funds new features, releases, and infrastructure for the whole ecosystem.
+[![Sponsor](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-ea4aaa?style=flat-square&logo=github)](https://github.com/sponsors/ishan-parihar) [![Donate](https://img.shields.io/badge/Donate-Razorpay-3395FF?style=flat-square)](https://rzp.io/rzp/ishan-parihar) Your support funds new features, releases, and infrastructure for the whole ecosystem.
