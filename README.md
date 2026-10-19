@@ -16,7 +16,8 @@ Every document in `docs/` is listed with the question it answers in [docs/PAGE-I
 Every entry — a task, a note, a person, a goal — finds its place in one of 5 Notion databases organized across 3 functional layers. The cycle is the unit of health:
 
 ```
-Trajectory → Logbook → Synthesis → Profile → Trajectory (pull)      (capture)  (process)   (condense) (feedback)
+Trajectory → Logbook → Synthesis → Profile → Trajectory
+  (pull)      (capture)  (process)   (condense) (feedback)
 ```
 
 **4 hops.** Tighter feedback = faster amplification.
@@ -34,12 +35,29 @@ Trajectory → Logbook → Synthesis → Profile → Trajectory (pull)      (cap
 ## The 3 Functional Layers
 
 ```
-┌─────────────────────────────────────────────────────┐ │  Layer A — Teleological Pull (Trajectory DB)        │ │                                                     │ │  Purpose → Value → Vision-Statement                 │
-│    → Annual-Goal → Quarterly-Goal                   │ │    → Project → Task                                 │ └──────────────────────┬──────────────────────────────┘ │ Pull (downward)
-                       ▼ ┌─────────────────────────────────────────────────────┐ │  Layer B — Historical Record                        │ │                                                     │
-│  Logbook ──── Ground ───▶ Synthesis ───▶ Profile    │ │  (capture)               (process)         (mirror) │ └──────────────────────┬──────────────────────────────┘ │ Feedback (loop)
-                       ▼ ┌─────────────────────────────────────────────────────┐ │  Layer C — Action Interface (Context DB)            │ │                                                     │
-│  People / Communities / Orgs /                      │ │  Financial-Accounts / Places                        │ └─────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│  Layer A — Teleological Pull (Trajectory DB)        │
+│                                                     │
+│  Purpose → Value → Vision-Statement                 │
+│    → Annual-Goal → Quarterly-Goal                   │
+│    → Project → Task                                 │
+└──────────────────────┬──────────────────────────────┘
+                       │ Pull (downward)
+                       ▼
+┌─────────────────────────────────────────────────────┐
+│  Layer B — Historical Record                        │
+│                                                     │
+│  Logbook ──── Ground ───▶ Synthesis ───▶ Profile    │
+│  (capture)               (process)         (mirror) │
+└──────────────────────┬──────────────────────────────┘
+                       │ Feedback (loop)
+                       ▼
+┌─────────────────────────────────────────────────────┐
+│  Layer C — Action Interface (Context DB)            │
+│                                                     │
+│  People / Communities / Orgs /                      │
+│  Financial-Accounts / Places                        │
+└─────────────────────────────────────────────────────┘
 ```
 
 ## The 3 Flows
@@ -61,19 +79,29 @@ curl -fsSL https://raw.githubusercontent.com/ishan-parihar/lifeos-ops/main/insta
 ### Manual install from releases
 
 ```bash
-curl -fsSL -o /tmp/lifeos.tar.gz https://github.com/ishan-parihar/lifeos-ops/releases/latest/download/lifeos-x86_64-unknown-linux-gnu.tar.gz tar xzf /tmp/lifeos.tar.gz -C /tmp sudo install /tmp/lifeos-x86_64-unknown-linux-gnu /usr/local/bin/lifeos lifeos --version
+curl -fsSL -o /tmp/lifeos.tar.gz https://github.com/ishan-parihar/lifeos-ops/releases/latest/download/lifeos-x86_64-unknown-linux-gnu.tar.gz
+tar xzf /tmp/lifeos.tar.gz -C /tmp
+sudo install /tmp/lifeos-x86_64-unknown-linux-gnu /usr/local/bin/lifeos
+lifeos --version
 ```
 
 ### Build from source
 
 ```bash
-git clone https://github.com/ishan-parihar/lifeos-ops.git cd lifeos-ops cargo build --release sudo install target/release/lifeos /usr/local/bin/
+git clone https://github.com/ishan-parihar/lifeos-ops.git
+cd lifeos-ops
+cargo build --release
+sudo install target/release/lifeos /usr/local/bin/
 ```
 
 ## Quick Start
 
 ```bash
-export NOTION_API_TOKEN=ntn_xxx lifeos discover          # Resolve your 5 DBs lifeos dashboard         # Overview: orphans, gaps, health lifeos daily             # Daily review
+export NOTION_API_TOKEN=ntn_xxx
+
+lifeos discover          # Resolve your 5 DBs
+lifeos dashboard         # Overview: orphans, gaps, health
+lifeos daily             # Daily review
 lifeos morning           # Active goals + today's tasks + recent logs
 ```
 
@@ -150,8 +178,14 @@ lifeos mcp
 LifeOS runs as a full MCP server, giving AI agents native access to your life-data:
 
 ```json
-{ "mcpServers": { "lifeos": { "command": "lifeos",
-      "args": ["mcp"] } } }
+{
+  "mcpServers": {
+    "lifeos": {
+      "command": "lifeos",
+      "args": ["mcp"]
+    }
+  }
+}
 ```
 
 ### Agent-Native Design
@@ -164,22 +198,48 @@ The 31 tools are built for AI agents, not humans. The user operates through Noti
 ### The Amplification Cycle
 
 ```
-Trajectory (Pull) --> Logbook (Capture) --> Synthesis (Process) --> Profile (Mirror) Purpose               Activity                Note                 Trait Vision                Diet                   Opportunity           Metric Annual-Goal           Financial               Strength              Capacity
-  Project               Subjective              Directive             Asset Task                  Relational              Risk Systemic
+Trajectory (Pull) --> Logbook (Capture) --> Synthesis (Process) --> Profile (Mirror)
+  Purpose               Activity                Note                 Trait
+  Vision                Diet                   Opportunity           Metric
+  Annual-Goal           Financial               Strength              Capacity
+  Project               Subjective              Directive             Asset
+  Task                  Relational              Risk
+                        Systemic
                                                     |
-                                                    v Feedback Loop: Profile + Synthesis --> Trajectory (The cycle completes when insights reshape goals)
+                                                    v
+                              Feedback Loop: Profile + Synthesis --> Trajectory
+                              (The cycle completes when insights reshape goals)
 ```
 
 ## Architecture
 
 ```
-lifeos-ops/ ├── lifeos-core/              # Shared library │   └── src/ │       ├── notion/           # Notion API client (v2025-09-03)
-│       ├── config.rs         # LifeOSConfig, DbConfig │       ├── util/ │       │   ├── schema_engine.rs   # Auto-discovering schema cache │       │   ├── yaml_schemas.rs    # 3-tier YAML schema validator
-│       │   ├── id_resolver.rs     # Fuzzy title → page ID │       │   └── date_filter.rs     # Date-range filter construction │       ├── tools/            # 31 MCP/CLI tools (mod.rs = registry) │       ├── transform/        # Notion blocks ↔ markdown
-│       ├── sync/             # Bidirectional Notion ↔ vault │       ├── vault/            # Local markdown vault index │       └── server.rs         # MCP JSON-RPC server ├── lifeos/                   # Binary crate (CLI + MCP runner)
-├── schemas/                  # 3-tier YAML schema hierarchy │   ├── universal/            # Properties + validation rules │   ├── per_db/               # Per-DB relations + entry-types │   └── per_entry_type/       # Per-entry-type specializations
-├── skill/                    # Bundled AI-agent skills │   ├── notion-cli/           # Notion CLI (ntn) reference │   └── workspace-lint/       # Directory structure validator ├── ONTOLOGY.md               # Architectural foundation
-├── AGENTS.md                 # AI agent development protocol └── lifeos.config.default.json
+lifeos-ops/
+├── lifeos-core/              # Shared library
+│   └── src/
+│       ├── notion/           # Notion API client (v2025-09-03)
+│       ├── config.rs         # LifeOSConfig, DbConfig
+│       ├── util/
+│       │   ├── schema_engine.rs   # Auto-discovering schema cache
+│       │   ├── yaml_schemas.rs    # 3-tier YAML schema validator
+│       │   ├── id_resolver.rs     # Fuzzy title → page ID
+│       │   └── date_filter.rs     # Date-range filter construction
+│       ├── tools/            # 31 MCP/CLI tools (mod.rs = registry)
+│       ├── transform/        # Notion blocks ↔ markdown
+│       ├── sync/             # Bidirectional Notion ↔ vault
+│       ├── vault/            # Local markdown vault index
+│       └── server.rs         # MCP JSON-RPC server
+├── lifeos/                   # Binary crate (CLI + MCP runner)
+├── schemas/                  # 3-tier YAML schema hierarchy
+│   ├── universal/            # Properties + validation rules
+│   ├── per_db/               # Per-DB relations + entry-types
+│   └── per_entry_type/       # Per-entry-type specializations
+├── skill/                    # Bundled AI-agent skills
+│   ├── notion-cli/           # Notion CLI (ntn) reference
+│   └── workspace-lint/       # Directory structure validator
+├── ONTOLOGY.md               # Architectural foundation
+├── AGENTS.md                 # AI agent development protocol
+└── lifeos.config.default.json
 ```
 
 
@@ -198,7 +258,10 @@ lifeos-ops/ ├── lifeos-core/              # Shared library │   └──
 The amplification cycle is the unit of health. If any link is broken, the cycle stalls:
 
 ```
-Trajectory --> Logbook     (Are you logging against active goals?) Logbook --> Synthesis      (Are you processing logs into insights?) Synthesis --> Profile      (Are insights accumulated into identity?) Profile --> Trajectory     (Is identity feeding back into goal revision?)
+Trajectory --> Logbook     (Are you logging against active goals?)
+Logbook --> Synthesis      (Are you processing logs into insights?)
+Synthesis --> Profile      (Are insights accumulated into identity?)
+Profile --> Trajectory     (Is identity feeding back into goal revision?)
 ```
 
 Check with:
